@@ -74,7 +74,7 @@ async fn poll_station(config: DataloggerConfig, pool: PgPool, status: SharedPoll
     }
 }
 
-async fn poll_one_table(
+pub async fn poll_one_table(
     client: &Cr300Client,
     pool: &PgPool,
     station_id: &str,

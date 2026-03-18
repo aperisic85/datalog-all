@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getObject,
   getLatestMeasurement,
@@ -8,6 +8,7 @@ import {
   getMeasurements1h,
   getAlarms,
   getEventLogs,
+  pollObject,
 } from '../api/endpoints';
 import {
   LineChart,
@@ -30,6 +31,7 @@ import {
   MapPin,
   Radio,
   Sun,
+  RefreshCw,
 } from 'lucide-react';
 import './ObjectDetailPage.css';
 
@@ -96,8 +98,11 @@ const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
 
 export default function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('overview');
   const [range, setRange] = useState<Range>('24h');
+  const [polling, setPolling] = useState(false);
+  const [pollResult, setPollResult] = useState<string | null>(null);
 
   const { data: obj, isLoading: loadingObj } = useQuery({
     queryKey: ['object', id],
@@ -141,6 +146,28 @@ export default function ObjectDetailPage() {
     queryFn: () => getEventLogs(id!, { limit: 100 }),
     enabled: !!id && tab === 'events',
   });
+
+  const handlePoll = async () => {
+    if (!id) return;
+    setPolling(true);
+    setPollResult(null);
+    try {
+      const res = await pollObject(id);
+      const total = res.results.reduce((s, r) => s + (r.records ?? 0), 0);
+      const errors = res.results.filter((r) => r.error);
+      if (errors.length > 0) {
+        setPollResult(`Greška: ${errors.map((e) => e.error).join(', ')}`);
+      } else {
+        setPollResult(`Dohvaćeno ${total} novih zapisa`);
+        qc.invalidateQueries({ queryKey: ['latest', id] });
+        qc.invalidateQueries({ queryKey: ['measurements-10min', id] });
+      }
+    } catch {
+      setPollResult('Greška — datalogger nije dostupan');
+    } finally {
+      setPolling(false);
+    }
+  };
 
   if (loadingObj) return <div className="page-spinner"><div className="spinner" /></div>;
   if (!obj) return <div className="error-msg">Objekt nije pronađen</div>;
@@ -219,9 +246,22 @@ export default function ObjectDetailPage() {
             <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg} />
           </div>
 
-          {latest?.recorded_at && (
-            <div className="last-update">
-              Zadnje mjerenje: {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
+          <div className="poll-row">
+            {latest?.recorded_at && (
+              <span className="last-update">
+                Zadnje mjerenje: {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
+              </span>
+            )}
+            {obj.datalogger_url && (
+              <button className="btn-secondary poll-btn" onClick={handlePoll} disabled={polling}>
+                <RefreshCw size={14} className={polling ? 'spin' : ''} />
+                {polling ? 'Dohvaćam...' : 'Dohvati podatke'}
+              </button>
+            )}
+          </div>
+          {pollResult && (
+            <div className={`poll-result ${pollResult.startsWith('Greška') ? 'error-msg' : 'success-msg'}`}>
+              {pollResult}
             </div>
           )}
 

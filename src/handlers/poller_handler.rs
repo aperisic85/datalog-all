@@ -1,4 +1,4 @@
-use axum::{extract::State, Extension, Json};
+use axum::{extract::{Path, State}, Extension, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -6,7 +6,51 @@ use uuid::Uuid;
 use crate::db::domain as db;
 use crate::errors::{AppError, AppResult};
 use crate::models::domain::JwtClaims;
-use crate::poller::{client::Cr300Client, client::DataloggerConfig, SharedPollerStatus};
+use crate::poller::{self, client::{Cr300Client, DataloggerConfig, PollState, TableConfig}, SharedPollerStatus};
+
+/// POST /api/v1/objects/:id/poll
+/// Ručno pokreni poll za jedan objekt (dohvati zadnje podatke odmah)
+pub async fn poll_object_now(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<serde_json::Value>> {
+    let _uid = Uuid::parse_str(&claims.sub).map_err(|_| AppError::Unauthorized)?;
+
+    let obj = db::get_object_by_id(&pool, id).await?
+        .ok_or_else(|| AppError::NotFound(format!("Object {}", id)))?;
+
+    let url = obj.datalogger_url.clone()
+        .ok_or_else(|| AppError::BadRequest("Objekt nema konfiguriran datalogger URL".into()))?;
+
+    let tables = vec![
+        TableConfig { name: "Measurements_10min".into(), initial_records: 5 },
+        TableConfig { name: "Alarms_10min".into(),       initial_records: 5 },
+        TableConfig { name: "Event_log".into(),           initial_records: 10 },
+    ];
+
+    let config = DataloggerConfig {
+        name:              obj.station_id.clone(),
+        url,
+        username:          Some("anonymous".to_string()),
+        password:          None,
+        poll_interval_sec: 0,
+        tables:            tables.clone(),
+    };
+
+    let client = Cr300Client::new(config).map_err(|e| AppError::Internal(e))?;
+
+    let mut results = vec![];
+    for table_cfg in &tables {
+        let mut state = PollState::default();
+        match poller::poll_one_table(&client, &pool, &obj.station_id, table_cfg, &mut state).await {
+            Ok(n)  => results.push(serde_json::json!({ "table": table_cfg.name, "records": n })),
+            Err(e) => results.push(serde_json::json!({ "table": table_cfg.name, "error": e.to_string() })),
+        }
+    }
+
+    Ok(Json(serde_json::json!({ "station_id": obj.station_id, "results": results })))
+}
 
 /// GET /api/v1/poller/status
 pub async fn poller_status(
