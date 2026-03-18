@@ -121,6 +121,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/users/:uid/regions/:rid",     delete(handlers::domain::revoke_region_access))
         // Poller control
         .route("/api/v1/control/setvalue",            post(handlers::poller_handler::set_datalogger_value))
+        .route("/api/v1/objects/:id/poll",            post(handlers::poller_handler::poll_object_now))
         .layer(axum_middleware::from_fn_with_state(jwt_secret.clone(), middleware::jwt_middleware))
         .layer(axum::Extension(jwt_secret.clone()))
         .with_state(pool.clone());

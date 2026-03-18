@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { listObjects, listRegions } from '../api/endpoints';
-import { AlertTriangle, Search, ChevronLeft, ChevronRight, MapPin, Radio } from 'lucide-react';
+import { listObjects, listRegions, listStationTypes, createObject } from '../api/endpoints';
+import { useAuth } from '../context/AuthContext';
+import { AlertTriangle, Search, ChevronLeft, ChevronRight, MapPin, Radio, Plus, X } from 'lucide-react';
 import './ObjectsPage.css';
 
 function AlarmBadge({ active, count }: { active: boolean; count: number }) {
@@ -10,12 +11,154 @@ function AlarmBadge({ active, count }: { active: boolean; count: number }) {
   return <span className="badge badge-danger"><AlertTriangle size={11} />{count} alarm{count !== 1 ? 'a' : ''}</span>;
 }
 
+function CreateObjectModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    station_id: '', name: '', short_name: '', region_id: '',
+    station_type_id: '', datalogger_url: '', location_name: '',
+    latitude: '', longitude: '', poll_interval_sec: '60',
+    polling_enabled: false, description: '',
+  });
+
+  const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
+  const { data: types }   = useQuery({ queryKey: ['station-types'], queryFn: listStationTypes });
+
+  const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await createObject({
+        station_id:      form.station_id,
+        name:            form.name,
+        short_name:      form.short_name || undefined,
+        region_id:       form.region_id,
+        station_type_id: form.station_type_id ? Number(form.station_type_id) : undefined,
+        datalogger_url:  form.datalogger_url || undefined,
+        location_name:   form.location_name || undefined,
+        latitude:        form.latitude ? Number(form.latitude) : undefined,
+        longitude:       form.longitude ? Number(form.longitude) : undefined,
+        poll_interval_sec: Number(form.poll_interval_sec) || 60,
+        polling_enabled: form.polling_enabled,
+        description:     form.description || undefined,
+      });
+      qc.invalidateQueries({ queryKey: ['objects'] });
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Greška pri kreiranju objekta');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box card">
+        <div className="modal-header">
+          <h3>Novi objekt</h3>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          {error && <div className="error-msg">{error}</div>}
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>ID Stanice *</label>
+              <input value={form.station_id} onChange={(e) => set('station_id', e.target.value)} required placeholder="npr. Galija_01" />
+            </div>
+            <div className="form-group">
+              <label>Naziv *</label>
+              <input value={form.name} onChange={(e) => set('name', e.target.value)} required placeholder="Naziv objekta" />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Kratki naziv</label>
+              <input value={form.short_name} onChange={(e) => set('short_name', e.target.value)} placeholder="Skraćenica" />
+            </div>
+            <div className="form-group">
+              <label>Regija *</label>
+              <select value={form.region_id} onChange={(e) => set('region_id', e.target.value)} required>
+                <option value="">Odaberi regiju...</option>
+                {regions?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Tip stanice</label>
+              <select value={form.station_type_id} onChange={(e) => set('station_type_id', e.target.value)}>
+                <option value="">Bez tipa</option>
+                {types?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Lokacija</label>
+              <input value={form.location_name} onChange={(e) => set('location_name', e.target.value)} placeholder="Naziv lokacije" />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Latitude</label>
+              <input type="number" step="any" value={form.latitude} onChange={(e) => set('latitude', e.target.value)} placeholder="43.123456" />
+            </div>
+            <div className="form-group">
+              <label>Longitude</label>
+              <input type="number" step="any" value={form.longitude} onChange={(e) => set('longitude', e.target.value)} placeholder="16.123456" />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Datalogger URL</label>
+            <input value={form.datalogger_url} onChange={(e) => set('datalogger_url', e.target.value)} placeholder="http://192.168.1.100" />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Poll interval (s)</label>
+              <input type="number" value={form.poll_interval_sec} onChange={(e) => set('poll_interval_sec', e.target.value)} min={10} />
+            </div>
+            <div className="form-group" style={{ justifyContent: 'flex-end' }}>
+              <label className="filter-checkbox" style={{ marginTop: 24 }}>
+                <input type="checkbox" checked={form.polling_enabled} onChange={(e) => set('polling_enabled', e.target.checked)} style={{ width: 'auto' }} />
+                Polling uključen
+              </label>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Opis</label>
+            <input value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Opis objekta" />
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Odustani</button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Sprema...</> : 'Kreiraj objekt'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ObjectsPage() {
+  const { isAdmin } = useAuth();
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [alarmFilter, setAlarmFilter] = useState(false);
   const [page, setPage] = useState(1);
+  const [showCreate, setShowCreate] = useState(false);
   const PAGE_SIZE = 20;
 
   const { data, isLoading } = useQuery({
@@ -39,9 +182,18 @@ export default function ObjectsPage() {
 
   return (
     <div className="objects-page">
+      {showCreate && <CreateObjectModal onClose={() => setShowCreate(false)} />}
+
       <div className="page-header">
-        <h2>Objekti</h2>
-        <span className="text-muted">Prikaz stanica i datalogera</span>
+        <div>
+          <h2>Objekti</h2>
+          <span className="text-muted">Prikaz stanica i datalogera</span>
+        </div>
+        {isAdmin && (
+          <button className="btn-primary" onClick={() => setShowCreate(true)}>
+            <Plus size={15} /> Novi objekt
+          </button>
+        )}
       </div>
 
       <div className="objects-filters card">

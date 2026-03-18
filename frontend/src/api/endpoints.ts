@@ -75,6 +75,11 @@ export const updateObject = (id: string, data: Record<string, unknown>) =>
 export const deleteObject = (id: string) =>
   api.delete(`/api/v1/objects/${id}`);
 
+export const pollObject = (id: string) =>
+  api.post<{ station_id: string; results: { table: string; records?: number; error?: string }[] }>(
+    `/api/v1/objects/${id}/poll`
+  ).then((r) => r.data);
+
 // Measurements
 export const getMeasurements10min = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
   api.get<Measurement10min[]>(`/api/v1/objects/${id}/measurements/10min`, { params }).then((r) => r.data);
