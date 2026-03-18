@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM event_logs\n         WHERE object_id = $1\n           AND ($2::smallint IS NULL OR log_level >= $2)\n           AND ($3::timestamptz IS NULL OR recorded_at >= $3)\n           AND ($4::timestamptz IS NULL OR recorded_at <= $4)\n         ORDER BY recorded_at DESC LIMIT $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "object_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "station_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "recorded_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "received_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "log_level",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "log_message",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int2",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "049c87d0077f15605f21c21fa0a0403c3471dd27d967f123cd12ef3f1b660e55"
+}

@@ -54,12 +54,12 @@ pub async fn set_datalogger_value(
         return Err(AppError::Forbidden);
     }
 
-    let url = obj.datalogger_url.ok_or_else(|| AppError::BadRequest("Objekt nema konfiguriran datalogger URL".into()))?;
+    let url = obj.datalogger_url.clone().ok_or_else(|| AppError::BadRequest("Objekt nema konfiguriran datalogger URL".into()))?;
 
     let config = DataloggerConfig {
         name:              obj.name.clone(),
         url,
-        username:          obj.datalogger_url.clone().map(|_| "anonymous".to_string()),
+        username:          obj.datalogger_url.map(|_| "anonymous".to_string()),
         password:          None,
         poll_interval_sec: 0,
         tables:            vec![],

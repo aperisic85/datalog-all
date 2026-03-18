@@ -15,6 +15,10 @@ RUN cargo build --release 2>/dev/null || true
 # Build full app
 COPY src ./src
 COPY migrations ./migrations
+# .sqlx contains pre-generated query metadata from `cargo sqlx prepare`
+# allowing offline builds without a live DATABASE_URL
+COPY .sqlx ./.sqlx
+ENV SQLX_OFFLINE=true
 RUN touch src/main.rs && cargo build --release
 
 # ============================================================

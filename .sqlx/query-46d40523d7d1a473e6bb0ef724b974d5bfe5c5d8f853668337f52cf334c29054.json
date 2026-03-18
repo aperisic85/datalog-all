@@ -1,0 +1,175 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM measurements_10min\n         WHERE object_id = $1\n           AND ($2::timestamptz IS NULL OR recorded_at >= $2)\n           AND ($3::timestamptz IS NULL OR recorded_at <= $3)\n         ORDER BY recorded_at DESC LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "object_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "station_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "recorded_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "received_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "datalogger_temp_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 6,
+        "name": "battery_voltage_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 7,
+        "name": "battery_current_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 8,
+        "name": "battery_status_smp",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 9,
+        "name": "battery_status_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 10,
+        "name": "solar_voltage_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 11,
+        "name": "solar_daylight_smp",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 12,
+        "name": "solar_daylight_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 13,
+        "name": "modem_power_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 14,
+        "name": "internet_ok_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 15,
+        "name": "garmin_comm_ok_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 16,
+        "name": "garmin_satellites_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 17,
+        "name": "garmin_latitude_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 18,
+        "name": "garmin_longitude_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 19,
+        "name": "garmin_distance_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 20,
+        "name": "lantern_comm_ok_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 21,
+        "name": "lantern_light_active_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 22,
+        "name": "lantern_current_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 23,
+        "name": "lantern_latitude_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 24,
+        "name": "lantern_longitude_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 25,
+        "name": "lantern_distance_avg",
+        "type_info": "Float4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "46d40523d7d1a473e6bb0ef724b974d5bfe5c5d8f853668337f52cf334c29054"
+}

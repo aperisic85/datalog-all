@@ -1,0 +1,121 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM measurements_24h\n         WHERE object_id = $1\n           AND ($2::timestamptz IS NULL OR recorded_at >= $2)\n           AND ($3::timestamptz IS NULL OR recorded_at <= $3)\n         ORDER BY recorded_at DESC LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "object_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "station_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "recorded_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "received_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "datalogger_temp_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 6,
+        "name": "battery_voltage_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 7,
+        "name": "battery_current_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 8,
+        "name": "battery_current_min",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 9,
+        "name": "battery_current_max",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 10,
+        "name": "battery_charge_tot",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 11,
+        "name": "battery_discharge_tot",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 12,
+        "name": "battery_status_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 13,
+        "name": "solar_daylight_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 14,
+        "name": "modem_power_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 15,
+        "name": "lantern_light_active_avg",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 16,
+        "name": "lantern_current_avg",
+        "type_info": "Float4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f95c1429bb876da895247927fcf1918162414e17366cbd997b382704aaaa6077"
+}

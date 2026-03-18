@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO user_region_access (user_id, region_id, permission, granted_by)\n         VALUES ($1,$2,$3,$4)\n         ON CONFLICT (user_id, region_id) DO UPDATE SET\n             permission = EXCLUDED.permission, granted_by = EXCLUDED.granted_by, granted_at = NOW()\n         RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "region_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "permission",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "granted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "granted_by",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7a779ca0513e43716711308bad11c9330d267a80f008462f2c24b5479c6d173a"
+}

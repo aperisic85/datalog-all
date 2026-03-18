@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ura.id, ura.user_id, ura.region_id,\n                  r.name AS region_name, r.code AS region_code, r.color AS region_color,\n                  ura.permission, ura.granted_at\n           FROM user_region_access ura\n           JOIN regions r ON ura.region_id = r.id\n           WHERE ura.user_id = $1 ORDER BY r.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "region_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "region_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "region_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "region_color",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "permission",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "granted_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b67f27ae92f47bd86d0ee1a117464bb837cca1b9ae929cec5729dcb863d274f6"
+}

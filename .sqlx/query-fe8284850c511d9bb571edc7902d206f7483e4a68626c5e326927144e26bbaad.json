@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM v_region_summary ORDER BY region_name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "region_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "region_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "region_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "region_color",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "total_objects",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "active_objects",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "objects_in_alarm",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "worst_alarm_level",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
+        "name": "avg_battery_voltage",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "battery_flat_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "battery_low_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "lanterns_on_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "fe8284850c511d9bb571edc7902d206f7483e4a68626c5e326927144e26bbaad"
+}
