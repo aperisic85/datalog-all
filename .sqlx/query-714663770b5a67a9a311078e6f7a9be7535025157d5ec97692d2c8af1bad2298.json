@@ -1,0 +1,104 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO object_images (object_id, filename, original_name, mime_type,\n             file_size_bytes, storage_path, storage_url, is_primary, caption, taken_at, uploaded_by)\n         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "object_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "filename",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "original_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "mime_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "file_size_bytes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "storage_path",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "storage_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_primary",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "caption",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "taken_at",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 11,
+        "name": "uploaded_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
+        "name": "uploaded_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Date",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "714663770b5a67a9a311078e6f7a9be7535025157d5ec97692d2c8af1bad2298"
+}

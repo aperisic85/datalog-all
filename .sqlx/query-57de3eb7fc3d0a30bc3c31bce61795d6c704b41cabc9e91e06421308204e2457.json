@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE\n         ORDER BY recorded_at DESC LIMIT 50",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "object_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "station_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "recorded_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "received_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "alarm_datalogger_high_temp",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "alarm_datalogger_high_voltage",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 7,
+        "name": "alarm_datalogger_other_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
+        "name": "alarm_battery_voltage_low",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 9,
+        "name": "alarm_battery_voltage_flat",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 10,
+        "name": "alarm_battery_other_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 11,
+        "name": "alarm_garmin_comm_failed",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 12,
+        "name": "alarm_garmin_other_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 13,
+        "name": "alarm_station_out_of_radius",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 14,
+        "name": "alarm_lantern_night_light_off",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 15,
+        "name": "alarm_lantern_day_light_on",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 16,
+        "name": "alarm_lantern_comm_failed",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 17,
+        "name": "alarm_lantern_other_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 18,
+        "name": "alarm_modem_network_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 19,
+        "name": "alarm_modem_other_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 20,
+        "name": "alarm_station_other_error",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 21,
+        "name": "any_alarm_active",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "57de3eb7fc3d0a30bc3c31bce61795d6c704b41cabc9e91e06421308204e2457"
+}

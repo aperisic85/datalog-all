@@ -487,10 +487,10 @@ pub struct RefreshRequest {
 // ================================================================
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct RegionSummary {
-    pub region_id:           Uuid,
-    pub region_name:         String,
-    pub region_code:         String,
-    pub region_color:        String,
+    pub region_id:           Option<Uuid>,
+    pub region_name:         Option<String>,
+    pub region_code:         Option<String>,
+    pub region_color:        Option<String>,
     pub total_objects:       Option<i64>,
     pub active_objects:      Option<i64>,
     pub objects_in_alarm:    Option<i64>,
@@ -507,8 +507,8 @@ pub struct RegionSummary {
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct LatestMeasurement {
     pub object_id:               Option<Uuid>,
-    pub station_id:              String,
-    pub recorded_at:             DateTime<Utc>,
+    pub station_id:              Option<String>,
+    pub recorded_at:             Option<DateTime<Utc>>,
     pub datalogger_temp_avg:     Option<f32>,
     pub battery_voltage_avg:     Option<f32>,
     pub battery_current_avg:     Option<f32>,
