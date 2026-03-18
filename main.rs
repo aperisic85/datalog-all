@@ -1,0 +1,169 @@
+mod auth;
+mod db;
+mod errors;
+mod handlers;
+mod middleware;
+mod models;
+mod poller;
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use axum::{
+    middleware as axum_middleware,
+    routing::{delete, get, patch, post, put},
+    Router,
+};
+use sqlx::postgres::PgPoolOptions;
+use tokio::sync::RwLock;
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+use poller::{PollerStatus, SharedPollerStatus};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| "datalogger_backend=debug,tower_http=info,sqlx=warn".into()))
+        .with(tracing_subscriber::fmt::layer().with_target(true))
+        .init();
+
+    // ── Database ─────────────────────────────────────────────────────────
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+
+    tracing::info!("Connecting to PostgreSQL...");
+    let pool = PgPoolOptions::new()
+        .max_connections(10)
+        .min_connections(2)
+        .acquire_timeout(Duration::from_secs(10))
+        .connect(&database_url)
+        .await?;
+    tracing::info!("Database connected.");
+
+    tracing::info!("Running migrations...");
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    tracing::info!("Migrations complete.");
+
+    // ── JWT secret ────────────────────────────────────────────────────────
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "change-this-secret-in-production-minimum-32-chars".to_string());
+
+    // ── Poller ────────────────────────────────────────────────────────────
+    let poller_status: SharedPollerStatus = Arc::new(RwLock::new(PollerStatus::default()));
+    let poller_configs = poller::load_configs_from_env();
+    if poller_configs.is_empty() {
+        tracing::info!("No DATALOGGER_URL set — running in push-only mode");
+    } else {
+        tracing::info!("Starting {} poller(s)...", poller_configs.len());
+        poller::start_pollers(poller_configs, pool.clone(), poller_status.clone());
+    }
+
+    // ── CORS ──────────────────────────────────────────────────────────────
+    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
+
+    // ── Routes ────────────────────────────────────────────────────────────
+
+    // Push ingest (CR300 → backend) — API key auth
+    let push_routes = Router::new()
+        .route("/api/v1/datalogger/alarms",       post(handlers::ingest_alarms))
+        .route("/api/v1/datalogger/measurements",  post(handlers::ingest_measurements))
+        .route("/api/v1/datalogger/eventlogs",     post(handlers::ingest_event_logs))
+        .layer(axum_middleware::from_fn_with_state(pool.clone(), middleware::auth_middleware))
+        .with_state(pool.clone());
+
+    // Auth (login, refresh, logout — no JWT middleware)
+    let auth_routes = Router::new()
+        .route("/api/v1/auth/login",   post(handlers::domain::login))
+        .route("/api/v1/auth/refresh", post(handlers::domain::refresh_token))
+        .route("/api/v1/auth/logout",  post(handlers::domain::logout))
+        .layer(axum::Extension(jwt_secret.clone()))
+        .with_state(pool.clone());
+
+    // Protected routes — JWT middleware
+    let protected = Router::new()
+        // Auth/me
+        .route("/api/v1/auth/me",                get(handlers::domain::me))
+        // Regions
+        .route("/api/v1/regions",                get(handlers::domain::list_regions))
+        .route("/api/v1/regions",                post(handlers::domain::create_region))
+        .route("/api/v1/regions/:id",            put(handlers::domain::update_region))
+        .route("/api/v1/regions/summary",        get(handlers::domain::region_summary))
+        // Station types
+        .route("/api/v1/station-types",          get(handlers::domain::list_station_types))
+        // Objects
+        .route("/api/v1/objects",                get(handlers::domain::list_objects))
+        .route("/api/v1/objects",                post(handlers::domain::create_object))
+        .route("/api/v1/objects/:id",            get(handlers::domain::get_object))
+        .route("/api/v1/objects/:id",            patch(handlers::domain::update_object))
+        .route("/api/v1/objects/:id",            delete(handlers::domain::delete_object))
+        // Measurements po objektu
+        .route("/api/v1/objects/:id/measurements/10min",  get(handlers::domain::get_measurements_10min))
+        .route("/api/v1/objects/:id/measurements/1h",     get(handlers::domain::get_measurements_1h))
+        .route("/api/v1/objects/:id/measurements/24h",    get(handlers::domain::get_measurements_24h))
+        .route("/api/v1/objects/:id/measurements/latest", get(handlers::domain::get_latest_measurement))
+        // Alarmi po objektu
+        .route("/api/v1/objects/:id/alarms",         get(handlers::domain::get_alarms))
+        .route("/api/v1/objects/:id/alarms/active",  get(handlers::domain::get_active_alarms))
+        // Event log po objektu
+        .route("/api/v1/objects/:id/eventlogs",      get(handlers::domain::get_event_logs))
+        // Users (admin only)
+        .route("/api/v1/users",                       get(handlers::domain::list_users))
+        .route("/api/v1/users",                       post(handlers::domain::create_user))
+        .route("/api/v1/users/:id/regions",           get(handlers::domain::get_user_regions))
+        .route("/api/v1/users/regions",               post(handlers::domain::grant_region_access))
+        .route("/api/v1/users/:uid/regions/:rid",     delete(handlers::domain::revoke_region_access))
+        // Poller control
+        .route("/api/v1/control/setvalue",            post(handlers::poller_handler::set_datalogger_value))
+        .layer(axum_middleware::from_fn_with_state(jwt_secret.clone(), middleware::jwt_middleware))
+        .layer(axum::Extension(jwt_secret.clone()))
+        .with_state(pool.clone());
+
+    // Poller status (no auth — internal monitoring)
+    let poller_routes = Router::new()
+        .route("/api/v1/poller/status", get(handlers::poller_handler::poller_status))
+        .with_state(poller_status);
+
+    // Health
+    let health = Router::new()
+        .route("/health", get(handlers::health))
+        .with_state(pool.clone());
+
+    let app = Router::new()
+        .merge(push_routes)
+        .merge(auth_routes)
+        .merge(protected)
+        .merge(poller_routes)
+        .merge(health)
+        .layer(TraceLayer::new_for_http())
+        .layer(CompressionLayer::new())
+        .layer(cors);
+
+    let port     = std::env::var("PORT").unwrap_or_else(|_| "8095".to_string());
+    let addr     = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+
+    tracing::info!("════════════════════════════════════════════");
+    tracing::info!("  Datalogger Backend v{}", env!("CARGO_PKG_VERSION"));
+    tracing::info!("  Listening on {}", addr);
+    tracing::info!("════════════════════════════════════════════");
+    tracing::info!("  PUSH  POST /api/v1/datalogger/alarms");
+    tracing::info!("  PUSH  POST /api/v1/datalogger/measurements");
+    tracing::info!("  PUSH  POST /api/v1/datalogger/eventlogs");
+    tracing::info!("  AUTH  POST /api/v1/auth/login");
+    tracing::info!("  GET   /api/v1/regions");
+    tracing::info!("  GET   /api/v1/objects");
+    tracing::info!("  GET   /api/v1/objects/:id/measurements/10min");
+    tracing::info!("  GET   /api/v1/objects/:id/alarms/active");
+    tracing::info!("  GET   /health");
+    tracing::info!("════════════════════════════════════════════");
+
+    axum::serve(listener, app).await?;
+    Ok(())
+}

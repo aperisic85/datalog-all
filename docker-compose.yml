@@ -1,0 +1,73 @@
+services:
+
+  # ============================================================
+  # PostgreSQL database
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: datalogger-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: datalogger
+      POSTGRES_USER: datalogger
+      POSTGRES_PASSWORD: datalogger
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Run initial schema on first boot
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datalogger -d datalogger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # Rust backend
+  # ============================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datalogger-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://datalogger:datalogger@postgres:5432/datalogger
+      PORT: 8095
+      RUST_LOG: datalogger_backend=info,tower_http=info,sqlx=warn
+    ports:
+      # Port 8095 matches the URL in config.CR300:
+      # http://sdn.plovput.hr:8095/api/v1/datalogger/...
+      - "8095:8095"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8095/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ============================================================
+  # pgAdmin - optional DB admin UI
+  # ============================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: datalogger-pgadmin
+    restart: unless-stopped
+    profiles:
+      - tools
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@plovput.hr
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
