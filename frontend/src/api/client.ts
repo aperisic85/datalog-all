@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8095';
+// U produkciji (Docker) VITE_API_URL nije postavljen — koristimo relativni path
+// pa nginx proxy hvata /api/* i prosljeđuje backendu.
+// Za lokalni dev: VITE_API_URL=http://localhost:8095
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 export const api = axios.create({
   baseURL: BASE_URL,
