@@ -1,0 +1,157 @@
+.map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0;
+}
+
+.map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.map-title h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem;
+}
+
+.map-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.map-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.map-filter-btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.map-filter-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.map-filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.map-filter-btn.alarm.active {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.map-filter-btn.inactive.active {
+  background: #6b7280;
+  border-color: #6b7280;
+}
+
+.map-legend {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0 1.5rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-dot.active { background: #22c55e; }
+.legend-dot.alarm  { background: #ef4444; }
+.legend-dot.inactive { background: #6b7280; }
+
+.map-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 0;
+  border-radius: 0;
+}
+
+/* Leaflet popup overrides */
+.map-popup {
+  min-width: 180px;
+  font-family: inherit;
+}
+
+.popup-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  color: #111;
+}
+
+.popup-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #555;
+  margin-bottom: 0.25rem;
+}
+
+.popup-region {
+  font-weight: 500;
+}
+
+.popup-location {
+  font-size: 0.75rem;
+  color: #555;
+  margin-bottom: 0.25rem;
+}
+
+.map-alarm-badge {
+  display: inline-block;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.popup-link {
+  display: block;
+  margin-top: 0.5rem;
+  color: #2563eb;
+  font-size: 0.78rem;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.popup-link:hover {
+  text-decoration: underline;
+}

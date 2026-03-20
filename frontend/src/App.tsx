@@ -8,6 +8,7 @@ import ObjectsPage from './pages/ObjectsPage';
 import ObjectDetailPage from './pages/ObjectDetailPage';
 import AdminRegionsPage from './pages/AdminRegionsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
+import MapPage from './pages/MapPage';
 import type { ReactNode } from 'react';
 
 const qc = new QueryClient({
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="objects" element={<ObjectsPage />} />
         <Route path="objects/:id" element={<ObjectDetailPage />} />
+        <Route path="map" element={<MapPage />} />
         <Route
           path="admin/regions"
           element={

@@ -10,6 +10,7 @@ import {
   Activity,
   Sun,
   Moon,
+  Map,
 } from 'lucide-react';
 import './Layout.css';
 
@@ -48,6 +49,10 @@ export default function Layout() {
           <NavLink to="/objects" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Radio size={16} />
             Objekti
+          </NavLink>
+          <NavLink to="/map" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <Map size={16} />
+            Karta
           </NavLink>
           {isAdmin && (
             <>
