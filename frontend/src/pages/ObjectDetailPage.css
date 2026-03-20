@@ -199,8 +199,36 @@
 .chart-wide { grid-column: 1 / -1; }
 
 /* Alarms */
-.alarm-summary { margin-bottom: 0; }
-.alarm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.alarm-ok {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.alarm-current-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.alarm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.alarm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.alarm-item-icon { flex-shrink: 0; }
 
 /* Events */
 .events-tab { }
