@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
@@ -7,12 +8,24 @@ import {
   MapPin,
   LogOut,
   Activity,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import './Layout.css';
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => t === 'dark' ? 'light' : 'dark');
 
   const handleLogout = async () => {
     await logout();
@@ -59,6 +72,9 @@ export default function Layout() {
               <div className="user-role">{user?.role}</div>
             </div>
           </div>
+          <button className="logout-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <button className="logout-btn" onClick={handleLogout} title="Odjavi se">
             <LogOut size={16} />
           </button>

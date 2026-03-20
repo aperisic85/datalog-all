@@ -6,7 +6,7 @@ import {
   getLatestMeasurement,
   getMeasurements10min,
   getMeasurements1h,
-  getAlarms,
+  getActiveAlarms,
   getEventLogs,
   pollObject,
 } from '../api/endpoints';
@@ -135,10 +135,11 @@ export default function ObjectDetailPage() {
     enabled: !!id && tab === 'charts' && range === '7d',
   });
 
-  const { data: alarms, isLoading: loadingAlarms } = useQuery({
-    queryKey: ['alarms', id, range],
-    queryFn: () => getAlarms(id!, { ...rangeParam, limit: 200 }),
+  const { data: activeAlarms, isLoading: loadingAlarms } = useQuery({
+    queryKey: ['alarms-active', id],
+    queryFn: () => getActiveAlarms(id!),
     enabled: !!id && tab === 'alarms',
+    refetchInterval: 60_000,
   });
 
   const { data: events, isLoading: loadingEvents } = useQuery({
@@ -176,12 +177,6 @@ export default function ObjectDetailPage() {
     ...m,
     time: format(parseISO(m.recorded_at), range === '7d' ? 'dd.MM HH:mm' : 'HH:mm'),
   })) ?? [];
-
-  const activeAlarmKeys = alarms?.length
-    ? Object.keys(ALARM_LABELS).filter((k) =>
-        alarms.some((a) => (a as unknown as Record<string, number>)[k] > 0)
-      )
-    : [];
 
   return (
     <div className="object-detail">
@@ -382,74 +377,46 @@ export default function ObjectDetailPage() {
 
       {tab === 'alarms' && (
         <div className="alarms-tab">
-          <div className="range-selector">
-            {(['6h', '24h', '7d'] as Range[]).map((r) => (
-              <button key={r} className={`filter-tab ${range === r ? 'active' : ''}`} onClick={() => setRange(r)}>{r}</button>
-            ))}
-          </div>
-
           {loadingAlarms ? (
             <div className="page-spinner"><div className="spinner" /></div>
-          ) : !alarms?.length ? (
-            <div className="no-data">Nema alarma za odabrani period</div>
-          ) : (
-            <>
-              {activeAlarmKeys.length > 0 && (
-                <div className="alarm-summary card">
-                  <h4 style={{ marginBottom: 8 }}>Aktivni alarmi</h4>
-                  <div className="alarm-tags">
-                    {activeAlarmKeys.map((k) => (
-                      <span key={k} className="badge badge-danger">{ALARM_LABELS[k]}</span>
-                    ))}
-                  </div>
+          ) : (() => {
+            const latest = activeAlarms?.[0];
+            const activeKeys = latest
+              ? Object.keys(ALARM_LABELS).filter((k) => (latest as unknown as Record<string, number>)[k] > 0)
+              : [];
+            if (!latest || activeKeys.length === 0) {
+              return (
+                <div className="alarm-ok card">
+                  <span className="badge badge-success" style={{ fontSize: 14, padding: '6px 16px' }}>OK — nema aktivnih alarma</span>
+                  {latest && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)' }}>
+                      Zadnja provjera: {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm')}
+                    </div>
+                  )}
                 </div>
-              )}
-              <div className="card" style={{ padding: 0, marginTop: 12, overflow: 'hidden' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Zabilježeno</th>
-                      <th>Aktivan</th>
-                      <th>Alarmi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {alarms.slice(0, 100).map((a) => {
-                      const active = Object.keys(ALARM_LABELS).filter(
-                        (k) => (a as unknown as Record<string, number>)[k] > 0
-                      );
-                      return (
-                        <tr key={a.id}>
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            {format(parseISO(a.recorded_at), 'dd.MM.yyyy HH:mm')}
-                          </td>
-                          <td>
-                            {a.any_alarm_active
-                              ? <span className="badge badge-danger">Da</span>
-                              : <span className="badge badge-success">Ne</span>
-                            }
-                          </td>
-                          <td>
-                            {active.length === 0 ? (
-                              <span className="text-muted">—</span>
-                            ) : (
-                              <div className="alarm-tags">
-                                {active.map((k) => (
-                                  <span key={k} className="badge badge-danger" style={{ fontSize: 11 }}>
-                                    {ALARM_LABELS[k]}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              );
+            }
+            return (
+              <div className="alarm-current card">
+                <div className="alarm-current-header">
+                  <span className="badge badge-danger" style={{ fontSize: 13 }}>
+                    <AlertTriangle size={13} /> Aktivni alarmi
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    od {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm')}
+                  </span>
+                </div>
+                <div className="alarm-tags" style={{ marginTop: 12 }}>
+                  {activeKeys.map((k) => (
+                    <div key={k} className="alarm-item">
+                      <AlertTriangle size={14} className="alarm-item-icon" />
+                      <span>{ALARM_LABELS[k]}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </>
-          )}
+            );
+          })()}
         </div>
       )}
 
