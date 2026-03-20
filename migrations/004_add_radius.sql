@@ -3,7 +3,9 @@
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS allowed_radius_m INTEGER NOT NULL DEFAULT 0;
 
 -- Refresh v_objects view to include allowed_radius_m
-CREATE OR REPLACE VIEW v_objects AS
+-- DROP first because CREATE OR REPLACE cannot change column order
+DROP VIEW IF EXISTS v_objects;
+CREATE VIEW v_objects AS
 SELECT
     o.id,
     o.station_id,
