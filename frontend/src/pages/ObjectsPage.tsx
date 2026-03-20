@@ -18,7 +18,7 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({
     station_id: '', name: '', short_name: '', region_id: '',
     station_type_id: '', datalogger_url: '', location_name: '',
-    latitude: '', longitude: '', poll_interval_sec: '60',
+    latitude: '', longitude: '', allowed_radius_m: '0', poll_interval_sec: '60',
     polling_enabled: false, description: '',
   });
 
@@ -42,6 +42,7 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
         location_name:   form.location_name || undefined,
         latitude:        form.latitude ? Number(form.latitude) : undefined,
         longitude:       form.longitude ? Number(form.longitude) : undefined,
+        allowed_radius_m: Number(form.allowed_radius_m) || 0,
         poll_interval_sec: Number(form.poll_interval_sec) || 60,
         polling_enabled: form.polling_enabled,
         description:     form.description || undefined,
@@ -114,6 +115,14 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
               <label>Longitude</label>
               <input type="number" step="any" value={form.longitude} onChange={(e) => set('longitude', e.target.value)} placeholder="16.123456" />
             </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Dozvoljeni radijus (m)</label>
+              <input type="number" min="0" value={form.allowed_radius_m} onChange={(e) => set('allowed_radius_m', e.target.value)} placeholder="0 = fiksni objekt" />
+            </div>
+            <div className="form-group" />
           </div>
 
           <div className="form-group">

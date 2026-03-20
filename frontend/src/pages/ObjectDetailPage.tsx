@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup } from 'react-leaflet';
 import {
   getObject,
   getLatestMeasurement,
@@ -10,6 +11,7 @@ import {
   getEventLogs,
   pollObject,
 } from '../api/endpoints';
+import 'leaflet/dist/leaflet.css';
 import {
   LineChart,
   Line,
@@ -113,6 +115,13 @@ export default function ObjectDetailPage() {
   const { data: latest } = useQuery({
     queryKey: ['latest', id],
     queryFn: () => getLatestMeasurement(id!),
+    enabled: !!id,
+    refetchInterval: 60_000,
+  });
+
+  const { data: recentPositions } = useQuery({
+    queryKey: ['positions', id],
+    queryFn: () => getMeasurements10min(id!, { limit: 3 }),
     enabled: !!id,
     refetchInterval: 60_000,
   });
@@ -277,10 +286,86 @@ export default function ObjectDetailPage() {
                   </a>
                 </div>
               )}
+              {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
+                <div><span>Dozvoljeni radijus:</span> {obj.allowed_radius_m} m</div>
+              )}
+              {(obj.allowed_radius_m == null || obj.allowed_radius_m === 0) && (
+                <div><span>Tip pozicije:</span> Fiksni objekt</div>
+              )}
               <div><span>Polling:</span> {obj.polling_enabled ? `${obj.poll_interval_sec}s` : 'isključen'}</div>
               {obj.description && <div className="info-full"><span>Opis:</span> {obj.description}</div>}
             </div>
           </div>
+
+          {obj.latitude && obj.longitude && (() => {
+            const gpsPoints = (recentPositions ?? [])
+              .filter((m) => m.garmin_latitude_avg != null && m.garmin_longitude_avg != null)
+              .slice(0, 3);
+            const posColors = ['#f97316', '#fb923c', '#fdba74'];
+            return (
+              <div className="location-map-section card" style={{ marginTop: 16 }}>
+                <div className="location-map-header">
+                  <h3>Lokacija objekta</h3>
+                  <div className="location-map-legend">
+                    <span className="loc-legend-item"><span className="loc-dot default" />Zadana pozicija</span>
+                    {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
+                      <span className="loc-legend-item"><span className="loc-dot radius" />Dozvoljeni radijus</span>
+                    )}
+                    {gpsPoints.length > 0 && (
+                      <span className="loc-legend-item"><span className="loc-dot gps" />Zadnje GPS pozicije</span>
+                    )}
+                  </div>
+                </div>
+                <div className="location-map-wrap">
+                  <MapContainer
+                    center={[obj.latitude, obj.longitude]}
+                    zoom={15}
+                    style={{ height: '100%', width: '100%' }}
+                    scrollWheelZoom={false}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {/* Radius circle */}
+                    {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
+                      <Circle
+                        center={[obj.latitude, obj.longitude]}
+                        radius={obj.allowed_radius_m}
+                        pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.08, weight: 2, dashArray: '6 4' }}
+                      />
+                    )}
+                    {/* Default position */}
+                    <CircleMarker
+                      center={[obj.latitude, obj.longitude]}
+                      radius={9}
+                      pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.9, weight: 2 }}
+                    >
+                      <Popup>
+                        <strong>Zadana pozicija</strong><br />
+                        {obj.latitude.toFixed(5)}, {obj.longitude.toFixed(5)}
+                      </Popup>
+                    </CircleMarker>
+                    {/* Last 3 GPS positions */}
+                    {gpsPoints.map((m, i) => (
+                      <CircleMarker
+                        key={m.id}
+                        center={[m.garmin_latitude_avg!, m.garmin_longitude_avg!]}
+                        radius={6}
+                        pathOptions={{ color: posColors[i], fillColor: posColors[i], fillOpacity: 0.85, weight: 2 }}
+                      >
+                        <Popup>
+                          <strong>GPS pozicija #{i + 1}</strong><br />
+                          {m.garmin_latitude_avg!.toFixed(5)}, {m.garmin_longitude_avg!.toFixed(5)}<br />
+                          <span style={{ fontSize: 11, color: '#6b7280' }}>{m.recorded_at.replace('T', ' ').slice(0, 16)}</span>
+                        </Popup>
+                      </CircleMarker>
+                    ))}
+                  </MapContainer>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
