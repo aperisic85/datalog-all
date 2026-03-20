@@ -24,6 +24,7 @@ export interface ObjectView {
   latitude?: number;
   longitude?: number;
   location_name?: string;
+  allowed_radius_m?: number;
   description?: string;
   notes?: string;
   is_active: boolean;
