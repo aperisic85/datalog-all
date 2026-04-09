@@ -230,6 +230,18 @@ impl Cr300Client {
             return Ok(None);
         }
 
+        // Detektiramo HTML odgovor (router login stranica umjesto CR300 JSON-a)
+        let trimmed = text.trim_start();
+        if trimmed.starts_with("<!DOCTYPE") || trimmed.starts_with("<html") {
+            warn!(
+                station = %self.config.name,
+                table = %table,
+                "Received HTML instead of JSON — request is being intercepted (router login page?). \
+                 Check port forwarding on the router at this station."
+            );
+            return Ok(None);
+        }
+
         let cr300_resp: Cr300Response = serde_json::from_str(&text)
             .with_context(|| {
                 let preview = if text.len() > 500 { &text[..500] } else { &text };
