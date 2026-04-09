@@ -77,7 +77,7 @@ function CreateUserForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
 function UserRegions({ user }: { user: UserPublic }) {
   const qc = useQueryClient();
   const [regionId, setRegionId] = useState('');
-  const [permission, setPermission] = useState('read');
+  const [permission, setPermission] = useState('viewer');
 
   const { data: userRegions } = useQuery({
     queryKey: ['user-regions', user.id],
@@ -132,9 +132,8 @@ function UserRegions({ user }: { user: UserPublic }) {
             {available?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           <select value={permission} onChange={(e) => setPermission(e.target.value)} style={{ width: 'auto' }}>
-            <option value="read">read</option>
-            <option value="write">write</option>
-            <option value="admin">admin</option>
+            <option value="viewer">viewer</option>
+            <option value="operator">operator</option>
           </select>
           <button
             className="btn-primary"
