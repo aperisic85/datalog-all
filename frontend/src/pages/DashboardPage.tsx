@@ -38,7 +38,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="stat-cards">
-        <div className="stat-card card">
+        <div className="stat-card stat-card-blue card">
           <div className="stat-icon stat-icon-blue">
             <Radio size={20} />
           </div>
@@ -47,7 +47,7 @@ export default function DashboardPage() {
             <div className="stat-label">Ukupno objekata</div>
           </div>
         </div>
-        <div className="stat-card card">
+        <div className="stat-card stat-card-green card">
           <div className="stat-icon stat-icon-green">
             <CheckCircle size={20} />
           </div>
@@ -56,7 +56,7 @@ export default function DashboardPage() {
             <div className="stat-label">Aktivnih</div>
           </div>
         </div>
-        <div className="stat-card card">
+        <div className="stat-card stat-card-red card">
           <div className="stat-icon stat-icon-red">
             <AlertTriangle size={20} />
           </div>
@@ -65,7 +65,7 @@ export default function DashboardPage() {
             <div className="stat-label">U alarmu</div>
           </div>
         </div>
-        <div className="stat-card card">
+        <div className="stat-card stat-card-yellow card">
           <div className="stat-icon stat-icon-yellow">
             <Zap size={20} />
           </div>
@@ -76,7 +76,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <h3 style={{ margin: '24px 0 12px' }}>Regije</h3>
+      <div className="regions-header">
+        <h3>Regije</h3>
+        {summaries && <span className="region-count-badge">{summaries.length}</span>}
+      </div>
       <div className="region-grid">
         {summaries?.map((s) => (
           <div key={s.region_id} className="region-card card">

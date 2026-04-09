@@ -31,10 +31,13 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-box card">
         <div className="login-header">
-          <Activity size={32} color="var(--accent)" />
+          <div className="login-logo-wrap">
+            <Activity size={26} color="var(--accent)" />
+          </div>
           <h1>DataLogger</h1>
           <p>Prijavite se na sistem</p>
         </div>
+        <div className="login-divider" />
 
         <form onSubmit={handleSubmit}>
           {error && <div className="error-msg" style={{ marginBottom: 14 }}>{error}</div>}
