@@ -203,13 +203,15 @@
 .page-info { font-size: 13px; color: var(--text2); }
 
 /* ── Mobile card list ── */
-.desktop-only { display: block; }
-.mobile-only  { display: none; }
-
+/* desktop: show table, hide cards */
 .obj-card-list {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 10px;
+}
+
+.objects-table {
+  display: block;
 }
 
 .obj-card {
@@ -276,8 +278,8 @@
 
 /* ── Mobile ── */
 @media (max-width: 640px) {
-  .desktop-only { display: none; }
-  .mobile-only  { display: block; }
+  .obj-card-list    { display: flex; }
+  .objects-table    { display: none; }
 
   .page-header {
     flex-direction: row;

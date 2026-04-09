@@ -1,0 +1,257 @@
+.alarms-page {
+  max-width: 900px;
+  animation: fadeInUp 0.25s ease both;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 10px;
+}
+
+.page-header h2 { margin: 0; }
+
+/* ── Filters ── */
+.alarms-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.alarms-filters select {
+  width: auto;
+  min-width: 160px;
+}
+
+/* ── Summary badges ── */
+.alarms-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* ── Empty state ── */
+.alarms-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text2);
+}
+
+.alarms-empty-icon {
+  width: 72px;
+  height: 72px;
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: var(--success);
+}
+
+.alarms-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.alarms-empty-sub {
+  font-size: 14px;
+  color: var(--text2);
+}
+
+/* ── Alarm list ── */
+.alarm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Alarm card ── */
+.alarm-card {
+  padding: 16px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.alarm-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+}
+
+.alarm-card-critical::before { background: var(--danger); }
+.alarm-card-warning::before  { background: var(--warning); }
+
+.alarm-card-critical {
+  border-color: rgba(239,68,68,0.2);
+  background: linear-gradient(135deg, rgba(239,68,68,0.03) 0%, transparent 60%);
+}
+
+.alarm-card-warning {
+  border-color: rgba(245,158,11,0.2);
+  background: linear-gradient(135deg, rgba(245,158,11,0.03) 0%, transparent 60%);
+}
+
+.alarm-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.alarm-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.alarm-obj-name {
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alarm-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+/* ── Alarm tags ── */
+.alarm-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.alarm-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.alarm-tag-danger {
+  background: rgba(239,68,68,0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+
+.alarm-tag-warning {
+  background: rgba(245,158,11,0.1);
+  color: var(--warning);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+
+.alarm-time {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 12px;
+}
+
+/* ── Card actions ── */
+.alarm-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.alarm-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.alarm-action-btn:hover { text-decoration: none; }
+
+/* Modal reuse */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modal-header h3 { margin: 0; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .alarms-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .alarms-filters select { width: 100%; min-width: 0; }
+
+  .alarm-card-actions {
+    gap: 6px;
+  }
+
+  .alarm-action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions button { width: 100%; justify-content: center; }
+}

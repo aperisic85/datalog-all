@@ -13,6 +13,7 @@ import {
   Map,
   Menu,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import './Layout.css';
 
@@ -74,6 +75,10 @@ export default function Layout() {
           <NavLink to="/map" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Map size={16} />
             Karta
+          </NavLink>
+          <NavLink to="/alarms" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <AlertTriangle size={16} />
+            Alarmi
           </NavLink>
           {isAdmin && (
             <>
@@ -144,29 +149,26 @@ export default function Layout() {
           <span>Objekti</span>
         </NavLink>
         <NavLink
+          to="/alarms"
+          className={`bottom-nav-item${location.pathname === '/alarms' ? ' active' : ''}`}
+        >
+          <AlertTriangle size={22} />
+          <span>Alarmi</span>
+        </NavLink>
+        <NavLink
           to="/map"
           className={`bottom-nav-item${location.pathname === '/map' ? ' active' : ''}`}
         >
           <Map size={22} />
           <span>Karta</span>
         </NavLink>
-        {isAdmin && (
-          <button
-            className={`bottom-nav-item${location.pathname.startsWith('/admin') ? ' active' : ''}`}
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Users size={22} />
-            <span>Admin</span>
-          </button>
-        )}
-        {!isAdmin && (
-          <button className="bottom-nav-item" onClick={() => setSidebarOpen(true)}>
-            <div className="user-avatar" style={{ width: 26, height: 26, fontSize: 11 }}>
-              {user?.username?.[0]?.toUpperCase()}
-            </div>
-            <span>Profil</span>
-          </button>
-        )}
+        <button
+          className={`bottom-nav-item${location.pathname.startsWith('/admin') ? ' active' : ''}`}
+          onClick={() => setSidebarOpen(true)}
+        >
+          <Menu size={22} />
+          <span>{isAdmin ? 'Admin' : 'Više'}</span>
+        </button>
       </nav>
     </div>
   );

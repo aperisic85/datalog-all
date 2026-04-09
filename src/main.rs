@@ -109,8 +109,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/measurements/24h",    get(handlers::domain::get_measurements_24h))
         .route("/api/v1/objects/:id/measurements/latest", get(handlers::domain::get_latest_measurement))
         // Alarmi po objektu
-        .route("/api/v1/objects/:id/alarms",         get(handlers::domain::get_alarms))
-        .route("/api/v1/objects/:id/alarms/active",  get(handlers::domain::get_active_alarms))
+        .route("/api/v1/objects/:id/alarms",              get(handlers::domain::get_alarms))
+        .route("/api/v1/objects/:id/alarms",              delete(handlers::domain::delete_alarms))
+        .route("/api/v1/objects/:id/alarms/active",       get(handlers::domain::get_active_alarms))
+        .route("/api/v1/objects/:id/alarms/acknowledge",  post(handlers::domain::acknowledge_alarm))
         // Event log po objektu
         .route("/api/v1/objects/:id/eventlogs",      get(handlers::domain::get_event_logs))
         // Users (admin only)

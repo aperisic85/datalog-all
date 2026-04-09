@@ -97,6 +97,12 @@ export const getAlarms = (id: string, params?: { from?: string; to?: string; lim
 export const getActiveAlarms = (id: string) =>
   api.get<AlarmRecord[]>(`/api/v1/objects/${id}/alarms/active`).then((r) => r.data);
 
+export const acknowledgeAlarm = (id: string) =>
+  api.post(`/api/v1/objects/${id}/alarms/acknowledge`);
+
+export const deleteAlarms = (id: string) =>
+  api.delete(`/api/v1/objects/${id}/alarms`);
+
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
   api.get<EventLogRecord[]>(`/api/v1/objects/${id}/eventlogs`, { params }).then((r) => r.data);

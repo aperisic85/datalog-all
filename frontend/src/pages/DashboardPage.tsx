@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { regionSummary } from '../api/endpoints';
-import { AlertTriangle, Battery, Zap, Radio, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Battery, Zap, Radio, CheckCircle, ChevronRight } from 'lucide-react';
 import './DashboardPage.css';
 
 function AlarmLevel({ level }: { level?: number | null }) {
@@ -11,6 +12,7 @@ function AlarmLevel({ level }: { level?: number | null }) {
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { data: summaries, isLoading, error } = useQuery({
     queryKey: ['region-summary'],
     queryFn: regionSummary,
@@ -38,42 +40,34 @@ export default function DashboardPage() {
       </div>
 
       <div className="stat-cards">
-        <div className="stat-card stat-card-blue card">
-          <div className="stat-icon stat-icon-blue">
-            <Radio size={20} />
-          </div>
+        <button className="stat-card stat-card-blue card stat-card-btn" onClick={() => navigate('/objects')}>
+          <div className="stat-icon stat-icon-blue"><Radio size={20} /></div>
           <div>
             <div className="stat-value">{total?.objects ?? '—'}</div>
             <div className="stat-label">Ukupno objekata</div>
           </div>
-        </div>
-        <div className="stat-card stat-card-green card">
-          <div className="stat-icon stat-icon-green">
-            <CheckCircle size={20} />
-          </div>
+        </button>
+        <button className="stat-card stat-card-green card stat-card-btn" onClick={() => navigate('/objects?active=true')}>
+          <div className="stat-icon stat-icon-green"><CheckCircle size={20} /></div>
           <div>
             <div className="stat-value">{total?.active ?? '—'}</div>
             <div className="stat-label">Aktivnih</div>
           </div>
-        </div>
-        <div className="stat-card stat-card-red card">
-          <div className="stat-icon stat-icon-red">
-            <AlertTriangle size={20} />
-          </div>
+        </button>
+        <button className="stat-card stat-card-red card stat-card-btn" onClick={() => navigate('/alarms')}>
+          <div className="stat-icon stat-icon-red"><AlertTriangle size={20} /></div>
           <div>
             <div className="stat-value">{total?.alarms ?? '—'}</div>
             <div className="stat-label">U alarmu</div>
           </div>
-        </div>
-        <div className="stat-card stat-card-yellow card">
-          <div className="stat-icon stat-icon-yellow">
-            <Zap size={20} />
-          </div>
+        </button>
+        <button className="stat-card stat-card-yellow card stat-card-btn" onClick={() => navigate('/objects')}>
+          <div className="stat-icon stat-icon-yellow"><Zap size={20} /></div>
           <div>
             <div className="stat-value">{total?.lanterns ?? '—'}</div>
             <div className="stat-label">Fenjeri uključeni</div>
           </div>
-        </div>
+        </button>
       </div>
 
       <div className="regions-header">
@@ -84,15 +78,12 @@ export default function DashboardPage() {
         {summaries?.map((s) => (
           <div key={s.region_id} className="region-card card">
             <div className="region-header">
-              <div
-                className="region-color-dot"
-                style={{ background: s.region_color || '#666' }}
-              />
+              <div className="region-color-dot" style={{ background: s.region_color || '#666' }} />
               <div>
                 <div className="region-name">{s.region_name}</div>
                 <div className="region-code">{s.region_code}</div>
               </div>
-              <div style={{ marginLeft: 'auto' }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlarmLevel level={s.worst_alarm_level} />
               </div>
             </div>
@@ -131,6 +122,17 @@ export default function DashboardPage() {
                   <Zap size={14} />
                   <span>{s.lanterns_on_count} fenjera uključeno</span>
                 </div>
+              )}
+            </div>
+
+            <div className="region-actions">
+              <button className="region-action-btn" onClick={() => navigate(`/objects?region_id=${s.region_id}`)}>
+                <Radio size={13} /> Objekti <ChevronRight size={13} />
+              </button>
+              {(s.objects_in_alarm ?? 0) > 0 && (
+                <button className="region-action-btn region-action-alarm" onClick={() => navigate(`/alarms?region_id=${s.region_id}`)}>
+                  <AlertTriangle size={13} /> Alarmi <ChevronRight size={13} />
+                </button>
               )}
             </div>
           </div>
