@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapContainer, TileLayer, CircleMarker, Circle, Popup } from 'react-leaflet';
 import {
   getObject,
@@ -10,7 +10,11 @@ import {
   getActiveAlarms,
   getEventLogs,
   pollObject,
+  updateObject,
+  listRegions,
+  listStationTypes,
 } from '../api/endpoints';
+import { useAuth } from '../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
 import {
   LineChart,
@@ -34,8 +38,11 @@ import {
   Radio,
   Sun,
   RefreshCw,
+  Pencil,
+  X,
 } from 'lucide-react';
 import './ObjectDetailPage.css';
+import './ObjectsPage.css';
 
 type Tab = 'overview' | 'charts' | 'alarms' | 'events';
 type Range = '6h' | '24h' | '7d';
@@ -98,13 +105,175 @@ const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
   5: { label: 'Kritično', cls: 'badge-danger' },
 };
 
+function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    name: obj.name,
+    short_name: obj.short_name ?? '',
+    region_id: obj.region_id,
+    station_type_id: '',
+    datalogger_url: obj.datalogger_url ?? '',
+    location_name: obj.location_name ?? '',
+    latitude: obj.latitude != null ? String(obj.latitude) : '',
+    longitude: obj.longitude != null ? String(obj.longitude) : '',
+    allowed_radius_m: obj.allowed_radius_m != null ? String(obj.allowed_radius_m) : '0',
+    poll_interval_sec: String(obj.poll_interval_sec),
+    polling_enabled: obj.polling_enabled,
+    is_active: obj.is_active,
+    description: obj.description ?? '',
+  });
+
+  const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
+  const { data: types } = useQuery({ queryKey: ['station-types'], queryFn: listStationTypes });
+
+  const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
+
+  const update = useMutation({
+    mutationFn: (data: Record<string, unknown>) => updateObject(obj.id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['object', obj.id] });
+      qc.invalidateQueries({ queryKey: ['objects'] });
+      onClose();
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Greška pri spremanju');
+      setSaving(false);
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    update.mutate({
+      name: form.name,
+      short_name: form.short_name || undefined,
+      region_id: form.region_id,
+      station_type_id: form.station_type_id ? Number(form.station_type_id) : undefined,
+      datalogger_url: form.datalogger_url || undefined,
+      location_name: form.location_name || undefined,
+      latitude: form.latitude ? Number(form.latitude) : undefined,
+      longitude: form.longitude ? Number(form.longitude) : undefined,
+      allowed_radius_m: Number(form.allowed_radius_m) || 0,
+      poll_interval_sec: Number(form.poll_interval_sec) || 60,
+      polling_enabled: form.polling_enabled,
+      is_active: form.is_active,
+      description: form.description || undefined,
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box card">
+        <div className="modal-header">
+          <h3>Uredi objekt</h3>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          {error && <div className="error-msg">{error}</div>}
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Naziv *</label>
+              <input value={form.name} onChange={(e) => set('name', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Kratki naziv</label>
+              <input value={form.short_name} onChange={(e) => set('short_name', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Regija *</label>
+              <select value={form.region_id} onChange={(e) => set('region_id', e.target.value)} required>
+                <option value="">Odaberi regiju...</option>
+                {regions?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Tip stanice</label>
+              <select value={form.station_type_id} onChange={(e) => set('station_type_id', e.target.value)}>
+                <option value="">Bez tipa</option>
+                {types?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Datalogger URL</label>
+            <input value={form.datalogger_url} onChange={(e) => set('datalogger_url', e.target.value)} placeholder="http://192.168.1.100" />
+          </div>
+
+          <div className="form-group">
+            <label>Lokacija</label>
+            <input value={form.location_name} onChange={(e) => set('location_name', e.target.value)} />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Latitude</label>
+              <input type="number" step="any" value={form.latitude} onChange={(e) => set('latitude', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>Longitude</label>
+              <input type="number" step="any" value={form.longitude} onChange={(e) => set('longitude', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Dozvoljeni radijus (m)</label>
+              <input type="number" min="0" value={form.allowed_radius_m} onChange={(e) => set('allowed_radius_m', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>Poll interval (s)</label>
+              <input type="number" min={10} value={form.poll_interval_sec} onChange={(e) => set('poll_interval_sec', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 }}>
+              <label className="filter-checkbox">
+                <input type="checkbox" checked={form.polling_enabled} onChange={(e) => set('polling_enabled', e.target.checked)} style={{ width: 'auto' }} />
+                Polling uključen
+              </label>
+              <label className="filter-checkbox">
+                <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} style={{ width: 'auto' }} />
+                Aktivan
+              </label>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Opis</label>
+            <input value={form.description} onChange={(e) => set('description', e.target.value)} />
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Odustani</button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Sprema...</> : 'Spremi'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [range, setRange] = useState<Range>('24h');
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
+  const [showEdit, setShowEdit] = useState(false);
 
   const { data: obj, isLoading: loadingObj } = useQuery({
     queryKey: ['object', id],
@@ -189,6 +358,7 @@ export default function ObjectDetailPage() {
 
   return (
     <div className="object-detail">
+      {showEdit && <EditObjectModal obj={obj} onClose={() => setShowEdit(false)} />}
       <div className="detail-header">
         <Link to="/objects" className="back-link">
           <ArrowLeft size={16} /> Objekti
@@ -202,6 +372,11 @@ export default function ObjectDetailPage() {
               : <span className="badge badge-success">OK</span>
             }
             {!obj.is_active && <span className="badge badge-neutral">Neaktivan</span>}
+            {isAdmin && (
+              <button className="btn-secondary" style={{ marginLeft: 8, padding: '4px 10px', fontSize: 13 }} onClick={() => setShowEdit(true)}>
+                <Pencil size={13} /> Uredi
+              </button>
+            )}
           </div>
           <div className="detail-meta">
             <code className="station-id">{obj.station_id}</code>
