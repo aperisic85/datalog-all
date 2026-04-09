@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { listObjects, listRegions, listStationTypes, createObject } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, Search, ChevronLeft, ChevronRight, MapPin, Radio, Plus, X } from 'lucide-react';
@@ -162,9 +162,13 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
 
 export default function ObjectsPage() {
   const { isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [regionFilter, setRegionFilter] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [regionFilter, setRegionFilter] = useState(() => searchParams.get('region_id') || '');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>(() => {
+    const a = searchParams.get('active');
+    return a === 'true' ? 'active' : a === 'false' ? 'inactive' : 'all';
+  });
   const [alarmFilter, setAlarmFilter] = useState(false);
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
@@ -251,7 +255,7 @@ export default function ObjectsPage() {
       ) : (
         <>
           {/* Desktop table view */}
-          <div className="objects-table card desktop-only">
+          <div className="objects-table card objects-table">
             <div className="table-scroll">
             <table>
               <thead>
@@ -311,7 +315,7 @@ export default function ObjectsPage() {
           </div>
 
           {/* Mobile card view */}
-          <div className="obj-card-list mobile-only">
+          <div className="obj-card-list">
             {data?.data.length === 0 && (
               <div className="obj-card-empty">Nema rezultata</div>
             )}

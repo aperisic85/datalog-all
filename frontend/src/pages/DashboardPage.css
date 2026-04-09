@@ -158,6 +158,62 @@
 .region-stat-danger { color: var(--danger); font-weight: 600; }
 .region-stat-warn { color: var(--warning); }
 
+/* Clickable stat card */
+.stat-card-btn {
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+.stat-card-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(59,130,246,0.25);
+}
+
+/* Region action buttons */
+.region-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.region-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.region-action-btn:hover {
+  background: rgba(59,130,246,0.1);
+  color: var(--accent);
+  border-color: rgba(59,130,246,0.2);
+}
+
+.region-action-alarm {
+  color: var(--warning);
+  border-color: rgba(245,158,11,0.2);
+  background: rgba(245,158,11,0.06);
+}
+
+.region-action-alarm:hover {
+  background: rgba(245,158,11,0.12);
+  color: var(--warning);
+  border-color: rgba(245,158,11,0.3);
+}
+
 /* ── Mobile ── */
 @media (max-width: 600px) {
   .stat-cards {

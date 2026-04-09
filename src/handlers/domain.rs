@@ -300,6 +300,36 @@ pub async fn get_active_alarms(
     Ok(Json(db::get_active_alarms(&pool, id).await?))
 }
 
+/// POST /api/v1/objects/:id/alarms/acknowledge  — potvrdi/resetiraj cached alarm stanje
+pub async fn acknowledge_alarm(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    if claims.role == "viewer" { return Err(AppError::Forbidden); }
+    check_object_access(&pool, &claims, id).await?;
+    db::acknowledge_object_alarm(&pool, id).await?;
+    let uid = parse_uid(&claims.sub).ok();
+    let _ = db::write_audit(&pool, uid, Some(&claims.username),
+        "ACKNOWLEDGE_ALARM", Some("object"), Some(&id.to_string()), None, None).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/v1/objects/:id/alarms  — briši sve alarm zapise
+pub async fn delete_alarms(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    if claims.role == "viewer" { return Err(AppError::Forbidden); }
+    check_object_access(&pool, &claims, id).await?;
+    db::clear_object_alarms(&pool, id).await?;
+    let uid = parse_uid(&claims.sub).ok();
+    let _ = db::write_audit(&pool, uid, Some(&claims.username),
+        "DELETE_ALARMS", Some("object"), Some(&id.to_string()), None, None).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// GET /api/v1/objects/:id/eventlogs
 pub async fn get_event_logs(
     State(pool): State<PgPool>,

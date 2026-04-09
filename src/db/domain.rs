@@ -383,6 +383,36 @@ pub async fn get_active_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<Vec<
         .fetch_all(pool).await?)
 }
 
+/// Potvrdi alarm: resetira cached alarm stanje na objektu (ne briše zapise)
+pub async fn acknowledge_object_alarm(pool: &PgPool, object_id: Uuid) -> AppResult<()> {
+    sqlx::query(
+        "UPDATE objects SET
+            alarm_active = FALSE,
+            alarm_count = 0,
+            alarm_worst_level = NULL,
+            alarm_summary = NULL,
+            alarm_last_seen_at = NULL
+         WHERE id = $1")
+        .bind(object_id).execute(pool).await?;
+    Ok(())
+}
+
+/// Briši sve alarm zapise za objekt i resetira cached stanje
+pub async fn clear_object_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<u64> {
+    let result = sqlx::query("DELETE FROM alarms WHERE object_id = $1")
+        .bind(object_id).execute(pool).await?;
+    sqlx::query(
+        "UPDATE objects SET
+            alarm_active = FALSE,
+            alarm_count = 0,
+            alarm_worst_level = NULL,
+            alarm_summary = NULL,
+            alarm_last_seen_at = NULL
+         WHERE id = $1")
+        .bind(object_id).execute(pool).await?;
+    Ok(result.rows_affected())
+}
+
 // ================================================================
 // EVENT LOGS
 // ================================================================
