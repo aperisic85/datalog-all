@@ -63,7 +63,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "8086:80"
 
   # ============================================================
   # pgAdmin - optional DB admin UI
