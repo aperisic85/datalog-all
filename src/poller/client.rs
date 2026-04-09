@@ -93,6 +93,8 @@ impl Default for DataloggerConfig {
 #[derive(Debug, Deserialize)]
 pub struct Cr300Response {
     pub head: Cr300Head,
+    /// CR300 ponekad vraća "data": null kad nema podataka — #[serde(default)] to pretvara u prazan Vec
+    #[serde(default)]
     pub data: Vec<Cr300DataRow>,
     /// If true, more data is available - poll with since-record
     #[serde(default)]
@@ -229,10 +231,21 @@ impl Cr300Client {
         }
 
         let cr300_resp: Cr300Response = serde_json::from_str(&text)
-            .with_context(|| format!("Failed to parse CR300 JSON response for table {}", table))?;
+            .with_context(|| {
+                let preview = if text.len() > 500 { &text[..500] } else { &text };
+                format!(
+                    "Failed to parse CR300 JSON response for table {} (station: {}). First 500 chars: {}",
+                    table, self.config.name, preview
+                )
+            })?;
 
         if cr300_resp.data.is_empty() {
-            debug!(station = %self.config.name, table = %table, "No new data");
+            debug!(
+                station = %self.config.name,
+                table = %table,
+                env_station = ?cr300_resp.head.environment.as_ref().and_then(|e| e.station_name.as_deref()),
+                "No new data (empty data array)"
+            );
             return Ok(None);
         }
 
