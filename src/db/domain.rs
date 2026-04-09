@@ -201,6 +201,29 @@ pub async fn soft_delete_object(pool: &PgPool, id: Uuid) -> AppResult<()> {
 }
 
 // ================================================================
+// OBJECT POLL CONFIGS (interní — za poller, čita direktno iz objects tablice)
+// ================================================================
+
+pub async fn get_object_poll_config(pool: &PgPool, id: Uuid) -> AppResult<Option<ObjectPollConfig>> {
+    Ok(sqlx::query_as(
+        "SELECT id, station_id, datalogger_url, datalogger_user, datalogger_pass,
+                poll_interval_sec, polling_enabled
+         FROM objects WHERE id = $1 AND is_active = TRUE")
+        .bind(id)
+        .fetch_optional(pool).await?)
+}
+
+pub async fn list_pollable_objects(pool: &PgPool) -> AppResult<Vec<ObjectPollConfig>> {
+    Ok(sqlx::query_as(
+        "SELECT id, station_id, datalogger_url, datalogger_user, datalogger_pass,
+                poll_interval_sec, polling_enabled
+         FROM objects
+         WHERE is_active = TRUE AND polling_enabled = TRUE AND datalogger_url IS NOT NULL
+         ORDER BY station_id")
+        .fetch_all(pool).await?)
+}
+
+// ================================================================
 // IMAGES
 // ================================================================
 

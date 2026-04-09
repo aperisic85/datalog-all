@@ -575,6 +575,20 @@ pub struct LatestMeasurement {
 }
 
 // ================================================================
+// OBJECT POLL CONFIG (interný — za poller, bez izlaganja lozinke u API-u)
+// ================================================================
+#[derive(Debug, sqlx::FromRow)]
+pub struct ObjectPollConfig {
+    pub id:                Uuid,
+    pub station_id:        String,
+    pub datalogger_url:    Option<String>,
+    pub datalogger_user:   Option<String>,
+    pub datalogger_pass:   Option<String>,
+    pub poll_interval_sec: i32,
+    pub polling_enabled:   bool,
+}
+
+// ================================================================
 // QUERY PARAMS
 // ================================================================
 #[derive(Debug, Deserialize, Default)]
