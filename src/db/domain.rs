@@ -383,8 +383,12 @@ pub async fn get_active_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<Vec<
         .fetch_all(pool).await?)
 }
 
-/// Potvrdi alarm: resetira cached alarm stanje na objektu (ne briše zapise)
-pub async fn acknowledge_object_alarm(pool: &PgPool, object_id: Uuid) -> AppResult<()> {
+/// Potvrdi alarm: označava alarm zapise kao potvrđene i resetira cached stanje
+pub async fn acknowledge_object_alarm(pool: &PgPool, object_id: Uuid, by: &str) -> AppResult<()> {
+    sqlx::query(
+        "UPDATE alarms SET acknowledged_at = NOW(), acknowledged_by = $2
+         WHERE object_id = $1 AND acknowledged_at IS NULL AND any_alarm_active = TRUE")
+        .bind(object_id).bind(by).execute(pool).await?;
     sqlx::query(
         "UPDATE objects SET
             alarm_active = FALSE,
@@ -395,6 +399,76 @@ pub async fn acknowledge_object_alarm(pool: &PgPool, object_id: Uuid) -> AppResu
          WHERE id = $1")
         .bind(object_id).execute(pool).await?;
     Ok(())
+}
+
+/// Globalni popis alarm zapisa s filtrima po regiji i statusu
+pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<Page<AlarmListItem>> {
+    let page      = q.page.unwrap_or(1).max(1);
+    let page_size = q.page_size.unwrap_or(50).min(200);
+    let offset    = (page - 1) * page_size;
+    let status    = q.status.as_deref().unwrap_or("active");
+
+    let where_status = match status {
+        "acknowledged" => "a.acknowledged_at IS NOT NULL",
+        "all"          => "TRUE",
+        _              => "a.any_alarm_active = TRUE AND a.acknowledged_at IS NULL",
+    };
+
+    let sql = format!(
+        "SELECT
+            a.id,
+            o.id          AS object_id,
+            o.name        AS object_name,
+            a.station_id,
+            r.id          AS region_id,
+            r.name        AS region_name,
+            r.code        AS region_code,
+            r.color       AS region_color,
+            o.location_name,
+            a.recorded_at,
+            a.acknowledged_at,
+            a.acknowledged_by,
+            a.any_alarm_active,
+            a.alarm_datalogger_high_temp,
+            a.alarm_datalogger_high_voltage,
+            a.alarm_datalogger_other_error,
+            a.alarm_battery_voltage_low,
+            a.alarm_battery_voltage_flat,
+            a.alarm_battery_other_error,
+            a.alarm_garmin_comm_failed,
+            a.alarm_garmin_other_error,
+            a.alarm_station_out_of_radius,
+            a.alarm_lantern_night_light_off,
+            a.alarm_lantern_day_light_on,
+            a.alarm_lantern_comm_failed,
+            a.alarm_lantern_other_error,
+            a.alarm_modem_network_error,
+            a.alarm_modem_other_error,
+            a.alarm_station_other_error
+         FROM alarms a
+         JOIN objects o ON o.id = a.object_id
+         JOIN regions r ON r.id = o.region_id
+         WHERE {where_status}
+           AND ($1::uuid IS NULL OR r.id = $1)
+         ORDER BY a.recorded_at DESC
+         LIMIT $2 OFFSET $3");
+
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM alarms a
+         JOIN objects o ON o.id = a.object_id
+         JOIN regions r ON r.id = o.region_id
+         WHERE {where_status}
+           AND ($1::uuid IS NULL OR r.id = $1)");
+
+    let rows: Vec<AlarmListItem> = sqlx::query_as(&sql)
+        .bind(q.region_id).bind(page_size).bind(offset)
+        .fetch_all(pool).await?;
+
+    let total: i64 = sqlx::query_scalar(&count_sql)
+        .bind(q.region_id)
+        .fetch_one(pool).await?;
+
+    Ok(Page::new(rows, total, page, page_size))
 }
 
 /// Briši sve alarm zapise za objekt i resetira cached stanje

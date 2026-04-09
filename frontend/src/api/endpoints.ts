@@ -9,6 +9,7 @@ import type {
   Measurement10min,
   Measurement1h,
   AlarmRecord,
+  AlarmListItem,
   EventLogRecord,
   LatestMeasurement,
   UserPublic,
@@ -102,6 +103,16 @@ export const acknowledgeAlarm = (id: string) =>
 
 export const deleteAlarms = (id: string) =>
   api.delete(`/api/v1/objects/${id}/alarms`);
+
+export interface AlarmHistoryParams {
+  region_id?: string;
+  status?: 'active' | 'acknowledged' | 'all';
+  page?: number;
+  page_size?: number;
+}
+
+export const listAlarmHistory = (params?: AlarmHistoryParams) =>
+  api.get<Page<AlarmListItem>>('/api/v1/alarms', { params }).then((r) => r.data);
 
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>

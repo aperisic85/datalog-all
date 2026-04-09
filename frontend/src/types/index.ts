@@ -93,6 +93,38 @@ export interface Measurement1h {
   lantern_current_avg?: number;
 }
 
+export interface AlarmListItem {
+  id: number;
+  object_id: string;
+  object_name: string;
+  station_id: string;
+  region_id: string;
+  region_name: string;
+  region_code: string;
+  region_color: string;
+  location_name?: string;
+  recorded_at: string;
+  acknowledged_at?: string;
+  acknowledged_by?: string;
+  any_alarm_active: boolean;
+  alarm_datalogger_high_temp: number;
+  alarm_datalogger_high_voltage: number;
+  alarm_datalogger_other_error: number;
+  alarm_battery_voltage_low: number;
+  alarm_battery_voltage_flat: number;
+  alarm_battery_other_error: number;
+  alarm_garmin_comm_failed: number;
+  alarm_garmin_other_error: number;
+  alarm_station_out_of_radius: number;
+  alarm_lantern_night_light_off: number;
+  alarm_lantern_day_light_on: number;
+  alarm_lantern_comm_failed: number;
+  alarm_lantern_other_error: number;
+  alarm_modem_network_error: number;
+  alarm_modem_other_error: number;
+  alarm_station_other_error: number;
+}
+
 export interface AlarmRecord {
   id: number;
   station_id: string;

@@ -319,6 +319,49 @@ pub struct AlarmRecord {
     pub any_alarm_active:             bool,
 }
 
+/// Prošireni alarm zapis s info o objektu i regiji — za globalni pregled
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AlarmListItem {
+    pub id:                           i64,
+    pub object_id:                    Uuid,
+    pub object_name:                  String,
+    pub station_id:                   String,
+    pub region_id:                    Uuid,
+    pub region_name:                  String,
+    pub region_code:                  String,
+    pub region_color:                 String,
+    pub location_name:                Option<String>,
+    pub recorded_at:                  DateTime<Utc>,
+    pub acknowledged_at:              Option<DateTime<Utc>>,
+    pub acknowledged_by:              Option<String>,
+    pub any_alarm_active:             bool,
+    pub alarm_datalogger_high_temp:   i16,
+    pub alarm_datalogger_high_voltage: i16,
+    pub alarm_datalogger_other_error: i16,
+    pub alarm_battery_voltage_low:    i16,
+    pub alarm_battery_voltage_flat:   i16,
+    pub alarm_battery_other_error:    i16,
+    pub alarm_garmin_comm_failed:     i16,
+    pub alarm_garmin_other_error:     i16,
+    pub alarm_station_out_of_radius:  i16,
+    pub alarm_lantern_night_light_off: i16,
+    pub alarm_lantern_day_light_on:   i16,
+    pub alarm_lantern_comm_failed:    i16,
+    pub alarm_lantern_other_error:    i16,
+    pub alarm_modem_network_error:    i16,
+    pub alarm_modem_other_error:      i16,
+    pub alarm_station_other_error:    i16,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct AlarmListQuery {
+    pub region_id:  Option<Uuid>,
+    /// "active" | "acknowledged" | "all"  (default: "active")
+    pub status:     Option<String>,
+    pub page:       Option<i64>,
+    pub page_size:  Option<i64>,
+}
+
 #[derive(Debug, Default)]
 pub struct AlarmInsert {
     pub object_id:                    Option<Uuid>,
