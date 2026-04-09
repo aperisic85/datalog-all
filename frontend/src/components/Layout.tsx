@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -19,6 +19,7 @@ import './Layout.css';
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
   });
@@ -108,21 +109,65 @@ export default function Layout() {
 
       <main className="content">
         <div className="mobile-topbar">
-          <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Meni">
-            <Menu size={22} />
-          </button>
           <div className="mobile-logo">
             <Activity size={18} />
             <span>DataLogger</span>
           </div>
-          <button className="logout-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+          <div className="mobile-topbar-actions">
+            <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Više">
+              <Menu size={22} />
+            </button>
+          </div>
         </div>
         <div className="content-inner">
           <Outlet />
         </div>
       </main>
+
+      {/* Bottom navigation — mobile only */}
+      <nav className="bottom-nav">
+        <NavLink
+          to="/dashboard"
+          className={`bottom-nav-item${location.pathname === '/dashboard' ? ' active' : ''}`}
+        >
+          <LayoutDashboard size={22} />
+          <span>Dashboard</span>
+        </NavLink>
+        <NavLink
+          to="/objects"
+          className={`bottom-nav-item${location.pathname.startsWith('/objects') ? ' active' : ''}`}
+        >
+          <Radio size={22} />
+          <span>Objekti</span>
+        </NavLink>
+        <NavLink
+          to="/map"
+          className={`bottom-nav-item${location.pathname === '/map' ? ' active' : ''}`}
+        >
+          <Map size={22} />
+          <span>Karta</span>
+        </NavLink>
+        {isAdmin && (
+          <button
+            className={`bottom-nav-item${location.pathname.startsWith('/admin') ? ' active' : ''}`}
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Users size={22} />
+            <span>Admin</span>
+          </button>
+        )}
+        {!isAdmin && (
+          <button className="bottom-nav-item" onClick={() => setSidebarOpen(true)}>
+            <div className="user-avatar" style={{ width: 26, height: 26, fontSize: 11 }}>
+              {user?.username?.[0]?.toUpperCase()}
+            </div>
+            <span>Profil</span>
+          </button>
+        )}
+      </nav>
     </div>
   );
 }

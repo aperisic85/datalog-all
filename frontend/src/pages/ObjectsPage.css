@@ -1,4 +1,7 @@
-.objects-page { max-width: 1200px; }
+.objects-page {
+  max-width: 1200px;
+  animation: fadeInUp 0.25s ease both;
+}
 
 .page-header {
   display: flex;
@@ -199,11 +202,87 @@
 
 .page-info { font-size: 13px; color: var(--text2); }
 
+/* ── Mobile card list ── */
+.desktop-only { display: block; }
+.mobile-only  { display: none; }
+
+.obj-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.obj-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.obj-card:hover {
+  border-color: rgba(59,130,246,0.3);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.obj-card:active { transform: scale(0.98); }
+
+.obj-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.obj-card-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  min-width: 0;
+}
+
+.obj-card-name span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obj-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.obj-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.obj-card-empty {
+  text-align: center;
+  color: var(--text2);
+  padding: 40px 16px;
+  font-size: 14px;
+}
+
 /* ── Mobile ── */
 @media (max-width: 640px) {
+  .desktop-only { display: none; }
+  .mobile-only  { display: block; }
+
   .page-header {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
   }
 
   .objects-filters {

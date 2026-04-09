@@ -196,7 +196,7 @@ export default function ObjectsPage() {
       <div className="page-header">
         <div>
           <h2>Objekti</h2>
-          <span className="text-muted">Prikaz stanica i datalogera</span>
+          <span className="text-muted">{data?.total != null ? `${data.total} stanica` : 'Prikaz stanica i datalogera'}</span>
         </div>
         {isAdmin && (
           <button className="btn-primary" onClick={() => setShowCreate(true)}>
@@ -250,7 +250,8 @@ export default function ObjectsPage() {
         <div className="page-spinner"><div className="spinner" /></div>
       ) : (
         <>
-          <div className="objects-table card">
+          {/* Desktop table view */}
+          <div className="objects-table card desktop-only">
             <div className="table-scroll">
             <table>
               <thead>
@@ -307,6 +308,43 @@ export default function ObjectsPage() {
               </tbody>
             </table>
             </div>
+          </div>
+
+          {/* Mobile card view */}
+          <div className="obj-card-list mobile-only">
+            {data?.data.length === 0 && (
+              <div className="obj-card-empty">Nema rezultata</div>
+            )}
+            {data?.data.map((obj) => (
+              <Link to={`/objects/${obj.id}`} key={obj.id} className="obj-card card">
+                <div className="obj-card-top">
+                  <div className="obj-card-name">
+                    <span className={`status-dot ${obj.alarm_active ? 'status-dot-alarm' : obj.is_active ? 'status-dot-active' : 'status-dot-inactive'}`} />
+                    <span>{obj.name}</span>
+                  </div>
+                  <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
+                </div>
+                <div className="obj-card-meta">
+                  <span className="region-tag">
+                    <span className="region-dot" style={{ background: obj.region_color }} />
+                    {obj.region_name}
+                  </span>
+                  {obj.location_name && (
+                    <span className="location-cell">
+                      <MapPin size={12} />
+                      {obj.location_name}
+                    </span>
+                  )}
+                </div>
+                <div className="obj-card-footer">
+                  <code className="station-id">{obj.station_id}</code>
+                  {obj.is_active
+                    ? <span className="badge badge-success" style={{ fontSize: 11 }}>Aktivan</span>
+                    : <span className="badge badge-neutral" style={{ fontSize: 11 }}>Neaktivan</span>
+                  }
+                </div>
+              </Link>
+            ))}
           </div>
 
           {data && data.total_pages > 1 && (
