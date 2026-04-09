@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
-import { listAlarmHistory, listRegions, acknowledgeAlarm, deleteAlarms } from '../api/endpoints';
+import { listAlarmHistory, listRegions, acknowledgeAlarm, deleteAlarm } from '../api/endpoints';
 import type { AlarmListItem } from '../types';
 import {
   AlertTriangle, Battery, Wifi, WifiOff,
   MapPin, Thermometer, Zap, Check, Trash2,
   ExternalLink, Filter, ChevronLeft, ChevronRight,
-  Clock, CheckCircle,
+  Clock, CheckCircle, X,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { bs } from 'date-fns/locale';
 import './AlarmsPage.css';
 
-// ── Mapiranje polja na čitljive opise ──────────────────────────────────────
+// ── Alarm tip definicije ────────────────────────────────────────────────────
 type AlarmKey = keyof Pick<AlarmListItem,
   'alarm_battery_voltage_flat' | 'alarm_battery_voltage_low' | 'alarm_battery_other_error' |
   'alarm_datalogger_high_temp' | 'alarm_datalogger_high_voltage' | 'alarm_datalogger_other_error' |
@@ -24,21 +24,21 @@ type AlarmKey = keyof Pick<AlarmListItem,
 >;
 
 const ALARM_DEFS: { key: AlarmKey; label: string; icon: React.ReactNode; severity: 'danger' | 'warning' }[] = [
-  { key: 'alarm_battery_voltage_flat',    label: 'Baterija prazna',          icon: <Battery size={12} />,     severity: 'danger' },
-  { key: 'alarm_battery_voltage_low',     label: 'Baterija slaba',           icon: <Battery size={12} />,     severity: 'warning' },
-  { key: 'alarm_battery_other_error',     label: 'Greška baterije',          icon: <Battery size={12} />,     severity: 'warning' },
-  { key: 'alarm_datalogger_high_temp',    label: 'Visoka temp.',             icon: <Thermometer size={12} />, severity: 'warning' },
-  { key: 'alarm_datalogger_high_voltage', label: 'Visoki napon',             icon: <Zap size={12} />,         severity: 'warning' },
+  { key: 'alarm_battery_voltage_flat',    label: 'Baterija prazna',          icon: <Battery size={12} />,       severity: 'danger' },
+  { key: 'alarm_battery_voltage_low',     label: 'Baterija slaba',           icon: <Battery size={12} />,       severity: 'warning' },
+  { key: 'alarm_battery_other_error',     label: 'Greška baterije',          icon: <Battery size={12} />,       severity: 'warning' },
+  { key: 'alarm_datalogger_high_temp',    label: 'Visoka temp.',             icon: <Thermometer size={12} />,   severity: 'warning' },
+  { key: 'alarm_datalogger_high_voltage', label: 'Visoki napon',             icon: <Zap size={12} />,           severity: 'warning' },
   { key: 'alarm_datalogger_other_error',  label: 'Greška datalogera',        icon: <AlertTriangle size={12} />, severity: 'warning' },
-  { key: 'alarm_garmin_comm_failed',      label: 'GPS komunikacija pala',    icon: <MapPin size={12} />,      severity: 'danger' },
-  { key: 'alarm_garmin_other_error',      label: 'GPS greška',               icon: <MapPin size={12} />,      severity: 'warning' },
-  { key: 'alarm_station_out_of_radius',   label: 'Van radijusa',             icon: <MapPin size={12} />,      severity: 'danger' },
-  { key: 'alarm_lantern_night_light_off', label: 'Fenjer ugašen noću',       icon: <Zap size={12} />,         severity: 'danger' },
-  { key: 'alarm_lantern_day_light_on',    label: 'Fenjer upaljen danju',     icon: <Zap size={12} />,         severity: 'warning' },
-  { key: 'alarm_lantern_comm_failed',     label: 'Fenjer komunikacija pala', icon: <WifiOff size={12} />,     severity: 'danger' },
-  { key: 'alarm_lantern_other_error',     label: 'Fenjer greška',            icon: <Zap size={12} />,         severity: 'warning' },
-  { key: 'alarm_modem_network_error',     label: 'Greška mreže',             icon: <Wifi size={12} />,        severity: 'warning' },
-  { key: 'alarm_modem_other_error',       label: 'Greška modema',            icon: <WifiOff size={12} />,     severity: 'warning' },
+  { key: 'alarm_garmin_comm_failed',      label: 'GPS komunikacija pala',    icon: <MapPin size={12} />,        severity: 'danger' },
+  { key: 'alarm_garmin_other_error',      label: 'GPS greška',               icon: <MapPin size={12} />,        severity: 'warning' },
+  { key: 'alarm_station_out_of_radius',   label: 'Van radijusa',             icon: <MapPin size={12} />,        severity: 'danger' },
+  { key: 'alarm_lantern_night_light_off', label: 'Fenjer ugašen noću',       icon: <Zap size={12} />,           severity: 'danger' },
+  { key: 'alarm_lantern_day_light_on',    label: 'Fenjer upaljen danju',     icon: <Zap size={12} />,           severity: 'warning' },
+  { key: 'alarm_lantern_comm_failed',     label: 'Fenjer komun. pala',       icon: <WifiOff size={12} />,       severity: 'danger' },
+  { key: 'alarm_lantern_other_error',     label: 'Fenjer greška',            icon: <Zap size={12} />,           severity: 'warning' },
+  { key: 'alarm_modem_network_error',     label: 'Greška mreže',             icon: <Wifi size={12} />,          severity: 'warning' },
+  { key: 'alarm_modem_other_error',       label: 'Greška modema',            icon: <WifiOff size={12} />,       severity: 'warning' },
   { key: 'alarm_station_other_error',     label: 'Greška stanice',           icon: <AlertTriangle size={12} />, severity: 'warning' },
 ];
 
@@ -56,14 +56,133 @@ function AlarmTags({ item }: { item: AlarmListItem }) {
   );
 }
 
-type Status = 'active' | 'acknowledged' | 'all';
+function isCriticalAlarm(item: AlarmListItem) {
+  return item.alarm_battery_voltage_flat > 0 ||
+    item.alarm_garmin_comm_failed > 0 ||
+    item.alarm_lantern_night_light_off > 0 ||
+    item.alarm_lantern_comm_failed > 0 ||
+    item.alarm_station_out_of_radius > 0;
+}
 
+// ── Modalna forma za potvrdu ────────────────────────────────────────────────
+function ConfirmModal({ title, message, danger, confirmLabel, onConfirm, onCancel }: {
+  title: string;
+  message: React.ReactNode;
+  danger?: boolean;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box card" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{title}</h3>
+          <button className="modal-close-btn" onClick={onCancel}><X size={18} /></button>
+        </div>
+        <p className="modal-body">{message}</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={onCancel}>Odustani</button>
+          <button className={danger ? 'btn-danger' : 'btn-primary'} onClick={onConfirm}>
+            {danger ? <Trash2 size={14} /> : <Check size={14} />} {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Status tab definicije ──────────────────────────────────────────────────
+type Status = 'active' | 'acknowledged' | 'all';
 const STATUS_TABS: { value: Status; label: string; icon: React.ReactNode }[] = [
-  { value: 'active',       label: 'Aktivni',    icon: <AlertTriangle size={14} /> },
-  { value: 'acknowledged', label: 'Potvrđeni',  icon: <CheckCircle size={14} /> },
-  { value: 'all',          label: 'Svi',        icon: <Clock size={14} /> },
+  { value: 'active',       label: 'Aktivni',   icon: <AlertTriangle size={14} /> },
+  { value: 'acknowledged', label: 'Potvrđeni', icon: <CheckCircle size={14} /> },
+  { value: 'all',          label: 'Svi',       icon: <Clock size={14} /> },
 ];
 
+// ── Alarm kartica ──────────────────────────────────────────────────────────
+function AlarmCard({ item, onAcknowledge, onDelete, isAcking }: {
+  item: AlarmListItem;
+  onAcknowledge: () => void;
+  onDelete: () => void;
+  isAcking: boolean;
+}) {
+  const isAcknowledged = !!item.acknowledged_at;
+  const critical = isCriticalAlarm(item);
+
+  return (
+    <div className={`alarm-card card ${isAcknowledged ? 'alarm-card-ack' : critical ? 'alarm-card-critical' : 'alarm-card-warning'}`}>
+      {/* Header: naziv + status badge */}
+      <div className="alarm-card-header">
+        <div className="alarm-card-title">
+          <span className={`status-dot ${isAcknowledged ? 'status-dot-inactive' : 'status-dot-alarm'}`} />
+          <div className="alarm-card-title-text">
+            <span className="alarm-obj-name">{item.object_name}</span>
+            <code className="station-id">{item.station_id}</code>
+          </div>
+        </div>
+        <div>
+          {isAcknowledged
+            ? <span className="badge badge-neutral"><CheckCircle size={11} /> Potvrđen</span>
+            : critical
+              ? <span className="badge badge-danger badge-pulse"><AlertTriangle size={11} /> Kritično</span>
+              : <span className="badge badge-warning"><AlertTriangle size={11} /> Upozorenje</span>
+          }
+        </div>
+      </div>
+
+      {/* Meta: regija + lokacija */}
+      <div className="alarm-card-meta">
+        <span className="region-tag">
+          <span className="region-dot" style={{ background: item.region_color }} />
+          {item.region_name}
+        </span>
+        {item.location_name && (
+          <span className="location-cell"><MapPin size={12} />{item.location_name}</span>
+        )}
+      </div>
+
+      {/* Alarm tagovi */}
+      <AlarmTags item={item} />
+
+      {/* Vremena */}
+      <div className="alarm-times">
+        <span><Clock size={11} />
+          {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm')}
+          {' · '}
+          {formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: bs })}
+        </span>
+        {isAcknowledged && item.acknowledged_at && (
+          <span className="alarm-ack-info">
+            <CheckCircle size={11} />
+            Potvrdio: <strong>{item.acknowledged_by || '—'}</strong>
+            {' · '}{format(new Date(item.acknowledged_at), 'dd.MM.yyyy HH:mm')}
+          </span>
+        )}
+      </div>
+
+      {/* Akcijski gumbi */}
+      <div className="alarm-card-actions">
+        <Link to={`/objects/${item.object_id}`} className="btn-secondary alarm-action-btn">
+          <ExternalLink size={13} /> Pregledaj
+        </Link>
+        {!isAcknowledged && (
+          <button className="btn-secondary alarm-action-btn" onClick={onAcknowledge} disabled={isAcking}>
+            {isAcking
+              ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Potvrđuje...</>
+              : <><Check size={13} /> Potvrdi</>
+            }
+          </button>
+        )}
+        <button className="btn-danger alarm-action-btn" onClick={onDelete}>
+          <Trash2 size={13} /> Briši
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Glavna stranica ────────────────────────────────────────────────────────
 export default function AlarmsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState<Status>(
@@ -71,8 +190,15 @@ export default function AlarmsPage() {
   );
   const [regionFilter, setRegionFilter] = useState(searchParams.get('region_id') || '');
   const [page, setPage] = useState(1);
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
-  const [pendingAck, setPendingAck] = useState<Set<string>>(new Set());
+
+  // Modalne potvrde
+  const [ackTarget, setAckTarget]       = useState<AlarmListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AlarmListItem | null>(null);
+
+  // Loading stanja po kartici
+  const [pendingAck, setPendingAck]     = useState<Set<string>>(new Set());
+  const [actionError, setActionError]   = useState('');
+
   const qc = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
@@ -98,26 +224,35 @@ export default function AlarmsPage() {
   const handleStatus = (s: Status) => { setStatus(s); setPage(1); syncParams(s, regionFilter); };
   const handleRegion = (r: string) => { setRegionFilter(r); setPage(1); syncParams(status, r); };
 
-  const handleAcknowledge = async (objectId: string) => {
-    setPendingAck(prev => new Set(prev).add(objectId));
+  // Potvrdi alarm
+  const doAcknowledge = async () => {
+    if (!ackTarget) return;
+    setAckTarget(null);
+    setActionError('');
+    setPendingAck(prev => new Set(prev).add(ackTarget.object_id));
     try {
-      await acknowledgeAlarm(objectId);
-      qc.invalidateQueries({ queryKey: ['alarms-history'] });
-      qc.invalidateQueries({ queryKey: ['region-summary'] });
+      await acknowledgeAlarm(ackTarget.object_id);
+      await qc.invalidateQueries({ queryKey: ['alarms-history'] });
+      await qc.invalidateQueries({ queryKey: ['region-summary'] });
+    } catch {
+      setActionError(`Greška pri potvrdi alarma za "${ackTarget.object_name}". Pokušaj ponovo.`);
     } finally {
-      setPendingAck(prev => { const s = new Set(prev); s.delete(objectId); return s; });
+      setPendingAck(prev => { const s = new Set(prev); s.delete(ackTarget.object_id); return s; });
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!confirmDelete) return;
-    const { id } = confirmDelete;
-    setConfirmDelete(null);
+  // Briši jedan alarm zapis
+  const doDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteTarget(null);
+    setActionError('');
     try {
-      await deleteAlarms(id);
-      qc.invalidateQueries({ queryKey: ['alarms-history'] });
-      qc.invalidateQueries({ queryKey: ['region-summary'] });
-    } catch { /* ignore */ }
+      await deleteAlarm(deleteTarget.id);
+      await qc.invalidateQueries({ queryKey: ['alarms-history'] });
+      await qc.invalidateQueries({ queryKey: ['region-summary'] });
+    } catch {
+      setActionError(`Greška pri brisanju alarma. Pokušaj ponovo.`);
+    }
   };
 
   const items = data?.data ?? [];
@@ -126,25 +261,34 @@ export default function AlarmsPage() {
 
   return (
     <div className="alarms-page">
-      {/* Delete confirm dialog */}
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="modal-box card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Brisanje alarma</h3>
-            </div>
-            <p style={{ margin: '0 0 20px', color: 'var(--text2)' }}>
-              Sigurno želiš obrisati sve alarm zapise za <strong style={{ color: 'var(--text)' }}>{confirmDelete.name}</strong>?
-              Ova radnja je nepovratna.
-            </p>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setConfirmDelete(null)}>Odustani</button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>
-                <Trash2 size={14} /> Briši sve alarme
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Confirm acknowledge */}
+      {ackTarget && (
+        <ConfirmModal
+          title="Potvrdi alarm"
+          message={<>Potvrđuješ alarm za <strong>{ackTarget.object_name}</strong>?
+            <br /><span style={{ color: 'var(--text2)', fontSize: 13 }}>
+              Alarm će biti označen kao potvrđen s tvojim imenom i vremenom.
+            </span></>}
+          confirmLabel="Potvrdi alarm"
+          onConfirm={doAcknowledge}
+          onCancel={() => setAckTarget(null)}
+        />
+      )}
+
+      {/* Confirm delete */}
+      {deleteTarget && (
+        <ConfirmModal
+          title="Brisanje alarma"
+          danger
+          message={<>Brišeš alarm od <strong>{format(new Date(deleteTarget.recorded_at), 'dd.MM.yyyy HH:mm')}</strong>{' '}
+            za objekt <strong>{deleteTarget.object_name}</strong>.
+            <br /><span style={{ color: 'var(--text2)', fontSize: 13 }}>
+              Briše se samo ovaj zapis, ne svi alarmi objekta.
+            </span></>}
+          confirmLabel="Briši ovaj alarm"
+          onConfirm={doDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
 
       {/* Header */}
@@ -152,16 +296,25 @@ export default function AlarmsPage() {
         <div>
           <h2>Alarmi</h2>
           <span className="text-muted">
-            {total > 0 ? `${total} ${total === 1 ? 'zapis' : total < 5 ? 'zapisa' : 'zapisa'}` : 'Nema zapisa'}
+            {total > 0 ? `${total} ${total === 1 ? 'zapis' : 'zapisa'}` : 'Nema zapisa'}
           </span>
         </div>
       </div>
 
+      {/* Greška akcije */}
+      {actionError && (
+        <div className="error-msg" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {actionError}
+          <button style={{ background: 'none', padding: 4, color: 'inherit' }} onClick={() => setActionError('')}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Status tabs */}
       <div className="alarm-status-tabs">
         {STATUS_TABS.map(t => (
-          <button
-            key={t.value}
+          <button key={t.value}
             className={`alarm-status-tab${status === t.value ? ' active' : ''}`}
             onClick={() => handleStatus(t.value)}
           >
@@ -170,7 +323,7 @@ export default function AlarmsPage() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Region filter */}
       <div className="alarms-filters card">
         <Filter size={14} style={{ color: 'var(--text2)', flexShrink: 0 }} />
         <select value={regionFilter} onChange={e => handleRegion(e.target.value)}>
@@ -179,12 +332,18 @@ export default function AlarmsPage() {
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
+        {regionFilter && (
+          <button className="clear-filter-btn" onClick={() => handleRegion('')}>
+            <X size={14} /> Sve regije
+          </button>
+        )}
       </div>
 
-      {/* Content */}
+      {/* Loading / error */}
       {isLoading && <div className="page-spinner"><div className="spinner" /></div>}
       {error && <div className="error-msg">Greška pri učitavanju alarma</div>}
 
+      {/* Empty state */}
       {!isLoading && items.length === 0 && (
         <div className="alarms-empty">
           <div className="alarms-empty-icon">
@@ -200,21 +359,22 @@ export default function AlarmsPage() {
         </div>
       )}
 
+      {/* Lista */}
       {items.length > 0 && (
         <div className="alarm-list">
           {items.map(item => (
-            <AlarmRow
+            <AlarmCard
               key={item.id}
               item={item}
               isAcking={pendingAck.has(item.object_id)}
-              onAcknowledge={() => handleAcknowledge(item.object_id)}
-              onDelete={() => setConfirmDelete({ id: item.object_id, name: item.object_name })}
+              onAcknowledge={() => setAckTarget(item)}
+              onDelete={() => setDeleteTarget(item)}
             />
           ))}
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Paginacija */}
       {totalPages > 1 && (
         <div className="alarm-pagination">
           <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
@@ -226,93 +386,6 @@ export default function AlarmsPage() {
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Alarm row component ────────────────────────────────────────────────────
-function AlarmRow({ item, isAcking, onAcknowledge, onDelete }: {
-  item: AlarmListItem;
-  isAcking: boolean;
-  onAcknowledge: () => void;
-  onDelete: () => void;
-}) {
-  const isCritical = item.alarm_battery_voltage_flat > 0 ||
-    item.alarm_garmin_comm_failed > 0 ||
-    item.alarm_lantern_night_light_off > 0 ||
-    item.alarm_lantern_comm_failed > 0 ||
-    item.alarm_station_out_of_radius > 0;
-
-  const isAcknowledged = !!item.acknowledged_at;
-
-  return (
-    <div className={`alarm-card card ${isAcknowledged ? 'alarm-card-ack' : isCritical ? 'alarm-card-critical' : 'alarm-card-warning'}`}>
-      <div className="alarm-card-header">
-        <div className="alarm-card-title">
-          <span className={`status-dot ${isAcknowledged ? 'status-dot-inactive' : isCritical ? 'status-dot-alarm' : 'status-dot-alarm'}`} />
-          <div>
-            <div className="alarm-obj-name">{item.object_name}</div>
-            <code className="station-id" style={{ marginTop: 2, display: 'block' }}>{item.station_id}</code>
-          </div>
-        </div>
-        <div className="alarm-card-badges">
-          {isAcknowledged
-            ? <span className="badge badge-neutral"><CheckCircle size={11} /> Potvrđen</span>
-            : isCritical
-              ? <span className="badge badge-danger badge-pulse"><AlertTriangle size={11} /> Kritično</span>
-              : <span className="badge badge-warning"><AlertTriangle size={11} /> Upozorenje</span>
-          }
-        </div>
-      </div>
-
-      <div className="alarm-card-meta">
-        <span className="region-tag">
-          <span className="region-dot" style={{ background: item.region_color }} />
-          {item.region_name}
-        </span>
-        {item.location_name && (
-          <span className="location-cell"><MapPin size={12} /> {item.location_name}</span>
-        )}
-      </div>
-
-      <AlarmTags item={item} />
-
-      <div className="alarm-times">
-        <span>
-          <Clock size={11} />
-          {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm')}
-          {' · '}
-          {formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: bs })}
-        </span>
-        {isAcknowledged && item.acknowledged_by && (
-          <span className="alarm-ack-info">
-            <CheckCircle size={11} />
-            Potvrdio: <strong>{item.acknowledged_by}</strong>
-            {' · '}{format(new Date(item.acknowledged_at!), 'dd.MM.yyyy HH:mm')}
-          </span>
-        )}
-      </div>
-
-      <div className="alarm-card-actions">
-        <Link to={`/objects/${item.object_id}`} className="btn-secondary alarm-action-btn">
-          <ExternalLink size={13} /> Pregledaj
-        </Link>
-        {!isAcknowledged && (
-          <button
-            className="btn-secondary alarm-action-btn"
-            onClick={onAcknowledge}
-            disabled={isAcking}
-          >
-            {isAcking
-              ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Potvrđuje...</>
-              : <><Check size={13} /> Potvrdi</>
-            }
-          </button>
-        )}
-        <button className="btn-danger alarm-action-btn" onClick={onDelete}>
-          <Trash2 size={13} /> Briši
-        </button>
-      </div>
     </div>
   );
 }

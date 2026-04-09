@@ -401,22 +401,34 @@ pub async fn acknowledge_object_alarm(pool: &PgPool, object_id: Uuid, by: &str) 
     Ok(())
 }
 
-/// Globalni popis alarm zapisa s filtrima po regiji i statusu
+/// Globalni popis alarm zapisa s filtrima po regiji i statusu — bez duplikata
 pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<Page<AlarmListItem>> {
     let page      = q.page.unwrap_or(1).max(1);
     let page_size = q.page_size.unwrap_or(50).min(200);
     let offset    = (page - 1) * page_size;
     let status    = q.status.as_deref().unwrap_or("active");
 
-    let where_status = match status {
-        "acknowledged" => "a.acknowledged_at IS NOT NULL",
-        "all"          => "TRUE",
-        _              => "a.any_alarm_active = TRUE AND a.acknowledged_at IS NULL",
+    // DISTINCT ON (object_id) = jedan zapis po objektu (najnoviji)
+    // Za potvrđene: DISTINCT ON (object_id, datum potvrde)
+    let (distinct_clause, where_status, order_inner, order_outer) = match status {
+        "acknowledged" =>
+            ("DISTINCT ON (o.id, acknowledged_at::date)",
+             "a.acknowledged_at IS NOT NULL",
+             "o.id, acknowledged_at::date DESC, a.recorded_at DESC",
+             "sub.acknowledged_at DESC NULLS LAST"),
+        "all" =>
+            ("DISTINCT ON (o.id)",
+             "TRUE",
+             "o.id, a.recorded_at DESC",
+             "sub.recorded_at DESC"),
+        _ =>  // "active"
+            ("DISTINCT ON (o.id)",
+             "a.any_alarm_active = TRUE AND a.acknowledged_at IS NULL",
+             "o.id, a.recorded_at DESC",
+             "sub.recorded_at DESC"),
     };
 
-    let sql = format!(
-        "SELECT
-            a.id,
+    let cols = "a.id,
             o.id          AS object_id,
             o.name        AS object_name,
             a.station_id,
@@ -444,21 +456,31 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
             a.alarm_lantern_other_error,
             a.alarm_modem_network_error,
             a.alarm_modem_other_error,
-            a.alarm_station_other_error
-         FROM alarms a
+            a.alarm_station_other_error";
+
+    let from_join = "FROM alarms a
          JOIN objects o ON o.id = a.object_id
-         JOIN regions r ON r.id = o.region_id
-         WHERE {where_status}
-           AND ($1::uuid IS NULL OR r.id = $1)
-         ORDER BY a.recorded_at DESC
+         JOIN regions r ON r.id = o.region_id";
+
+    let sql = format!(
+        "SELECT sub.* FROM (
+           SELECT {distinct_clause} {cols}
+           {from_join}
+           WHERE {where_status}
+             AND ($1::uuid IS NULL OR r.id = $1)
+           ORDER BY {order_inner}
+         ) sub
+         ORDER BY {order_outer}
          LIMIT $2 OFFSET $3");
 
     let count_sql = format!(
-        "SELECT COUNT(*) FROM alarms a
-         JOIN objects o ON o.id = a.object_id
-         JOIN regions r ON r.id = o.region_id
-         WHERE {where_status}
-           AND ($1::uuid IS NULL OR r.id = $1)");
+        "SELECT COUNT(*) FROM (
+           SELECT {distinct_clause} a.id
+           {from_join}
+           WHERE {where_status}
+             AND ($1::uuid IS NULL OR r.id = $1)
+           ORDER BY {order_inner}
+         ) sub");
 
     let rows: Vec<AlarmListItem> = sqlx::query_as(&sql)
         .bind(q.region_id).bind(page_size).bind(offset)
@@ -469,6 +491,30 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
         .fetch_one(pool).await?;
 
     Ok(Page::new(rows, total, page, page_size))
+}
+
+/// Briši jedan alarm zapis po ID-u
+pub async fn delete_alarm_by_id(pool: &PgPool, alarm_id: i64) -> AppResult<Option<Uuid>> {
+    // Vrati object_id da bi mogli ažurirati cached stanje
+    let object_id: Option<Uuid> = sqlx::query_scalar(
+        "DELETE FROM alarms WHERE id = $1 RETURNING object_id")
+        .bind(alarm_id).fetch_optional(pool).await?;
+
+    if let Some(oid) = object_id {
+        // Rekalkuliraj cached alarm stanje na objektu
+        let still_active: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE AND acknowledged_at IS NULL)")
+            .bind(oid).fetch_one(pool).await?;
+
+        if !still_active {
+            sqlx::query(
+                "UPDATE objects SET alarm_active = FALSE, alarm_count = 0,
+                    alarm_worst_level = NULL, alarm_summary = NULL, alarm_last_seen_at = NULL
+                 WHERE id = $1")
+                .bind(oid).execute(pool).await?;
+        }
+    }
+    Ok(object_id)
 }
 
 /// Briši sve alarm zapise za objekt i resetira cached stanje

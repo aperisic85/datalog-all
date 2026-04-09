@@ -8,7 +8,6 @@
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 14px;
-  gap: 10px;
 }
 
 .page-header h2 { margin: 0; }
@@ -38,11 +37,12 @@
   border-right: 1px solid var(--border);
   transition: background var(--transition), color var(--transition);
   cursor: pointer;
+  font-family: inherit;
 }
 
 .alarm-status-tab:last-child { border-right: none; }
 .alarm-status-tab:hover { background: var(--bg3); color: var(--text); }
-.alarm-status-tab.active { background: rgba(59,130,246,0.12); color: var(--accent); }
+.alarm-status-tab.active { background: rgba(59,130,246,0.12); color: var(--accent); font-weight: 600; }
 
 /* ── Filters ── */
 .alarms-filters {
@@ -51,11 +51,28 @@
   gap: 10px;
   padding: 10px 14px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .alarms-filters select { width: auto; min-width: 160px; }
 
-/* ── Empty state ── */
+.clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text2);
+  cursor: pointer;
+}
+
+.clear-filter-btn:hover { color: var(--text); }
+
+/* ── Empty ── */
 .alarms-empty {
   text-align: center;
   padding: 56px 20px;
@@ -78,21 +95,22 @@
 .alarms-empty-title { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
 .alarms-empty-sub   { font-size: 13px; }
 
-/* ── Alarm list ── */
+/* ── Alarm lista ── */
 .alarm-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* ── Alarm card ── */
+/* ── Alarm kartica ── */
 .alarm-card {
   padding: 14px 16px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
   position: relative;
   overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Lijevý rub boje */
 .alarm-card::before {
   content: '';
   position: absolute;
@@ -100,31 +118,24 @@
   width: 3px;
 }
 
+.alarm-card-critical { border-color: rgba(239,68,68,0.22); }
 .alarm-card-critical::before { background: var(--danger); }
+.alarm-card-critical { background: linear-gradient(135deg, rgba(239,68,68,0.025) 0%, transparent 50%); }
+
 .alarm-card-warning::before  { background: var(--warning); }
-.alarm-card-ack::before      { background: var(--text2); }
+.alarm-card-warning { border-color: rgba(245,158,11,0.22);
+  background: linear-gradient(135deg, rgba(245,158,11,0.025) 0%, transparent 50%); }
 
-.alarm-card-critical {
-  border-color: rgba(239,68,68,0.2);
-  background: linear-gradient(135deg, rgba(239,68,68,0.025) 0%, transparent 50%);
-}
+.alarm-card-ack { opacity: 0.7; }
+.alarm-card-ack::before { background: var(--text2); }
 
-.alarm-card-warning {
-  border-color: rgba(245,158,11,0.2);
-  background: linear-gradient(135deg, rgba(245,158,11,0.025) 0%, transparent 50%);
-}
-
-.alarm-card-ack {
-  opacity: 0.75;
-}
-
-/* Card header */
+/* Header */
 .alarm-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 8px;
-  gap: 8px;
 }
 
 .alarm-card-title {
@@ -136,15 +147,22 @@
 
 .alarm-card-title .status-dot { margin-top: 5px; flex-shrink: 0; }
 
+.alarm-card-title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .alarm-obj-name {
   font-weight: 600;
   font-size: 15px;
-  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.alarm-card-badges { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
-
-/* Card meta */
+/* Meta */
 .alarm-card-meta {
   display: flex;
   align-items: center;
@@ -154,7 +172,7 @@
   font-size: 13px;
 }
 
-/* Alarm type tags */
+/* Alarm tagovi */
 .alarm-tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -175,7 +193,7 @@
 .alarm-tag-danger  { background: rgba(239,68,68,0.1);  color: var(--danger);  border: 1px solid rgba(239,68,68,0.2); }
 .alarm-tag-warning { background: rgba(245,158,11,0.1); color: var(--warning); border: 1px solid rgba(245,158,11,0.2); }
 
-/* Time info */
+/* Vremena */
 .alarm-times {
   display: flex;
   flex-direction: column;
@@ -185,15 +203,16 @@
   color: var(--text2);
 }
 
-.alarm-times span {
+.alarm-times > span {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-wrap: wrap;
 }
 
 .alarm-ack-info { color: var(--success); }
 
-/* Card actions */
+/* Akcije */
 .alarm-card-actions {
   display: flex;
   gap: 7px;
@@ -211,11 +230,12 @@
   font-weight: 500;
   text-decoration: none;
   border-radius: var(--radius);
+  transition: background var(--transition), color var(--transition);
 }
 
 .alarm-action-btn:hover { text-decoration: none; }
 
-/* ── Pagination ── */
+/* Paginacija */
 .alarm-pagination {
   display: flex;
   align-items: center;
@@ -224,32 +244,71 @@
   margin-top: 16px;
 }
 
-/* ── Modali ── */
+/* ══════════════════════════════════════════════════════
+   MODAL — position:fixed, overflow scrolls, margin:auto
+   centrira kad je malen, scrollable kad je velik,
+   uvijek na vidljivom dijelu ekrana (ne ovisi o scroll poziciji)
+   ══════════════════════════════════════════════════════ */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   z-index: 1000;
-  padding: 24px 16px 40px;
+  /* Flex column s auto marginom na modal-box = vertikalno centriranje
+     kad ima mjesta, scrollanje kad nema */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  backdrop-filter: blur(3px);
+  padding: 16px;
 }
 
 .modal-box {
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
+  /* margin: auto centrira vertikalno kad overlay ima slobodnog prostora */
+  margin: auto;
+  /* Na mobilima mali vertikalni razmak */
   padding: 24px;
-  margin: auto 0;
+  border-radius: var(--radius-lg, 14px);
+  animation: fadeInUp 0.2s ease both;
 }
 
-.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.modal-header h3 { margin: 0; }
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
 
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.modal-header h3 { margin: 0; font-size: 17px; }
+
+.modal-close-btn {
+  background: none;
+  padding: 4px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius);
+}
+
+.modal-close-btn:hover { background: var(--bg3); color: var(--text); }
+
+.modal-body {
+  margin: 0 0 20px;
+  color: var(--text2);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 /* ── Mobile ── */
 @media (max-width: 640px) {
@@ -262,6 +321,8 @@
   .alarm-card-actions { gap: 6px; }
   .alarm-action-btn { flex: 1; justify-content: center; }
 
+  .modal-overlay { padding: 12px; }
+  .modal-box { padding: 20px 16px; }
   .modal-actions { flex-direction: column-reverse; }
-  .modal-actions button { width: 100%; justify-content: center; }
+  .modal-actions button { width: 100%; justify-content: center; display: flex; }
 }

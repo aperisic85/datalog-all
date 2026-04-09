@@ -337,6 +337,20 @@ pub async fn list_alarms(
     Ok(Json(db::list_alarms_global(&pool, &q2).await?))
 }
 
+/// DELETE /api/v1/alarms/:alarm_id  — briši jedan alarm zapis
+pub async fn delete_alarm(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(alarm_id): Path<i64>,
+) -> AppResult<StatusCode> {
+    if claims.role == "viewer" { return Err(AppError::Forbidden); }
+    db::delete_alarm_by_id(&pool, alarm_id).await?;
+    let uid = parse_uid(&claims.sub).ok();
+    let _ = db::write_audit(&pool, uid, Some(&claims.username),
+        "DELETE_ALARM", Some("alarm"), Some(&alarm_id.to_string()), None, None).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// DELETE /api/v1/objects/:id/alarms  — briši sve alarm zapise
 pub async fn delete_alarms(
     State(pool): State<PgPool>,

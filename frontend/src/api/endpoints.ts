@@ -114,6 +114,9 @@ export interface AlarmHistoryParams {
 export const listAlarmHistory = (params?: AlarmHistoryParams) =>
   api.get<Page<AlarmListItem>>('/api/v1/alarms', { params }).then((r) => r.data);
 
+export const deleteAlarm = (alarmId: number) =>
+  api.delete(`/api/v1/alarms/${alarmId}`);
+
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
   api.get<EventLogRecord[]>(`/api/v1/objects/${id}/eventlogs`, { params }).then((r) => r.data);
