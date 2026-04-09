@@ -128,6 +128,39 @@ pub fn start_pollers(configs: Vec<DataloggerConfig>, pool: PgPool, status: Share
     }
 }
 
+// ── Load configs from database ────────────────────────────────────────────
+
+/// Učitaj poller konfiguracije iz DB-a (objects gdje je polling_enabled=true).
+/// Ovo se poziva pri startu servera paralelno s load_configs_from_env().
+pub async fn load_configs_from_db(pool: &PgPool) -> Vec<DataloggerConfig> {
+    match db::list_pollable_objects(pool).await {
+        Ok(objects) => {
+            info!("Loaded {} pollable station(s) from database", objects.len());
+            objects.into_iter().filter_map(|obj| {
+                let url = obj.datalogger_url?; // skip ako nema URL (ne bi trebalo, ali sigurnost)
+                Some(DataloggerConfig {
+                    name:              obj.station_id,
+                    url,
+                    username:          obj.datalogger_user,
+                    password:          obj.datalogger_pass,
+                    poll_interval_sec: (obj.poll_interval_sec as u64).max(10),
+                    tables: vec![
+                        TableConfig { name: "Measurements_10min".into(), initial_records: 3 },
+                        TableConfig { name: "Measurements_1h".into(),    initial_records: 1 },
+                        TableConfig { name: "Measurements_24h".into(),   initial_records: 1 },
+                        TableConfig { name: "Alarms_10min".into(),       initial_records: 3 },
+                        TableConfig { name: "Event_log".into(),          initial_records: 20 },
+                    ],
+                })
+            }).collect()
+        }
+        Err(e) => {
+            error!("Failed to load polling configs from database: {}", e);
+            vec![]
+        }
+    }
+}
+
 // ── Load configs from environment ────────────────────────────────────────
 
 pub fn load_configs_from_env() -> Vec<DataloggerConfig> {

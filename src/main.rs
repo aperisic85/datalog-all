@@ -57,12 +57,25 @@ async fn main() -> anyhow::Result<()> {
 
     // ── Poller ────────────────────────────────────────────────────────────
     let poller_status: SharedPollerStatus = Arc::new(RwLock::new(PollerStatus::default()));
-    let poller_configs = poller::load_configs_from_env();
-    if poller_configs.is_empty() {
-        tracing::info!("No DATALOGGER_URL set — running in push-only mode");
+
+    // Kombiniraj konfiguracije iz env varijabli i iz baze podataka
+    let env_configs = poller::load_configs_from_env();
+    let db_configs  = poller::load_configs_from_db(&pool).await;
+
+    // Spoji konfiguracije; env varijable imaju prednost za isti station (po imenu)
+    let env_names: std::collections::HashSet<String> = env_configs.iter().map(|c| c.name.clone()).collect();
+    let mut all_configs = env_configs;
+    for cfg in db_configs {
+        if !env_names.contains(&cfg.name) {
+            all_configs.push(cfg);
+        }
+    }
+
+    if all_configs.is_empty() {
+        tracing::info!("No pollers configured (no DATALOGGER_URL and no polling_enabled objects in DB) — running in push-only mode");
     } else {
-        tracing::info!("Starting {} poller(s)...", poller_configs.len());
-        poller::start_pollers(poller_configs, pool.clone(), poller_status.clone());
+        tracing::info!("Starting {} poller(s)...", all_configs.len());
+        poller::start_pollers(all_configs, pool.clone(), poller_status.clone());
     }
 
     // ── CORS ──────────────────────────────────────────────────────────────

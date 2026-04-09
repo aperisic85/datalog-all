@@ -17,10 +17,10 @@ pub async fn poll_object_now(
 ) -> AppResult<Json<serde_json::Value>> {
     let _uid = Uuid::parse_str(&claims.sub).map_err(|_| AppError::Unauthorized)?;
 
-    let obj = db::get_object_by_id(&pool, id).await?
+    let poll_cfg = db::get_object_poll_config(&pool, id).await?
         .ok_or_else(|| AppError::NotFound(format!("Object {}", id)))?;
 
-    let url = obj.datalogger_url.clone()
+    let url = poll_cfg.datalogger_url.clone()
         .ok_or_else(|| AppError::BadRequest("Objekt nema konfiguriran datalogger URL".into()))?;
 
     let tables = vec![
@@ -30,10 +30,10 @@ pub async fn poll_object_now(
     ];
 
     let config = DataloggerConfig {
-        name:              obj.station_id.clone(),
+        name:              poll_cfg.station_id.clone(),
         url,
-        username:          Some("anonymous".to_string()),
-        password:          None,
+        username:          poll_cfg.datalogger_user.clone(),
+        password:          poll_cfg.datalogger_pass.clone(),
         poll_interval_sec: 0,
         tables:            tables.clone(),
     };
@@ -43,13 +43,13 @@ pub async fn poll_object_now(
     let mut results = vec![];
     for table_cfg in &tables {
         let mut state = PollState::default();
-        match poller::poll_one_table(&client, &pool, &obj.station_id, table_cfg, &mut state).await {
+        match poller::poll_one_table(&client, &pool, &poll_cfg.station_id, table_cfg, &mut state).await {
             Ok(n)  => results.push(serde_json::json!({ "table": table_cfg.name, "records": n })),
             Err(e) => results.push(serde_json::json!({ "table": table_cfg.name, "error": e.to_string() })),
         }
     }
 
-    Ok(Json(serde_json::json!({ "station_id": obj.station_id, "results": results })))
+    Ok(Json(serde_json::json!({ "station_id": poll_cfg.station_id, "results": results })))
 }
 
 /// GET /api/v1/poller/status
@@ -98,13 +98,17 @@ pub async fn set_datalogger_value(
         return Err(AppError::Forbidden);
     }
 
-    let url = obj.datalogger_url.clone().ok_or_else(|| AppError::BadRequest("Objekt nema konfiguriran datalogger URL".into()))?;
+    let poll_cfg = db::get_object_poll_config(&pool, req.object_id).await?
+        .ok_or_else(|| AppError::NotFound(format!("Object {}", req.object_id)))?;
+
+    let url = poll_cfg.datalogger_url.clone()
+        .ok_or_else(|| AppError::BadRequest("Objekt nema konfiguriran datalogger URL".into()))?;
 
     let config = DataloggerConfig {
         name:              obj.name.clone(),
         url,
-        username:          obj.datalogger_url.map(|_| "anonymous".to_string()),
-        password:          None,
+        username:          poll_cfg.datalogger_user,
+        password:          poll_cfg.datalogger_pass,
         poll_interval_sec: 0,
         tables:            vec![],
     };
