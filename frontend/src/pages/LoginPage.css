@@ -4,6 +4,7 @@
   align-items: center;
   justify-content: center;
   background: var(--bg);
+  padding: 16px;
 }
 
 .login-box {
@@ -36,4 +37,11 @@
   padding: 10px;
   font-size: 15px;
   margin-top: 4px;
+  min-height: 44px;
+}
+
+@media (max-width: 480px) {
+  .login-box {
+    padding: 24px 20px;
+  }
 }

@@ -169,6 +169,7 @@ export default function AdminUsersPage() {
       {showAdd && <CreateUserForm onDone={() => setShowAdd(false)} onCancel={() => setShowAdd(false)} />}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-scroll">
         <table>
           <thead>
             <tr>
@@ -227,6 +228,7 @@ export default function AdminUsersPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

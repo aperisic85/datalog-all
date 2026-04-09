@@ -64,13 +64,19 @@
   flex-shrink: 0;
 }
 
+/* Tab bar — scrollable on mobile */
 .detail-tabs {
   display: flex;
   gap: 4px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+
+.detail-tabs::-webkit-scrollbar { display: none; }
 
 .tab-btn {
   background: none;
@@ -80,6 +86,8 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover { color: var(--text); }
@@ -165,8 +173,6 @@
 .info-full { grid-column: 1 / -1; }
 
 /* Charts */
-.charts-tab { }
-
 .range-selector {
   display: flex;
   border: 1px solid var(--border);
@@ -183,6 +189,7 @@
   border-radius: 0;
   border-right: 1px solid var(--border);
   font-size: 13px;
+  white-space: nowrap;
 }
 .filter-tab:last-child { border-right: none; }
 .filter-tab:hover { background: var(--bg3); color: var(--text); }
@@ -190,7 +197,7 @@
 
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -231,8 +238,6 @@
 .alarm-item-icon { flex-shrink: 0; }
 
 /* Events */
-.events-tab { }
-
 .no-data {
   text-align: center;
   padding: 48px;
@@ -284,4 +289,32 @@
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .metric-card { padding: 12px; }
+  .metric-value { font-size: 16px; }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .range-selector {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .location-map-wrap {
+    height: 240px;
+  }
 }

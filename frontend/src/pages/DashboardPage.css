@@ -5,6 +5,7 @@
   display: flex;
   align-items: baseline;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .page-header h2 { font-size: 20px; }
@@ -86,3 +87,20 @@
 .region-stat-alarm { color: var(--warning); }
 .region-stat-danger { color: var(--danger); }
 .region-stat-warn { color: var(--warning); }
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .stat-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat-card { padding: 12px; gap: 10px; }
+  .stat-icon { width: 34px; height: 34px; border-radius: 8px; }
+  .stat-value { font-size: 20px; }
+
+  .region-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
