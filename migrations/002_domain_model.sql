@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Defaultni admin  (lozinka: admin123 — PROMIJENI!)
 INSERT INTO users (username, email, password_hash, full_name, role) VALUES
     ('admin','admin@plovput.hr',
-     '$2b$12$iUbD1mrTvNe4EQpML3mFv.g2MVTbgW6u2T4hKjA6AbOn3z9fvVF1m',
+     '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMaFMWt6/QhQOHZVqbXWAmVN4K',
      'System Administrator','admin')
 ON CONFLICT DO NOTHING;
 
