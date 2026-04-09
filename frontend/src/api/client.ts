@@ -22,6 +22,10 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config;
+    // Don't intercept auth endpoints — let login/refresh errors propagate normally
+    if (original?.url?.includes('/api/v1/auth/')) {
+      return Promise.reject(err);
+    }
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true;
       const refreshToken = localStorage.getItem('refresh_token');
