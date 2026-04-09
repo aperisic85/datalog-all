@@ -1,0 +1,10 @@
+# Rust build artifacts
+target/
+
+# Environment files
+.env
+.env.local
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/
