@@ -11,6 +11,8 @@ import {
   Sun,
   Moon,
   Map,
+  Menu,
+  X,
 } from 'lucide-react';
 import './Layout.css';
 
@@ -20,11 +22,22 @@ export default function Layout() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
   });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   const toggleTheme = () => setTheme((t) => t === 'dark' ? 'light' : 'dark');
 
@@ -33,35 +46,42 @@ export default function Layout() {
     navigate('/login');
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="layout">
-      <aside className="sidebar">
+      {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar} />}
+
+      <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <Activity size={20} />
           <span>DataLogger</span>
+          <button className="sidebar-close-btn" onClick={closeSidebar} title="Zatvori">
+            <X size={18} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">
-          <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <NavLink to="/dashboard" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <LayoutDashboard size={16} />
             Dashboard
           </NavLink>
-          <NavLink to="/objects" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <NavLink to="/objects" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Radio size={16} />
             Objekti
           </NavLink>
-          <NavLink to="/map" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <NavLink to="/map" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Map size={16} />
             Karta
           </NavLink>
           {isAdmin && (
             <>
               <div className="nav-section">Admin</div>
-              <NavLink to="/admin/regions" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <NavLink to="/admin/regions" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                 <MapPin size={16} />
                 Regije
               </NavLink>
-              <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <NavLink to="/admin/users" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                 <Users size={16} />
                 Korisnici
               </NavLink>
@@ -87,7 +107,21 @@ export default function Layout() {
       </aside>
 
       <main className="content">
-        <Outlet />
+        <div className="mobile-topbar">
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Meni">
+            <Menu size={22} />
+          </button>
+          <div className="mobile-logo">
+            <Activity size={18} />
+            <span>DataLogger</span>
+          </div>
+          <button className="logout-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
+        <div className="content-inner">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

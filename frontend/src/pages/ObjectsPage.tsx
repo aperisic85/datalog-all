@@ -251,6 +251,7 @@ export default function ObjectsPage() {
       ) : (
         <>
           <div className="objects-table card">
+            <div className="table-scroll">
             <table>
               <thead>
                 <tr>
@@ -305,6 +306,7 @@ export default function ObjectsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {data && data.total_pages > 1 && (

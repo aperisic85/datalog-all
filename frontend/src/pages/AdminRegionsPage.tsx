@@ -119,6 +119,7 @@ export default function AdminRegionsPage() {
       {update.isError && <div className="error-msg">Greška pri ažuriranju regije</div>}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-scroll">
         <table>
           <thead>
             <tr>
@@ -171,6 +172,7 @@ export default function AdminRegionsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

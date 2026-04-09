@@ -82,6 +82,12 @@ input, select, textarea {
   outline: none;
   transition: border-color 0.15s;
   width: 100%;
+  /* Prevent iOS zoom on focus */
+  font-size: max(16px, 14px);
+}
+
+@media (min-width: 769px) {
+  input, select, textarea { font-size: 14px; }
 }
 
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
@@ -113,12 +119,20 @@ label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 4px
 .badge-danger  { background: rgba(239,68,68,0.15);  color: var(--danger); }
 .badge-neutral { background: rgba(136,146,164,0.15); color: var(--text2); }
 
+/* Scrollable table wrapper */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table { width: 100%; border-collapse: collapse; }
 
 th, td {
   text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 
 th {

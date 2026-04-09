@@ -688,6 +688,7 @@ export default function ObjectDetailPage() {
             <div className="no-data">Nema event log zapisa</div>
           ) : (
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
@@ -711,6 +712,7 @@ export default function ObjectDetailPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
