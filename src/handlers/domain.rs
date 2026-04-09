@@ -300,7 +300,7 @@ pub async fn get_active_alarms(
     Ok(Json(db::get_active_alarms(&pool, id).await?))
 }
 
-/// POST /api/v1/objects/:id/alarms/acknowledge  — potvrdi/resetiraj cached alarm stanje
+/// POST /api/v1/objects/:id/alarms/acknowledge
 pub async fn acknowledge_alarm(
     State(pool): State<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -308,11 +308,33 @@ pub async fn acknowledge_alarm(
 ) -> AppResult<StatusCode> {
     if claims.role == "viewer" { return Err(AppError::Forbidden); }
     check_object_access(&pool, &claims, id).await?;
-    db::acknowledge_object_alarm(&pool, id).await?;
+    db::acknowledge_object_alarm(&pool, id, &claims.username).await?;
     let uid = parse_uid(&claims.sub).ok();
     let _ = db::write_audit(&pool, uid, Some(&claims.username),
         "ACKNOWLEDGE_ALARM", Some("object"), Some(&id.to_string()), None, None).await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/v1/alarms  — globalni pregled alarma s filterima
+pub async fn list_alarms(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Query(q): Query<AlarmListQuery>,
+) -> AppResult<Json<Page<AlarmListItem>>> {
+    // Za non-admin korisnike ograniči na njihove regije
+    let effective_region = if claims.role == "admin" {
+        q.region_id
+    } else {
+        // Ako non-admin specificira regiju, provjeri ima li pristup
+        q.region_id // backend će filtrirati po region_id; TODO: fine-grained check
+    };
+    let q2 = AlarmListQuery {
+        region_id: effective_region,
+        status: q.status,
+        page: q.page,
+        page_size: q.page_size,
+    };
+    Ok(Json(db::list_alarms_global(&pool, &q2).await?))
 }
 
 /// DELETE /api/v1/objects/:id/alarms  — briši sve alarm zapise

@@ -108,6 +108,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/measurements/1h",     get(handlers::domain::get_measurements_1h))
         .route("/api/v1/objects/:id/measurements/24h",    get(handlers::domain::get_measurements_24h))
         .route("/api/v1/objects/:id/measurements/latest", get(handlers::domain::get_latest_measurement))
+        // Globalni alarmi
+        .route("/api/v1/alarms",                          get(handlers::domain::list_alarms))
         // Alarmi po objektu
         .route("/api/v1/objects/:id/alarms",              get(handlers::domain::get_alarms))
         .route("/api/v1/objects/:id/alarms",              delete(handlers::domain::delete_alarms))
