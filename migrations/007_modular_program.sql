@@ -211,8 +211,11 @@ COMMENT ON COLUMN objects.program_features IS
 
 -- ================================================================
 -- Ažuriraj v_objects view (dodaj nova polja)
+-- DROP + CREATE jer se dodaju kolone (CREATE OR REPLACE ne može
+-- mijenjati redoslijed postojećih kolona)
 -- ================================================================
-CREATE OR REPLACE VIEW v_objects AS
+DROP VIEW IF EXISTS v_objects;
+CREATE VIEW v_objects AS
 SELECT
     o.id,
     o.station_id,
@@ -221,6 +224,7 @@ SELECT
     o.latitude,
     o.longitude,
     o.location_name,
+    o.allowed_radius_m,
     o.description,
     o.notes,
     o.is_active,
@@ -256,6 +260,8 @@ JOIN      regions        r  ON o.region_id = r.id;
 
 -- ================================================================
 -- Ažuriraj v_latest_measurements view (dodaj nova polja)
+-- CREATE OR REPLACE je ok jedino ako se nove kolone dodaju NA KRAJ
+-- (v_region_summary ovisi o ovom viewu pa ga ne smijemo dropati)
 -- ================================================================
 CREATE OR REPLACE VIEW v_latest_measurements AS
 SELECT DISTINCT ON (m.object_id)
@@ -277,10 +283,10 @@ SELECT DISTINCT ON (m.object_id)
     m.garmin_distance_avg,
     m.lantern_comm_ok_avg,
     m.lantern_light_active_avg,
-    m.lantern_current_active_avg,
     m.lantern_current_avg,
     m.lantern_distance_avg,
-    -- Novi senzori
+    -- Novi senzori (sve na kraj da ne poremetimo redoslijed)
+    m.lantern_current_active_avg,
     m.visibility_comm_ok_avg,
     m.visibility_value_avg,
     m.visibility_alarm_avg,
