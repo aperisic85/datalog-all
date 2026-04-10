@@ -315,6 +315,10 @@ export default function ObjectsPage() {
                             {obj.name}
                           </Link>
                           {obj.short_name && <div className="obj-sub">{obj.short_name}</div>}
+                          {obj.program_features != null
+                            ? <span className="badge" style={{ fontSize: 10, background: 'var(--accent)', color: '#fff', marginTop: 2 }}>Tip 2</span>
+                            : <span className="badge badge-neutral" style={{ fontSize: 10, marginTop: 2 }}>Tip 1</span>
+                          }
                         </td>
                         <td><code className="station-id">{obj.station_id}</code></td>
                         <td>
@@ -379,6 +383,10 @@ export default function ObjectsPage() {
                   </div>
                   <div className="obj-card-footer">
                     <code className="station-id">{obj.station_id}</code>
+                    {obj.program_features != null
+                      ? <span className="badge" style={{ fontSize: 10, background: 'var(--accent)', color: '#fff' }}>Tip 2</span>
+                      : <span className="badge badge-neutral" style={{ fontSize: 10 }}>Tip 1</span>
+                    }
                     {obj.is_active
                       ? <span className="badge badge-success" style={{ fontSize: 11 }}>Aktivan</span>
                       : <span className="badge badge-neutral" style={{ fontSize: 11 }}>Neaktivan</span>

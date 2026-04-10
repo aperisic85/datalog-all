@@ -1,3 +1,14 @@
+// Aktivirani moduli na objektu (novi modularni CR300 program)
+export interface ProgramFeatures {
+  sealite?: boolean;
+  navlite?: boolean;
+  modem?: boolean;
+  modem_on_other_station?: boolean;
+  vaisala_pwd20?: boolean;
+  visibility_on_other_station?: boolean;
+  fog_signal?: boolean;
+}
+
 export interface Region {
   id: string;
   name: string;
@@ -32,6 +43,9 @@ export interface ObjectView {
   datalogger_url?: string;
   poll_interval_sec: number;
   commissioned_at?: string;
+  // Program tip — null = Tip 1 (Galija), postavljen = Tip 2 (Modularni)
+  program_version?: string;
+  program_features?: ProgramFeatures;
   alarm_active: boolean;
   alarm_count: number;
   alarm_worst_level?: number;
@@ -71,10 +85,18 @@ export interface Measurement10min {
   garmin_distance_avg?: number;
   lantern_comm_ok_avg?: number;
   lantern_light_active_avg?: number;
+  lantern_current_active_avg?: number;
   lantern_current_avg?: number;
   lantern_latitude_avg?: number;
   lantern_longitude_avg?: number;
   lantern_distance_avg?: number;
+  // Novi senzori (modularni program)
+  visibility_comm_ok_avg?: number;
+  visibility_value_avg?: number;
+  visibility_alarm_avg?: number;
+  visibility_error_smp?: number;
+  fog_signal_active_avg?: number;
+  fog_signal_current_avg?: number;
 }
 
 export interface Measurement1h {
@@ -89,8 +111,13 @@ export interface Measurement1h {
   solar_voltage_avg?: number;
   solar_daylight_avg?: number;
   datalogger_temp_avg?: number;
+  internet_ok_avg?: number;
   lantern_light_active_avg?: number;
   lantern_current_avg?: number;
+  // Novi senzori (modularni program)
+  visibility_value_avg?: number;
+  visibility_alarm_avg?: number;
+  fog_signal_current_avg?: number;
 }
 
 export interface AlarmListItem {
@@ -123,6 +150,11 @@ export interface AlarmListItem {
   alarm_modem_network_error: number;
   alarm_modem_other_error: number;
   alarm_station_other_error: number;
+  // Novi alarmi (modularni program)
+  alarm_visibility_comm_failed: number;
+  alarm_visibility_error: number;
+  alarm_fog_signal_off_during_fog: number;
+  alarm_fog_signal_on_while_no_fog: number;
 }
 
 export interface AlarmRecord {
@@ -145,6 +177,11 @@ export interface AlarmRecord {
   alarm_modem_network_error: number;
   alarm_modem_other_error: number;
   alarm_station_other_error: number;
+  // Novi alarmi (modularni program)
+  alarm_visibility_comm_failed: number;
+  alarm_visibility_error: number;
+  alarm_fog_signal_off_during_fog: number;
+  alarm_fog_signal_on_while_no_fog: number;
   any_alarm_active: boolean;
 }
 
@@ -175,8 +212,15 @@ export interface LatestMeasurement {
   garmin_distance_avg?: number;
   lantern_comm_ok_avg?: number;
   lantern_light_active_avg?: number;
+  lantern_current_active_avg?: number;
   lantern_current_avg?: number;
   lantern_distance_avg?: number;
+  // Novi senzori (modularni program)
+  visibility_comm_ok_avg?: number;
+  visibility_value_avg?: number;
+  visibility_alarm_avg?: number;
+  fog_signal_active_avg?: number;
+  fog_signal_current_avg?: number;
 }
 
 export interface RegionSummary {

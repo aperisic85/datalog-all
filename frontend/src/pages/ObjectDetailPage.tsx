@@ -42,6 +42,9 @@ import {
   X,
   TrendingUp,
   TrendingDown,
+  Eye,
+  Wind,
+  Cpu,
 } from 'lucide-react';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
@@ -108,6 +111,11 @@ const ALARM_LABELS: Record<string, string> = {
   alarm_modem_network_error: 'Modem mrežna greška',
   alarm_modem_other_error: 'Modem ostala greška',
   alarm_station_other_error: 'Stanica ostala greška',
+  // Novi alarmi — modularni program (Tip 2)
+  alarm_visibility_comm_failed: 'Vidljivost: greška veze',
+  alarm_visibility_error: 'Vidljivost: greška senzora',
+  alarm_fog_signal_off_during_fog: 'Maglenka: nije aktivna u magli',
+  alarm_fog_signal_on_while_no_fog: 'Maglenka: aktivna bez magle',
 };
 
 const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
@@ -122,6 +130,7 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const pf = obj.program_features;
   const [form, setForm] = useState({
     name: obj.name,
     short_name: obj.short_name ?? '',
@@ -136,6 +145,16 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
     polling_enabled: obj.polling_enabled,
     is_active: obj.is_active,
     description: obj.description ?? '',
+    // Program tip
+    is_modular: pf != null,
+    program_version: obj.program_version ?? '',
+    pf_sealite: pf?.sealite ?? false,
+    pf_navlite: pf?.navlite ?? false,
+    pf_modem: pf?.modem ?? false,
+    pf_modem_on_other: pf?.modem_on_other_station ?? false,
+    pf_vaisala: pf?.vaisala_pwd20 ?? false,
+    pf_visibility_other: pf?.visibility_on_other_station ?? false,
+    pf_fog: pf?.fog_signal ?? false,
   });
 
   const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
@@ -175,6 +194,16 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
       polling_enabled: form.polling_enabled,
       is_active: form.is_active,
       description: form.description || undefined,
+      program_version: form.is_modular && form.program_version ? form.program_version : undefined,
+      program_features: form.is_modular ? {
+        sealite: form.pf_sealite,
+        navlite: form.pf_navlite,
+        modem: form.pf_modem,
+        modem_on_other_station: form.pf_modem_on_other,
+        vaisala_pwd20: form.pf_vaisala,
+        visibility_on_other_station: form.pf_visibility_other,
+        fog_signal: form.pf_fog,
+      } : null,
     });
   };
 
@@ -265,6 +294,55 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
             <label>Opis</label>
             <input value={form.description} onChange={(e) => set('description', e.target.value)} />
           </div>
+
+          {/* Program tip */}
+          <div className="form-group" style={{ marginTop: 8 }}>
+            <label>Program tip</label>
+            <select
+              value={form.is_modular ? 'modular' : 'galija'}
+              onChange={(e) => set('is_modular', e.target.value === 'modular')}
+            >
+              <option value="galija">Tip 1 — Galija (stari program)</option>
+              <option value="modular">Tip 2 — Modularni program</option>
+            </select>
+          </div>
+
+          {form.is_modular && (
+            <>
+              <div className="form-group">
+                <label>Verzija programa</label>
+                <input
+                  value={form.program_version}
+                  onChange={(e) => set('program_version', e.target.value)}
+                  placeholder="npr. 0.05"
+                />
+              </div>
+              <div className="form-group">
+                <label>Instalirani moduli</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', marginTop: 4 }}>
+                  {[
+                    ['pf_sealite',        'SeaLite fenjer (SL serija)'],
+                    ['pf_navlite',        'NavLite fenjer'],
+                    ['pf_modem',          'Lokalni modem'],
+                    ['pf_modem_on_other', 'Modem na drugoj stanici'],
+                    ['pf_vaisala',        'Vaisala PWD20 vidljivost'],
+                    ['pf_visibility_other','Vidljivost s druge stanice'],
+                    ['pf_fog',            'Maglenka SFH'],
+                  ].map(([key, label]) => (
+                    <label key={key} className="filter-checkbox" style={{ fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={!!form[key as keyof typeof form]}
+                        onChange={(e) => set(key, e.target.checked)}
+                        style={{ width: 'auto' }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Odustani</button>
@@ -404,6 +482,10 @@ export default function ObjectDetailPage() {
                 <MapPin size={12} /> {obj.location_name}
               </span>
             )}
+            {obj.program_features != null
+              ? <span className="badge" style={{ background: 'var(--accent)', color: '#fff', fontSize: 11 }}><Cpu size={10} /> Tip 2 — Modularni</span>
+              : <span className="badge badge-neutral" style={{ fontSize: 11 }}><Cpu size={10} /> Tip 1 — Galija</span>
+            }
           </div>
         </div>
       </div>
@@ -444,8 +526,40 @@ export default function ObjectDetailPage() {
               prev={recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null} />
             <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A"
               prev={recentPositions?.[1]?.lantern_current_avg} />
-            <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
-              prev={recentPositions?.[1]?.garmin_satellites_avg} />
+            {/* Tip 1 — Galija: GPS sateliti */}
+            {!obj.program_features && (
+              <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
+                prev={recentPositions?.[1]?.garmin_satellites_avg} />
+            )}
+            {/* Tip 2 — Modularni: vidljivost i maglenka */}
+            {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
+              <MetricCard
+                icon={<Eye size={20} />}
+                label="Vidljivost"
+                value={latest?.visibility_value_avg}
+                unit="m"
+                color={
+                  latest?.visibility_value_avg == null ? undefined :
+                  latest.visibility_value_avg < 200 ? 'var(--danger)' :
+                  latest.visibility_value_avg < 1000 ? 'var(--warning)' : 'var(--success)'
+                }
+                prev={recentPositions?.[1]?.visibility_value_avg}
+              />
+            )}
+            {obj.program_features?.fog_signal && (
+              <MetricCard
+                icon={<Wind size={20} />}
+                label="Maglenka aktivna"
+                value={latest?.fog_signal_active_avg != null ? latest.fog_signal_active_avg * 100 : null}
+                unit="%"
+                color="var(--accent)"
+                prev={recentPositions?.[1]?.fog_signal_active_avg != null ? recentPositions[1].fog_signal_active_avg! * 100 : null}
+              />
+            )}
+            {obj.program_features?.fog_signal && (
+              <MetricCard icon={<Wind size={20} />} label="Struja maglenke" value={latest?.fog_signal_current_avg} unit="A"
+                prev={recentPositions?.[1]?.fog_signal_current_avg} />
+            )}
           </div>
 
           <div className="poll-row">
@@ -470,7 +584,26 @@ export default function ObjectDetailPage() {
           <div className="info-section card" style={{ marginTop: 16 }}>
             <h3>Informacije o objektu</h3>
             <div className="info-grid">
-              {obj.type_name && <div><span>Tip:</span> {obj.type_name}</div>}
+              {obj.type_name && <div><span>Fizički tip:</span> {obj.type_name}</div>}
+              <div>
+                <span>Program tip:</span>{' '}
+                {obj.program_features != null ? 'Tip 2 — Modularni' : 'Tip 1 — Galija'}
+              </div>
+              {obj.program_version && <div><span>Verzija programa:</span> {obj.program_version}</div>}
+              {obj.program_features && (
+                <div className="info-full">
+                  <span>Instalirani moduli:</span>{' '}
+                  {[
+                    obj.program_features.sealite && 'SeaLite',
+                    obj.program_features.navlite && 'NavLite',
+                    obj.program_features.modem && 'Modem',
+                    obj.program_features.modem_on_other_station && 'Modem (druga stanica)',
+                    obj.program_features.vaisala_pwd20 && 'Vaisala PWD20',
+                    obj.program_features.visibility_on_other_station && 'Vidljivost (druga stanica)',
+                    obj.program_features.fog_signal && 'Maglenka SFH',
+                  ].filter(Boolean).join(', ') || '—'}
+                </div>
+              )}
               {obj.commissioned_at && <div><span>Puštanje u rad:</span> {obj.commissioned_at}</div>}
               {obj.latitude && obj.longitude && (
                 <div>
@@ -653,6 +786,42 @@ export default function ObjectDetailPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+
+              {/* Vidljivost — samo ako je Vaisala ili vidljivost s druge stanice */}
+              {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
+                <div className="chart-card card chart-wide">
+                  <h4>Vidljivost (m)</h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="visibility_value_avg" stroke="var(--accent)" dot={false} name="Vidljivost (m)" />
+                      <Line type="monotone" dataKey="visibility_alarm_avg" stroke="var(--danger)" dot={false} name="Alarm vidljivosti" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Maglenka — samo ako je instalirana */}
+              {obj.program_features?.fog_signal && (
+                <div className="chart-card card chart-wide">
+                  <h4>Maglenka</h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="fog_signal_active_avg" stroke="var(--warning)" dot={false} name="Aktivan (0/1)" />
+                      <Line type="monotone" dataKey="fog_signal_current_avg" stroke="var(--accent)" dot={false} name="Struja (A)" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           )}
         </div>

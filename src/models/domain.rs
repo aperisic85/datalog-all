@@ -1,5 +1,6 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
 // ================================================================
@@ -64,6 +65,9 @@ pub struct ObjectView {
     pub datalogger_url:      Option<String>,
     pub poll_interval_sec:   i32,
     pub commissioned_at:     Option<NaiveDate>,
+    // Program tip (modularni CR300)
+    pub program_version:     Option<String>,
+    pub program_features:    Option<JsonValue>,
     // Alarm cache
     pub alarm_active:        bool,
     pub alarm_count:         i16,
@@ -103,6 +107,8 @@ pub struct CreateObjectRequest {
     pub poll_interval_sec: Option<i32>,
     pub polling_enabled:   Option<bool>,
     pub commissioned_at:   Option<NaiveDate>,
+    pub program_version:   Option<String>,
+    pub program_features:  Option<JsonValue>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -123,6 +129,8 @@ pub struct UpdateObjectRequest {
     pub poll_interval_sec: Option<i32>,
     pub polling_enabled:   Option<bool>,
     pub is_active:         Option<bool>,
+    pub program_version:   Option<String>,
+    pub program_features:  Option<JsonValue>,
 }
 
 // ================================================================
@@ -170,40 +178,56 @@ pub struct Measurement10min {
     pub garmin_latitude_avg:     Option<f64>,
     pub garmin_longitude_avg:    Option<f64>,
     pub garmin_distance_avg:     Option<f32>,
-    pub lantern_comm_ok_avg:     Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
-    pub lantern_latitude_avg:    Option<f64>,
-    pub lantern_longitude_avg:   Option<f64>,
-    pub lantern_distance_avg:    Option<f32>,
+    pub lantern_comm_ok_avg:        Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_active_avg: Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    pub lantern_latitude_avg:       Option<f64>,
+    pub lantern_longitude_avg:      Option<f64>,
+    pub lantern_distance_avg:       Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_comm_ok_avg:     Option<f32>,
+    pub visibility_value_avg:       Option<f32>,
+    pub visibility_alarm_avg:       Option<f32>,
+    pub visibility_error_smp:       Option<i16>,
+    pub fog_signal_active_avg:      Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 #[derive(Debug, Default)]
 pub struct Measurement10minInsert {
-    pub object_id:               Option<Uuid>,
-    pub station_id:              String,
-    pub recorded_at:             DateTime<Utc>,
-    pub datalogger_temp_avg:     Option<f32>,
-    pub battery_voltage_avg:     Option<f32>,
-    pub battery_current_avg:     Option<f32>,
-    pub battery_status_smp:      Option<i16>,
-    pub battery_status_avg:      Option<f32>,
-    pub solar_voltage_avg:       Option<f32>,
-    pub solar_daylight_smp:      Option<i16>,
-    pub solar_daylight_avg:      Option<f32>,
-    pub modem_power_avg:         Option<f32>,
-    pub internet_ok_avg:         Option<f32>,
-    pub garmin_comm_ok_avg:      Option<f32>,
-    pub garmin_satellites_avg:   Option<f32>,
-    pub garmin_latitude_avg:     Option<f64>,
-    pub garmin_longitude_avg:    Option<f64>,
-    pub garmin_distance_avg:     Option<f32>,
-    pub lantern_comm_ok_avg:     Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
-    pub lantern_latitude_avg:    Option<f64>,
-    pub lantern_longitude_avg:   Option<f64>,
-    pub lantern_distance_avg:    Option<f32>,
+    pub object_id:                  Option<Uuid>,
+    pub station_id:                 String,
+    pub recorded_at:                DateTime<Utc>,
+    pub datalogger_temp_avg:        Option<f32>,
+    pub battery_voltage_avg:        Option<f32>,
+    pub battery_current_avg:        Option<f32>,
+    pub battery_status_smp:         Option<i16>,
+    pub battery_status_avg:         Option<f32>,
+    pub solar_voltage_avg:          Option<f32>,
+    pub solar_daylight_smp:         Option<i16>,
+    pub solar_daylight_avg:         Option<f32>,
+    pub modem_power_avg:            Option<f32>,
+    pub internet_ok_avg:            Option<f32>,
+    pub garmin_comm_ok_avg:         Option<f32>,
+    pub garmin_satellites_avg:      Option<f32>,
+    pub garmin_latitude_avg:        Option<f64>,
+    pub garmin_longitude_avg:       Option<f64>,
+    pub garmin_distance_avg:        Option<f32>,
+    pub lantern_comm_ok_avg:        Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_active_avg: Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    pub lantern_latitude_avg:       Option<f64>,
+    pub lantern_longitude_avg:      Option<f64>,
+    pub lantern_distance_avg:       Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_comm_ok_avg:     Option<f32>,
+    pub visibility_value_avg:       Option<f32>,
+    pub visibility_alarm_avg:       Option<f32>,
+    pub visibility_error_smp:       Option<i16>,
+    pub fog_signal_active_avg:      Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 // ================================================================
@@ -224,27 +248,37 @@ pub struct Measurement1h {
     pub battery_status_avg:      Option<f32>,
     pub solar_voltage_avg:       Option<f32>,
     pub solar_daylight_avg:      Option<f32>,
-    pub modem_power_avg:         Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
+    pub modem_power_avg:            Option<f32>,
+    pub internet_ok_avg:            Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_value_avg:       Option<f32>,
+    pub visibility_alarm_avg:       Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 #[derive(Debug, Default)]
 pub struct Measurement1hInsert {
-    pub object_id:               Option<Uuid>,
-    pub station_id:              String,
-    pub recorded_at:             DateTime<Utc>,
-    pub datalogger_temp_avg:     Option<f32>,
-    pub battery_voltage_avg:     Option<f32>,
-    pub battery_current_avg:     Option<f32>,
-    pub battery_charge_tot:      Option<f32>,
-    pub battery_discharge_tot:   Option<f32>,
-    pub battery_status_avg:      Option<f32>,
-    pub solar_voltage_avg:       Option<f32>,
-    pub solar_daylight_avg:      Option<f32>,
-    pub modem_power_avg:         Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
+    pub object_id:                  Option<Uuid>,
+    pub station_id:                 String,
+    pub recorded_at:                DateTime<Utc>,
+    pub datalogger_temp_avg:        Option<f32>,
+    pub battery_voltage_avg:        Option<f32>,
+    pub battery_current_avg:        Option<f32>,
+    pub battery_charge_tot:         Option<f32>,
+    pub battery_discharge_tot:      Option<f32>,
+    pub battery_status_avg:         Option<f32>,
+    pub solar_voltage_avg:          Option<f32>,
+    pub solar_daylight_avg:         Option<f32>,
+    pub modem_power_avg:            Option<f32>,
+    pub internet_ok_avg:            Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_value_avg:       Option<f32>,
+    pub visibility_alarm_avg:       Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 // ================================================================
@@ -266,28 +300,36 @@ pub struct Measurement24h {
     pub battery_discharge_tot:   Option<f32>,
     pub battery_status_avg:      Option<f32>,
     pub solar_daylight_avg:      Option<f32>,
-    pub modem_power_avg:         Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
+    pub modem_power_avg:            Option<f32>,
+    pub internet_ok_avg:            Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_value_avg:       Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 #[derive(Debug, Default)]
 pub struct Measurement24hInsert {
-    pub object_id:               Option<Uuid>,
-    pub station_id:              String,
-    pub recorded_at:             DateTime<Utc>,
-    pub datalogger_temp_avg:     Option<f32>,
-    pub battery_voltage_avg:     Option<f32>,
-    pub battery_current_avg:     Option<f32>,
-    pub battery_current_min:     Option<f32>,
-    pub battery_current_max:     Option<f32>,
-    pub battery_charge_tot:      Option<f32>,
-    pub battery_discharge_tot:   Option<f32>,
-    pub battery_status_avg:      Option<f32>,
-    pub solar_daylight_avg:      Option<f32>,
-    pub modem_power_avg:         Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
+    pub object_id:                  Option<Uuid>,
+    pub station_id:                 String,
+    pub recorded_at:                DateTime<Utc>,
+    pub datalogger_temp_avg:        Option<f32>,
+    pub battery_voltage_avg:        Option<f32>,
+    pub battery_current_avg:        Option<f32>,
+    pub battery_current_min:        Option<f32>,
+    pub battery_current_max:        Option<f32>,
+    pub battery_charge_tot:         Option<f32>,
+    pub battery_discharge_tot:      Option<f32>,
+    pub battery_status_avg:         Option<f32>,
+    pub solar_daylight_avg:         Option<f32>,
+    pub modem_power_avg:            Option<f32>,
+    pub internet_ok_avg:            Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_value_avg:       Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 // ================================================================
@@ -314,9 +356,14 @@ pub struct AlarmRecord {
     pub alarm_lantern_comm_failed:    i16,
     pub alarm_lantern_other_error:    i16,
     pub alarm_modem_network_error:    i16,
-    pub alarm_modem_other_error:      i16,
-    pub alarm_station_other_error:    i16,
-    pub any_alarm_active:             bool,
+    pub alarm_modem_other_error:               i16,
+    pub alarm_station_other_error:             i16,
+    // Novi alarmi (modularni program)
+    pub alarm_visibility_comm_failed:          i16,
+    pub alarm_visibility_error:                i16,
+    pub alarm_fog_signal_off_during_fog:       i16,
+    pub alarm_fog_signal_on_while_no_fog:      i16,
+    pub any_alarm_active:                      bool,
 }
 
 /// Prošireni alarm zapis s info o objektu i regiji — za globalni pregled
@@ -348,9 +395,14 @@ pub struct AlarmListItem {
     pub alarm_lantern_day_light_on:   i16,
     pub alarm_lantern_comm_failed:    i16,
     pub alarm_lantern_other_error:    i16,
-    pub alarm_modem_network_error:    i16,
-    pub alarm_modem_other_error:      i16,
-    pub alarm_station_other_error:    i16,
+    pub alarm_modem_network_error:             i16,
+    pub alarm_modem_other_error:               i16,
+    pub alarm_station_other_error:             i16,
+    // Novi alarmi (modularni program)
+    pub alarm_visibility_comm_failed:          i16,
+    pub alarm_visibility_error:                i16,
+    pub alarm_fog_signal_off_during_fog:       i16,
+    pub alarm_fog_signal_on_while_no_fog:      i16,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -380,9 +432,14 @@ pub struct AlarmInsert {
     pub alarm_lantern_day_light_on:   i16,
     pub alarm_lantern_comm_failed:    i16,
     pub alarm_lantern_other_error:    i16,
-    pub alarm_modem_network_error:    i16,
-    pub alarm_modem_other_error:      i16,
-    pub alarm_station_other_error:    i16,
+    pub alarm_modem_network_error:             i16,
+    pub alarm_modem_other_error:               i16,
+    pub alarm_station_other_error:             i16,
+    // Novi alarmi (modularni program)
+    pub alarm_visibility_comm_failed:          i16,
+    pub alarm_visibility_error:                i16,
+    pub alarm_fog_signal_off_during_fog:       i16,
+    pub alarm_fog_signal_on_while_no_fog:      i16,
 }
 
 // ================================================================
@@ -568,10 +625,17 @@ pub struct LatestMeasurement {
     pub garmin_latitude_avg:     Option<f64>,
     pub garmin_longitude_avg:    Option<f64>,
     pub garmin_distance_avg:     Option<f32>,
-    pub lantern_comm_ok_avg:     Option<f32>,
-    pub lantern_light_active_avg: Option<f32>,
-    pub lantern_current_avg:     Option<f32>,
-    pub lantern_distance_avg:    Option<f32>,
+    pub lantern_comm_ok_avg:        Option<f32>,
+    pub lantern_light_active_avg:   Option<f32>,
+    pub lantern_current_active_avg: Option<f32>,
+    pub lantern_current_avg:        Option<f32>,
+    pub lantern_distance_avg:       Option<f32>,
+    // Novi senzori (modularni program)
+    pub visibility_comm_ok_avg:     Option<f32>,
+    pub visibility_value_avg:       Option<f32>,
+    pub visibility_alarm_avg:       Option<f32>,
+    pub fog_signal_active_avg:      Option<f32>,
+    pub fog_signal_current_avg:     Option<f32>,
 }
 
 // ================================================================
