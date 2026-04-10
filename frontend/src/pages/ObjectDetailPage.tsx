@@ -114,8 +114,8 @@ const ALARM_LABELS: Record<string, string> = {
   // Novi alarmi — modularni program (Tip 2)
   alarm_visibility_comm_failed: 'Vidljivost: greška veze',
   alarm_visibility_error: 'Vidljivost: greška senzora',
-  alarm_fog_signal_off_during_fog: 'Maglenka: nije aktivna u magli',
-  alarm_fog_signal_on_while_no_fog: 'Maglenka: aktivna bez magle',
+  alarm_fog_signal_off_during_fog: 'Sirena: nije aktivna u magli',
+  alarm_fog_signal_on_while_no_fog: 'Sirena: aktivna bez magle',
 };
 
 const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
@@ -327,7 +327,7 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
                     ['pf_modem_on_other', 'Modem na drugoj stanici'],
                     ['pf_vaisala',        'Vaisala PWD20 vidljivost'],
                     ['pf_visibility_other','Vidljivost s druge stanice'],
-                    ['pf_fog',            'Maglenka SFH'],
+                    ['pf_fog',            'Sirena SFH'],
                   ].map(([key, label]) => (
                     <label key={key} className="filter-checkbox" style={{ fontSize: 13 }}>
                       <input
@@ -531,7 +531,7 @@ export default function ObjectDetailPage() {
               <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
                 prev={recentPositions?.[1]?.garmin_satellites_avg} />
             )}
-            {/* Tip 2 — Modularni: vidljivost i maglenka */}
+            {/* Tip 2 — Modularni: vidljivost i sirena */}
             {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
               <MetricCard
                 icon={<Eye size={20} />}
@@ -549,7 +549,7 @@ export default function ObjectDetailPage() {
             {obj.program_features?.fog_signal && (
               <MetricCard
                 icon={<Wind size={20} />}
-                label="Maglenka aktivna"
+                label="Sirena aktivna"
                 value={latest?.fog_signal_active_avg != null ? latest.fog_signal_active_avg * 100 : null}
                 unit="%"
                 color="var(--accent)"
@@ -557,7 +557,7 @@ export default function ObjectDetailPage() {
               />
             )}
             {obj.program_features?.fog_signal && (
-              <MetricCard icon={<Wind size={20} />} label="Struja maglenke" value={latest?.fog_signal_current_avg} unit="A"
+              <MetricCard icon={<Wind size={20} />} label="Struja sirene" value={latest?.fog_signal_current_avg} unit="A"
                 prev={recentPositions?.[1]?.fog_signal_current_avg} />
             )}
           </div>
@@ -600,7 +600,7 @@ export default function ObjectDetailPage() {
                     obj.program_features.modem_on_other_station && 'Modem (druga stanica)',
                     obj.program_features.vaisala_pwd20 && 'Vaisala PWD20',
                     obj.program_features.visibility_on_other_station && 'Vidljivost (druga stanica)',
-                    obj.program_features.fog_signal && 'Maglenka SFH',
+                    obj.program_features.fog_signal && 'Sirena SFH',
                   ].filter(Boolean).join(', ') || '—'}
                 </div>
               )}
@@ -747,7 +747,7 @@ export default function ObjectDetailPage() {
               </div>
 
               <div className="chart-card card">
-                <h4>Solarna ploča (V)</h4>
+                <h4>Solarni panel (V)</h4>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -805,10 +805,10 @@ export default function ObjectDetailPage() {
                 </div>
               )}
 
-              {/* Maglenka — samo ako je instalirana */}
+              {/* Sirena — samo ako je instalirana */}
               {obj.program_features?.fog_signal && (
                 <div className="chart-card card chart-wide">
-                  <h4>Maglenka</h4>
+                  <h4>Sirena</h4>
                   <ResponsiveContainer width="100%" height={180}>
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
