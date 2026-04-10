@@ -181,13 +181,16 @@ pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -
              datalogger_pass   = COALESCE($14, datalogger_pass),
              poll_interval_sec = COALESCE($15, poll_interval_sec),
              polling_enabled   = COALESCE($16, polling_enabled),
-             is_active         = COALESCE($17, is_active)
+             is_active         = COALESCE($17, is_active),
+             program_version   = COALESCE($18, program_version),
+             program_features  = COALESCE($19, program_features)
          WHERE id = $1")
         .bind(id).bind(&req.name).bind(&req.short_name).bind(req.region_id)
         .bind(req.station_type_id).bind(req.latitude).bind(req.longitude)
         .bind(&req.location_name).bind(req.allowed_radius_m).bind(&req.description).bind(&req.notes)
         .bind(&req.datalogger_url).bind(&req.datalogger_user).bind(&req.datalogger_pass)
         .bind(req.poll_interval_sec).bind(req.polling_enabled).bind(req.is_active)
+        .bind(&req.program_version).bind(&req.program_features)
         .execute(pool).await?;
 
     get_object_by_id(pool, id).await?
