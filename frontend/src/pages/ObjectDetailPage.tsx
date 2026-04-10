@@ -40,6 +40,8 @@ import {
   RefreshCw,
   Pencil,
   X,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
@@ -53,13 +55,22 @@ function MetricCard({
   value,
   unit,
   color,
+  prev,
 }: {
   icon: React.ReactNode;
   label: string;
   value?: number | null;
   unit?: string;
   color?: string;
+  prev?: number | null;
 }) {
+  let trend: 'up' | 'down' | null = null;
+  if (value != null && prev != null) {
+    const threshold = Math.max(Math.abs(prev), 0.01) * 0.02; // 2% relative threshold
+    if (value - prev > threshold) trend = 'up';
+    else if (prev - value > threshold) trend = 'down';
+  }
+
   return (
     <div className="metric-card card">
       <div className="metric-icon" style={{ color: color || 'var(--accent)' }}>{icon}</div>
@@ -69,6 +80,8 @@ function MetricCard({
           <>
             <span>{typeof value === 'number' ? value.toFixed(2) : value}</span>
             {unit && <span className="metric-unit">{unit}</span>}
+            {trend === 'up' && <TrendingUp size={13} style={{ color: 'var(--success)', marginLeft: 3 }} />}
+            {trend === 'down' && <TrendingDown size={13} style={{ color: 'var(--danger)', marginLeft: 3 }} />}
           </>
         ) : (
           <span className="metric-na">N/A</span>
@@ -415,14 +428,24 @@ export default function ObjectDetailPage() {
       {tab === 'overview' && (
         <div className="overview-tab">
           <div className="metrics-grid">
-            <MetricCard icon={<Battery size={20} />} label="Napon baterije" value={latest?.battery_voltage_avg} unit="V" color="var(--success)" />
-            <MetricCard icon={<Battery size={20} />} label="Struja baterije" value={latest?.battery_current_avg} unit="A" />
-            <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)" />
-            <MetricCard icon={<Thermometer size={20} />} label="Temp. datalogera" value={latest?.datalogger_temp_avg} unit="°C" color="var(--danger)" />
-            <MetricCard icon={<Wifi size={20} />} label="Internet" value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null} unit="%" color="var(--accent)" />
-            <MetricCard icon={<Zap size={20} />} label="Svjetlo aktivno" value={latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null} unit="%" color="var(--warning)" />
-            <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A" />
-            <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg} />
+            <MetricCard icon={<Battery size={20} />} label="Napon baterije" value={latest?.battery_voltage_avg} unit="V" color="var(--success)"
+              prev={recentPositions?.[1]?.battery_voltage_avg} />
+            <MetricCard icon={<Battery size={20} />} label="Struja baterije" value={latest?.battery_current_avg} unit="A"
+              prev={recentPositions?.[1]?.battery_current_avg} />
+            <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
+              prev={recentPositions?.[1]?.solar_voltage_avg} />
+            <MetricCard icon={<Thermometer size={20} />} label="Temp. datalogera" value={latest?.datalogger_temp_avg} unit="°C" color="var(--danger)"
+              prev={recentPositions?.[1]?.datalogger_temp_avg} />
+            <MetricCard icon={<Wifi size={20} />} label="Internet"
+              value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null} unit="%" color="var(--accent)"
+              prev={recentPositions?.[1]?.internet_ok_avg != null ? recentPositions[1].internet_ok_avg! * 100 : null} />
+            <MetricCard icon={<Zap size={20} />} label="Svjetlo aktivno"
+              value={latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null} unit="%" color="var(--warning)"
+              prev={recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null} />
+            <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A"
+              prev={recentPositions?.[1]?.lantern_current_avg} />
+            <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
+              prev={recentPositions?.[1]?.garmin_satellites_avg} />
           </div>
 
           <div className="poll-row">

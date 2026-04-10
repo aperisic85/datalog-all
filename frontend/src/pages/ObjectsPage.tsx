@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { listObjects, listRegions, listStationTypes, createObject } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, Search, ChevronLeft, ChevronRight, MapPin, Radio, Plus, X } from 'lucide-react';
+import { AlertTriangle, Search, ChevronLeft, ChevronRight, MapPin, Radio, Plus, X, LayoutGrid, List } from 'lucide-react';
 import './ObjectsPage.css';
 
 function AlarmBadge({ active, count }: { active: boolean; count: number }) {
@@ -172,7 +172,8 @@ export default function ObjectsPage() {
   const [alarmFilter, setAlarmFilter] = useState(false);
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
-  const PAGE_SIZE = 20;
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const PAGE_SIZE = viewMode === 'grid' ? 100 : 20;
 
   const { data, isLoading } = useQuery({
     queryKey: ['objects', search, regionFilter, activeFilter, alarmFilter, page],
@@ -248,118 +249,147 @@ export default function ObjectsPage() {
           />
           Samo alarmi
         </label>
+
+        <div className="view-toggle">
+          <button
+            className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+            onClick={() => setViewMode('list')}
+            title="Prikaz liste"
+          ><List size={15} /></button>
+          <button
+            className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            onClick={() => setViewMode('grid')}
+            title="Prikaz mreže"
+          ><LayoutGrid size={15} /></button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="page-spinner"><div className="spinner" /></div>
       ) : (
         <>
-          {/* Desktop table view */}
-          <div className="objects-table card objects-table">
-            <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Naziv</th>
-                  <th>ID Stanice</th>
-                  <th>Regija</th>
-                  <th>Lokacija</th>
-                  <th>Status</th>
-                  <th>Alarm</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.data.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text2)', padding: 32 }}>Nema rezultata</td></tr>
-                )}
-                {data?.data.map((obj) => (
-                  <tr key={obj.id}>
-                    <td>
-                      <Link to={`/objects/${obj.id}`} className="obj-name">
-                        <Radio size={14} />
-                        {obj.name}
-                        <span
-                          className={`light-dot ${obj.is_active ? 'light-dot-on' : 'light-dot-off'}`}
-                          title={obj.is_active ? 'Svjetlo aktivno' : 'Svjetlo neaktivno'}
-                        />
-                      </Link>
-                      {obj.short_name && <div className="obj-sub">{obj.short_name}</div>}
-                    </td>
-                    <td><code className="station-id">{obj.station_id}</code></td>
-                    <td>
-                      <div className="region-tag">
-                        <span className="region-dot" style={{ background: obj.region_color }} />
-                        {obj.region_name}
-                      </div>
-                    </td>
-                    <td>
-                      {obj.location_name ? (
-                        <div className="location-cell">
-                          <MapPin size={12} />
-                          <span>{obj.location_name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                    <td>
-                      {obj.is_active
-                        ? <span className="badge badge-success">Aktivan</span>
-                        : <span className="badge badge-neutral">Neaktivan</span>
-                      }
-                    </td>
-                    <td>
-                      <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Status grid / heatmap view */}
+          {viewMode === 'grid' && (
+            <div className="obj-status-grid card">
+              {data?.data.length === 0 && (
+                <div className="obj-card-empty">Nema rezultata</div>
+              )}
+              {data?.data.map((obj) => (
+                <Link
+                  to={`/objects/${obj.id}`}
+                  key={obj.id}
+                  className={`obj-status-cell ${obj.alarm_active ? 'cell-alarm' : obj.is_active ? 'cell-active' : 'cell-inactive'}`}
+                  title={`${obj.name} · ${obj.station_id}${obj.alarm_active ? ' · ⚠ Alarm aktivan' : ''}`}
+                >
+                  <span className="cell-name">{obj.short_name || obj.name}</span>
+                  {obj.alarm_active && <AlertTriangle size={10} />}
+                </Link>
+              ))}
             </div>
-          </div>
+          )}
 
-          {/* Mobile card view */}
-          <div className="obj-card-list">
-            {data?.data.length === 0 && (
-              <div className="obj-card-empty">Nema rezultata</div>
-            )}
-            {data?.data.map((obj) => (
-              <Link to={`/objects/${obj.id}`} key={obj.id} className="obj-card card">
-                <div className="obj-card-top">
-                  <div className="obj-card-name">
-                    <span className={`status-dot ${obj.alarm_active ? 'status-dot-alarm' : obj.is_active ? 'status-dot-active' : 'status-dot-inactive'}`} />
-                    <span>{obj.name}</span>
-                    <span
-                      className={`light-dot ${obj.is_active ? 'light-dot-on' : 'light-dot-off'}`}
-                      title={obj.is_active ? 'Svjetlo aktivno' : 'Svjetlo neaktivno'}
-                    />
+          {/* Desktop table view */}
+          {viewMode === 'list' && (
+            <div className="objects-table card objects-table">
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Naziv</th>
+                      <th>ID Stanice</th>
+                      <th>Regija</th>
+                      <th>Lokacija</th>
+                      <th>Status</th>
+                      <th>Alarm</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.data.length === 0 && (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text2)', padding: 32 }}>Nema rezultata</td></tr>
+                    )}
+                    {data?.data.map((obj) => (
+                      <tr key={obj.id}>
+                        <td>
+                          <Link to={`/objects/${obj.id}`} className="obj-name">
+                            <Radio size={14} />
+                            {obj.name}
+                          </Link>
+                          {obj.short_name && <div className="obj-sub">{obj.short_name}</div>}
+                        </td>
+                        <td><code className="station-id">{obj.station_id}</code></td>
+                        <td>
+                          <div className="region-tag">
+                            <span className="region-dot" style={{ background: obj.region_color }} />
+                            {obj.region_name}
+                          </div>
+                        </td>
+                        <td>
+                          {obj.location_name ? (
+                            <div className="location-cell">
+                              <MapPin size={12} />
+                              <span>{obj.location_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {obj.is_active
+                            ? <span className="badge badge-success">Aktivan</span>
+                            : <span className="badge badge-neutral">Neaktivan</span>
+                          }
+                        </td>
+                        <td>
+                          <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile card view — only in list mode */}
+          {viewMode === 'list' && (
+            <div className="obj-card-list">
+              {data?.data.length === 0 && (
+                <div className="obj-card-empty">Nema rezultata</div>
+              )}
+              {data?.data.map((obj) => (
+                <Link to={`/objects/${obj.id}`} key={obj.id} className="obj-card card">
+                  <div className="obj-card-top">
+                    <div className="obj-card-name">
+                      <span className={`status-dot ${obj.alarm_active ? 'status-dot-alarm' : obj.is_active ? 'status-dot-active' : 'status-dot-inactive'}`} />
+                      <span>{obj.name}</span>
+                    </div>
+                    <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
                   </div>
-                  <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
-                </div>
-                <div className="obj-card-meta">
-                  <span className="region-tag">
-                    <span className="region-dot" style={{ background: obj.region_color }} />
-                    {obj.region_name}
-                  </span>
-                  {obj.location_name && (
-                    <span className="location-cell">
-                      <MapPin size={12} />
-                      {obj.location_name}
+                  <div className="obj-card-meta">
+                    <span className="region-tag">
+                      <span className="region-dot" style={{ background: obj.region_color }} />
+                      {obj.region_name}
                     </span>
-                  )}
-                </div>
-                <div className="obj-card-footer">
-                  <code className="station-id">{obj.station_id}</code>
-                  {obj.is_active
-                    ? <span className="badge badge-success" style={{ fontSize: 11 }}>Aktivan</span>
-                    : <span className="badge badge-neutral" style={{ fontSize: 11 }}>Neaktivan</span>
-                  }
-                </div>
-              </Link>
-            ))}
-          </div>
+                    {obj.location_name && (
+                      <span className="location-cell">
+                        <MapPin size={12} />
+                        {obj.location_name}
+                      </span>
+                    )}
+                  </div>
+                  <div className="obj-card-footer">
+                    <code className="station-id">{obj.station_id}</code>
+                    {obj.is_active
+                      ? <span className="badge badge-success" style={{ fontSize: 11 }}>Aktivan</span>
+                      : <span className="badge badge-neutral" style={{ fontSize: 11 }}>Neaktivan</span>
+                    }
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
 
-          {data && data.total_pages > 1 && (
+          {viewMode === 'list' && data && data.total_pages > 1 && (
             <div className="pagination">
               <button
                 className="btn-secondary"
