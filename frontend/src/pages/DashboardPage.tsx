@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { regionSummary } from '../api/endpoints';
@@ -11,9 +12,53 @@ function AlarmLevel({ level }: { level?: number | null }) {
   return <span className="badge badge-success">OK</span>;
 }
 
+function AnimatedStat({ value }: { value: number | undefined }) {
+  const [display, setDisplay] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (value == null) return;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    const start = performance.now();
+    const end = value;
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / 750, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(eased * end));
+      if (t < 1) rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [value]);
+  return <>{display}</>;
+}
+
+function LiveRing({ intervalMs, dataUpdatedAt }: { intervalMs: number; dataUpdatedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const tick = () => setElapsed(Date.now() - dataUpdatedAt);
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [dataUpdatedAt]);
+  const progress = Math.min(elapsed / intervalMs, 1);
+  const r = 9;
+  const circ = 2 * Math.PI * r;
+  const remaining = Math.max(0, Math.round((intervalMs - elapsed) / 1000));
+  return (
+    <div className="live-ring-wrap" title={`Osvježava se za ${remaining}s`}>
+      <svg width="26" height="26" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="13" cy="13" r={r} fill="none" stroke="var(--border)" strokeWidth="2" />
+        <circle cx="13" cy="13" r={r} fill="none" stroke="var(--success)" strokeWidth="2"
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - progress)} strokeLinecap="round" />
+      </svg>
+      <span className="live-label">LIVE</span>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { data: summaries, isLoading, error } = useQuery({
+  const { data: summaries, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['region-summary'],
     queryFn: regionSummary,
     refetchInterval: 60_000,
@@ -35,36 +80,39 @@ export default function DashboardPage() {
   return (
     <div className="dashboard">
       <div className="page-header">
-        <h2>Dashboard</h2>
-        <span className="text-muted">Pregled sistema u realnom vremenu</span>
+        <div>
+          <h2>Dashboard</h2>
+          <span className="text-muted">Pregled sistema u realnom vremenu</span>
+        </div>
+        {dataUpdatedAt > 0 && <LiveRing intervalMs={60_000} dataUpdatedAt={dataUpdatedAt} />}
       </div>
 
       <div className="stat-cards">
         <button className="stat-card stat-card-blue card stat-card-btn" onClick={() => navigate('/objects')}>
           <div className="stat-icon stat-icon-blue"><Radio size={20} /></div>
           <div>
-            <div className="stat-value">{total?.objects ?? '—'}</div>
+            <div className="stat-value"><AnimatedStat value={total?.objects} /></div>
             <div className="stat-label">Ukupno objekata</div>
           </div>
         </button>
         <button className="stat-card stat-card-green card stat-card-btn" onClick={() => navigate('/objects?active=true')}>
           <div className="stat-icon stat-icon-green"><CheckCircle size={20} /></div>
           <div>
-            <div className="stat-value">{total?.active ?? '—'}</div>
+            <div className="stat-value"><AnimatedStat value={total?.active} /></div>
             <div className="stat-label">Aktivnih</div>
           </div>
         </button>
         <button className="stat-card stat-card-red card stat-card-btn" onClick={() => navigate('/alarms')}>
           <div className="stat-icon stat-icon-red"><AlertTriangle size={20} /></div>
           <div>
-            <div className="stat-value">{total?.alarms ?? '—'}</div>
+            <div className="stat-value"><AnimatedStat value={total?.alarms} /></div>
             <div className="stat-label">U alarmu</div>
           </div>
         </button>
         <button className="stat-card stat-card-yellow card stat-card-btn" onClick={() => navigate('/objects')}>
           <div className="stat-icon stat-icon-yellow"><Zap size={20} /></div>
           <div>
-            <div className="stat-value">{total?.lanterns ?? '—'}</div>
+            <div className="stat-value"><AnimatedStat value={total?.lanterns} /></div>
             <div className="stat-label">Svjetla uključena</div>
           </div>
         </button>
@@ -93,6 +141,14 @@ export default function DashboardPage() {
                 <Radio size={14} />
                 <span>{s.active_objects} / {s.total_objects} aktivnih</span>
               </div>
+              {(s.total_objects ?? 0) > 0 && (
+                <div className="region-progress">
+                  <div
+                    className="region-progress-fill"
+                    style={{ width: `${Math.round(((s.active_objects ?? 0) / (s.total_objects ?? 1)) * 100)}%` }}
+                  />
+                </div>
+              )}
               {(s.objects_in_alarm ?? 0) > 0 && (
                 <div className="region-stat region-stat-alarm">
                   <AlertTriangle size={14} />
