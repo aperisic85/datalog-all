@@ -75,6 +75,13 @@ ALTER TABLE alarms
 -- Regeneriraj any_alarm_active generated column
 -- (treba uključiti nova alarm polja)
 -- ================================================================
+
+-- 1. Ukloni objekte koji ovise o kolonni any_alarm_active
+DROP INDEX IF EXISTS idx_alarms_active;
+DROP INDEX IF EXISTS idx_alarms_ack;
+DROP VIEW  IF EXISTS v_latest_alarms;
+
+-- 2. Obrisi stari generated column
 ALTER TABLE alarms DROP COLUMN IF EXISTS any_alarm_active;
 
 ALTER TABLE alarms ADD COLUMN any_alarm_active BOOLEAN NOT NULL GENERATED ALWAYS AS (
@@ -281,3 +288,37 @@ SELECT DISTINCT ON (m.object_id)
     m.fog_signal_current_avg
 FROM measurements_10min m
 ORDER BY m.object_id, m.recorded_at DESC;
+
+
+-- ================================================================
+-- Ponovo kreiraj v_latest_alarms (proširena s novim alarmima)
+-- ================================================================
+CREATE OR REPLACE VIEW v_latest_alarms AS
+SELECT DISTINCT ON (a.object_id)
+    a.object_id,
+    a.station_id,
+    a.recorded_at,
+    a.any_alarm_active,
+    a.alarm_datalogger_high_temp,
+    a.alarm_datalogger_high_voltage,
+    a.alarm_datalogger_other_error,
+    a.alarm_battery_voltage_low,
+    a.alarm_battery_voltage_flat,
+    a.alarm_battery_other_error,
+    a.alarm_garmin_comm_failed,
+    a.alarm_garmin_other_error,
+    a.alarm_station_out_of_radius,
+    a.alarm_lantern_night_light_off,
+    a.alarm_lantern_day_light_on,
+    a.alarm_lantern_comm_failed,
+    a.alarm_lantern_other_error,
+    a.alarm_modem_network_error,
+    a.alarm_modem_other_error,
+    a.alarm_station_other_error,
+    -- Novi alarmi (modularni program)
+    a.alarm_visibility_comm_failed,
+    a.alarm_visibility_error,
+    a.alarm_fog_signal_off_during_fog,
+    a.alarm_fog_signal_on_while_no_fog
+FROM alarms a
+ORDER BY a.object_id, a.recorded_at DESC;
