@@ -88,10 +88,10 @@ const ALARM_LABELS: Record<string, string> = {
   alarm_garmin_comm_failed: 'Garmin komunikacija pala',
   alarm_garmin_other_error: 'Garmin ostala greška',
   alarm_station_out_of_radius: 'Stanica van radijusa',
-  alarm_lantern_night_light_off: 'Fenjer noću ugašen',
-  alarm_lantern_day_light_on: 'Fenjer danju upaljen',
-  alarm_lantern_comm_failed: 'Fenjer komunikacija pala',
-  alarm_lantern_other_error: 'Fenjer ostala greška',
+  alarm_lantern_night_light_off: 'Svjetlo noću ugašeno',
+  alarm_lantern_day_light_on: 'Svjetlo danju upaljeno',
+  alarm_lantern_comm_failed: 'Svjetlo komunikacija pala',
+  alarm_lantern_other_error: 'Svjetlo ostala greška',
   alarm_modem_network_error: 'Modem mrežna greška',
   alarm_modem_other_error: 'Modem ostala greška',
   alarm_station_other_error: 'Stanica ostala greška',
@@ -420,8 +420,8 @@ export default function ObjectDetailPage() {
             <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)" />
             <MetricCard icon={<Thermometer size={20} />} label="Temp. datalogera" value={latest?.datalogger_temp_avg} unit="°C" color="var(--danger)" />
             <MetricCard icon={<Wifi size={20} />} label="Internet" value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null} unit="%" color="var(--accent)" />
-            <MetricCard icon={<Zap size={20} />} label="Fenjer aktivan" value={latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null} unit="%" color="var(--warning)" />
-            <MetricCard icon={<Zap size={20} />} label="Struja fenjera" value={latest?.lantern_current_avg} unit="A" />
+            <MetricCard icon={<Zap size={20} />} label="Svjetlo aktivno" value={latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null} unit="%" color="var(--warning)" />
+            <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A" />
             <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg} />
           </div>
 
@@ -617,7 +617,7 @@ export default function ObjectDetailPage() {
               </div>
 
               <div className="chart-card card chart-wide">
-                <h4>Fenjer</h4>
+                <h4>Svjetlo</h4>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
