@@ -272,9 +272,12 @@ pub async fn insert_measurement_10min(pool: &PgPool, r: &Measurement10minInsert)
              solar_daylight_smp, solar_daylight_avg, modem_power_avg, internet_ok_avg,
              garmin_comm_ok_avg, garmin_satellites_avg, garmin_latitude_avg,
              garmin_longitude_avg, garmin_distance_avg, lantern_comm_ok_avg,
-             lantern_light_active_avg, lantern_current_avg, lantern_latitude_avg,
-             lantern_longitude_avg, lantern_distance_avg)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+             lantern_light_active_avg, lantern_current_active_avg, lantern_current_avg,
+             lantern_latitude_avg, lantern_longitude_avg, lantern_distance_avg,
+             visibility_comm_ok_avg, visibility_value_avg, visibility_alarm_avg,
+             visibility_error_smp, fog_signal_active_avg, fog_signal_current_avg)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+                 $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
          RETURNING id")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
@@ -282,8 +285,11 @@ pub async fn insert_measurement_10min(pool: &PgPool, r: &Measurement10minInsert)
         .bind(r.solar_daylight_smp).bind(r.solar_daylight_avg).bind(r.modem_power_avg)
         .bind(r.internet_ok_avg).bind(r.garmin_comm_ok_avg).bind(r.garmin_satellites_avg)
         .bind(r.garmin_latitude_avg).bind(r.garmin_longitude_avg).bind(r.garmin_distance_avg)
-        .bind(r.lantern_comm_ok_avg).bind(r.lantern_light_active_avg).bind(r.lantern_current_avg)
-        .bind(r.lantern_latitude_avg).bind(r.lantern_longitude_avg).bind(r.lantern_distance_avg)
+        .bind(r.lantern_comm_ok_avg).bind(r.lantern_light_active_avg).bind(r.lantern_current_active_avg)
+        .bind(r.lantern_current_avg).bind(r.lantern_latitude_avg).bind(r.lantern_longitude_avg)
+        .bind(r.lantern_distance_avg).bind(r.visibility_comm_ok_avg).bind(r.visibility_value_avg)
+        .bind(r.visibility_alarm_avg).bind(r.visibility_error_smp).bind(r.fog_signal_active_avg)
+        .bind(r.fog_signal_current_avg)
         .fetch_one(pool).await?)
 }
 
@@ -292,14 +298,16 @@ pub async fn insert_measurement_1h(pool: &PgPool, r: &Measurement1hInsert) -> Ap
         "INSERT INTO measurements_1h (object_id, station_id, recorded_at,
              datalogger_temp_avg, battery_voltage_avg, battery_current_avg,
              battery_charge_tot, battery_discharge_tot, battery_status_avg,
-             solar_voltage_avg, solar_daylight_avg, modem_power_avg,
-             lantern_light_active_avg, lantern_current_avg)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id")
+             solar_voltage_avg, solar_daylight_avg, modem_power_avg, internet_ok_avg,
+             lantern_light_active_avg, lantern_current_avg,
+             visibility_value_avg, visibility_alarm_avg, fog_signal_current_avg)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
         .bind(r.battery_charge_tot).bind(r.battery_discharge_tot).bind(r.battery_status_avg)
         .bind(r.solar_voltage_avg).bind(r.solar_daylight_avg).bind(r.modem_power_avg)
-        .bind(r.lantern_light_active_avg).bind(r.lantern_current_avg)
+        .bind(r.internet_ok_avg).bind(r.lantern_light_active_avg).bind(r.lantern_current_avg)
+        .bind(r.visibility_value_avg).bind(r.visibility_alarm_avg).bind(r.fog_signal_current_avg)
         .fetch_one(pool).await?)
 }
 
@@ -309,13 +317,15 @@ pub async fn insert_measurement_24h(pool: &PgPool, r: &Measurement24hInsert) -> 
              datalogger_temp_avg, battery_voltage_avg, battery_current_avg,
              battery_current_min, battery_current_max, battery_charge_tot,
              battery_discharge_tot, battery_status_avg, solar_daylight_avg,
-             modem_power_avg, lantern_light_active_avg, lantern_current_avg)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id")
+             modem_power_avg, internet_ok_avg, lantern_light_active_avg, lantern_current_avg,
+             visibility_value_avg, fog_signal_current_avg)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
         .bind(r.battery_current_min).bind(r.battery_current_max).bind(r.battery_charge_tot)
         .bind(r.battery_discharge_tot).bind(r.battery_status_avg).bind(r.solar_daylight_avg)
-        .bind(r.modem_power_avg).bind(r.lantern_light_active_avg).bind(r.lantern_current_avg)
+        .bind(r.modem_power_avg).bind(r.internet_ok_avg).bind(r.lantern_light_active_avg)
+        .bind(r.lantern_current_avg).bind(r.visibility_value_avg).bind(r.fog_signal_current_avg)
         .fetch_one(pool).await?)
 }
 
@@ -323,44 +333,48 @@ pub async fn get_measurements_10min(
     pool: &PgPool, object_id: Uuid, q: &TimeRangeQuery,
 ) -> AppResult<Vec<Measurement10min>> {
     let limit = q.limit.unwrap_or(144).min(1000);
-    Ok(sqlx::query_as!(Measurement10min,
+    Ok(sqlx::query_as(
         "SELECT * FROM measurements_10min
          WHERE object_id = $1
            AND ($2::timestamptz IS NULL OR recorded_at >= $2)
            AND ($3::timestamptz IS NULL OR recorded_at <= $3)
-         ORDER BY recorded_at DESC LIMIT $4",
-        object_id, q.from, q.to, limit).fetch_all(pool).await?)
+         ORDER BY recorded_at DESC LIMIT $4")
+        .bind(object_id).bind(q.from).bind(q.to).bind(limit)
+        .fetch_all(pool).await?)
 }
 
 pub async fn get_measurements_1h(
     pool: &PgPool, object_id: Uuid, q: &TimeRangeQuery,
 ) -> AppResult<Vec<Measurement1h>> {
     let limit = q.limit.unwrap_or(168).min(1000);
-    Ok(sqlx::query_as!(Measurement1h,
+    Ok(sqlx::query_as(
         "SELECT * FROM measurements_1h
          WHERE object_id = $1
            AND ($2::timestamptz IS NULL OR recorded_at >= $2)
            AND ($3::timestamptz IS NULL OR recorded_at <= $3)
-         ORDER BY recorded_at DESC LIMIT $4",
-        object_id, q.from, q.to, limit).fetch_all(pool).await?)
+         ORDER BY recorded_at DESC LIMIT $4")
+        .bind(object_id).bind(q.from).bind(q.to).bind(limit)
+        .fetch_all(pool).await?)
 }
 
 pub async fn get_measurements_24h(
     pool: &PgPool, object_id: Uuid, q: &TimeRangeQuery,
 ) -> AppResult<Vec<Measurement24h>> {
     let limit = q.limit.unwrap_or(30).min(365);
-    Ok(sqlx::query_as!(Measurement24h,
+    Ok(sqlx::query_as(
         "SELECT * FROM measurements_24h
          WHERE object_id = $1
            AND ($2::timestamptz IS NULL OR recorded_at >= $2)
            AND ($3::timestamptz IS NULL OR recorded_at <= $3)
-         ORDER BY recorded_at DESC LIMIT $4",
-        object_id, q.from, q.to, limit).fetch_all(pool).await?)
+         ORDER BY recorded_at DESC LIMIT $4")
+        .bind(object_id).bind(q.from).bind(q.to).bind(limit)
+        .fetch_all(pool).await?)
 }
 
 pub async fn get_latest_measurement(pool: &PgPool, object_id: Uuid) -> AppResult<Option<LatestMeasurement>> {
-    Ok(sqlx::query_as!(LatestMeasurement,
-        "SELECT * FROM v_latest_measurements WHERE object_id = $1", object_id)
+    Ok(sqlx::query_as(
+        "SELECT * FROM v_latest_measurements WHERE object_id = $1")
+        .bind(object_id)
         .fetch_optional(pool).await?)
 }
 
@@ -376,8 +390,10 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<i64> {
              alarm_garmin_comm_failed, alarm_garmin_other_error, alarm_station_out_of_radius,
              alarm_lantern_night_light_off, alarm_lantern_day_light_on,
              alarm_lantern_comm_failed, alarm_lantern_other_error,
-             alarm_modem_network_error, alarm_modem_other_error, alarm_station_other_error)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+             alarm_modem_network_error, alarm_modem_other_error, alarm_station_other_error,
+             alarm_visibility_comm_failed, alarm_visibility_error,
+             alarm_fog_signal_off_during_fog, alarm_fog_signal_on_while_no_fog)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
          RETURNING id")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.alarm_datalogger_high_temp).bind(r.alarm_datalogger_high_voltage).bind(r.alarm_datalogger_other_error)
@@ -386,6 +402,8 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<i64> {
         .bind(r.alarm_lantern_night_light_off).bind(r.alarm_lantern_day_light_on)
         .bind(r.alarm_lantern_comm_failed).bind(r.alarm_lantern_other_error)
         .bind(r.alarm_modem_network_error).bind(r.alarm_modem_other_error).bind(r.alarm_station_other_error)
+        .bind(r.alarm_visibility_comm_failed).bind(r.alarm_visibility_error)
+        .bind(r.alarm_fog_signal_off_during_fog).bind(r.alarm_fog_signal_on_while_no_fog)
         .fetch_one(pool).await?)
 }
 
@@ -393,19 +411,21 @@ pub async fn get_alarms(
     pool: &PgPool, object_id: Uuid, q: &TimeRangeQuery,
 ) -> AppResult<Vec<AlarmRecord>> {
     let limit = q.limit.unwrap_or(100).min(1000);
-    Ok(sqlx::query_as!(AlarmRecord,
+    Ok(sqlx::query_as(
         "SELECT * FROM alarms
          WHERE object_id = $1
            AND ($2::timestamptz IS NULL OR recorded_at >= $2)
            AND ($3::timestamptz IS NULL OR recorded_at <= $3)
-         ORDER BY recorded_at DESC LIMIT $4",
-        object_id, q.from, q.to, limit).fetch_all(pool).await?)
+         ORDER BY recorded_at DESC LIMIT $4")
+        .bind(object_id).bind(q.from).bind(q.to).bind(limit)
+        .fetch_all(pool).await?)
 }
 
 pub async fn get_active_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<Vec<AlarmRecord>> {
-    Ok(sqlx::query_as!(AlarmRecord,
+    Ok(sqlx::query_as(
         "SELECT * FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE
-         ORDER BY recorded_at DESC LIMIT 50", object_id)
+         ORDER BY recorded_at DESC LIMIT 50")
+        .bind(object_id)
         .fetch_all(pool).await?)
 }
 
@@ -482,7 +502,11 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
             a.alarm_lantern_other_error,
             a.alarm_modem_network_error,
             a.alarm_modem_other_error,
-            a.alarm_station_other_error";
+            a.alarm_station_other_error,
+            a.alarm_visibility_comm_failed,
+            a.alarm_visibility_error,
+            a.alarm_fog_signal_off_during_fog,
+            a.alarm_fog_signal_on_while_no_fog";
 
     let from_join = "FROM alarms a
          JOIN objects o ON o.id = a.object_id
