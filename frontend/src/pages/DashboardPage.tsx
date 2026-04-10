@@ -65,7 +65,7 @@ export default function DashboardPage() {
           <div className="stat-icon stat-icon-yellow"><Zap size={20} /></div>
           <div>
             <div className="stat-value">{total?.lanterns ?? '—'}</div>
-            <div className="stat-label">Fenjeri uključeni</div>
+            <div className="stat-label">Svjetla uključena</div>
           </div>
         </button>
       </div>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
               {s.lanterns_on_count != null && (
                 <div className="region-stat">
                   <Zap size={14} />
-                  <span>{s.lanterns_on_count} fenjera uključeno</span>
+                  <span>{s.lanterns_on_count} svjetala uključeno</span>
                 </div>
               )}
             </div>

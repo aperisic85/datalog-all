@@ -278,6 +278,10 @@ export default function ObjectsPage() {
                       <Link to={`/objects/${obj.id}`} className="obj-name">
                         <Radio size={14} />
                         {obj.name}
+                        <span
+                          className={`light-dot ${obj.is_active ? 'light-dot-on' : 'light-dot-off'}`}
+                          title={obj.is_active ? 'Svjetlo aktivno' : 'Svjetlo neaktivno'}
+                        />
                       </Link>
                       {obj.short_name && <div className="obj-sub">{obj.short_name}</div>}
                     </td>
@@ -325,6 +329,10 @@ export default function ObjectsPage() {
                   <div className="obj-card-name">
                     <span className={`status-dot ${obj.alarm_active ? 'status-dot-alarm' : obj.is_active ? 'status-dot-active' : 'status-dot-inactive'}`} />
                     <span>{obj.name}</span>
+                    <span
+                      className={`light-dot ${obj.is_active ? 'light-dot-on' : 'light-dot-off'}`}
+                      title={obj.is_active ? 'Svjetlo aktivno' : 'Svjetlo neaktivno'}
+                    />
                   </div>
                   <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
                 </div>
