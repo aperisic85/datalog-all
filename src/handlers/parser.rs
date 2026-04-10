@@ -104,6 +104,11 @@ pub fn parse_alarms(payload: &DataloggerPayload, station_id: &str) -> AppResult<
             alarm_modem_network_error:     get_field_i16(row, &fm, &["Alarm_modem_network_error"]),
             alarm_modem_other_error:       get_field_i16(row, &fm, &["Alarm_modem_other_error"]),
             alarm_station_other_error:     get_field_i16(row, &fm, &["Alarm_station_other_error"]),
+            // Novi alarmi — modularni program (Tip 2); stari program šalje 0 jer polje ne postoji
+            alarm_visibility_comm_failed:     get_field_i16(row, &fm, &["Alarm_visibility_communication_failed"]),
+            alarm_visibility_error:           get_field_i16(row, &fm, &["Alarm_visibility_error"]),
+            alarm_fog_signal_off_during_fog:  get_field_i16(row, &fm, &["Alarm_fog_signal_off_during_fog"]),
+            alarm_fog_signal_on_while_no_fog: get_field_i16(row, &fm, &["Alarm_fog_signal_on_while_no_fog"]),
         })
     }).collect()
 }
@@ -143,27 +148,35 @@ pub fn parse_measurements_10min(payload: &DataloggerPayload, station_id: &str) -
             object_id:   None,
             station_id:  station_id.to_string(),
             recorded_at,
-            datalogger_temp_avg:      g(&["Datalogger_temperature_Avg"]),
-            battery_voltage_avg:      g(&["Battery_voltage_Avg"]),
-            battery_current_avg:      g(&["Battery_current_Avg"]),
-            battery_status_smp:       gi16(&["Battery_status"]),
-            battery_status_avg:       g(&["Battery_status_Avg"]),
-            solar_voltage_avg:        g(&["Solar_panel_voltage_Avg"]),
-            solar_daylight_smp:       gi16(&["Solar_panel_day_light"]),
-            solar_daylight_avg:       g(&["Solar_panel_day_light_Avg"]),
-            modem_power_avg:          g(&["Modem_power_state_Avg"]),
-            internet_ok_avg:          g(&["Internet_connection_ok_Avg"]),
-            garmin_comm_ok_avg:       g(&["Garmin_communication_ok_Avg"]),
-            garmin_satellites_avg:    g(&["Garmin_number_of_sattelites_Avg", "Garmin_satellites_Avg"]),
-            garmin_latitude_avg:      gf64(&["Garmin_latitude_Avg"]),
-            garmin_longitude_avg:     gf64(&["Garmin_longitude_Avg"]),
-            garmin_distance_avg:      g(&["Garmin_distance_Avg"]),
-            lantern_comm_ok_avg:      g(&["Lantern_communication_ok_Avg"]),
-            lantern_light_active_avg: g(&["Lantern_light_active_Avg"]),
-            lantern_current_avg:      g(&["Lantern_current_Avg"]),
-            lantern_latitude_avg:     gf64(&["Lantern_latitude_Avg"]),
-            lantern_longitude_avg:    gf64(&["Lantern_longitude_Avg"]),
-            lantern_distance_avg:     g(&["Lantern_distance_Avg"]),
+            datalogger_temp_avg:         g(&["Datalogger_temperature_Avg"]),
+            battery_voltage_avg:         g(&["Battery_voltage_Avg", "Battery_voltage_1min_Avg"]),
+            battery_current_avg:         g(&["Battery_current_Avg", "Battery_current_1min_Avg"]),
+            battery_status_smp:          gi16(&["Battery_status"]),
+            battery_status_avg:          g(&["Battery_status_Avg"]),
+            solar_voltage_avg:           g(&["Solar_panel_voltage_Avg"]),
+            solar_daylight_smp:          gi16(&["Solar_panel_day_light"]),
+            solar_daylight_avg:          g(&["Solar_panel_day_light_Avg"]),
+            modem_power_avg:             g(&["Modem_power_state_Avg"]),
+            internet_ok_avg:             g(&["Internet_connection_ok_Avg"]),
+            garmin_comm_ok_avg:          g(&["Garmin_communication_ok_Avg"]),
+            garmin_satellites_avg:       g(&["Garmin_number_of_sattelites_Avg", "Garmin_satellites_Avg"]),
+            garmin_latitude_avg:         gf64(&["Garmin_latitude_Avg"]),
+            garmin_longitude_avg:        gf64(&["Garmin_longitude_Avg"]),
+            garmin_distance_avg:         g(&["Garmin_distance_Avg"]),
+            lantern_comm_ok_avg:         g(&["Lantern_communication_ok_Avg"]),
+            lantern_light_active_avg:    g(&["Lantern_light_active_Avg"]),
+            lantern_current_active_avg:  g(&["Lantern_current_active_Avg"]),
+            lantern_current_avg:         g(&["Lantern_current_Avg", "Lantern_current_1min_Avg"]),
+            lantern_latitude_avg:        gf64(&["Lantern_latitude_Avg"]),
+            lantern_longitude_avg:       gf64(&["Lantern_longitude_Avg"]),
+            lantern_distance_avg:        g(&["Lantern_distance_Avg"]),
+            // Novi senzori — modularni program (Tip 2)
+            visibility_comm_ok_avg:      g(&["Visibility_communication_ok_Avg"]),
+            visibility_value_avg:        g(&["Visibility_value_Avg"]),
+            visibility_alarm_avg:        g(&["Visibility_alarm_Avg"]),
+            visibility_error_smp:        gi16(&["Visibility_error"]),
+            fog_signal_active_avg:       g(&["Fog_signal_current_active_Avg"]),
+            fog_signal_current_avg:      g(&["Fog_signal_current_Avg"]),
         })
     }).collect()
 }
@@ -189,8 +202,13 @@ pub fn parse_measurements_1h(payload: &DataloggerPayload, station_id: &str) -> A
             solar_voltage_avg:        g("Solar_panel_voltage_Avg"),
             solar_daylight_avg:       g("Solar_panel_day_light_Avg"),
             modem_power_avg:          g("Modem_power_state_Avg"),
+            internet_ok_avg:          g("Internet_connection_ok_Avg"),
             lantern_light_active_avg: g("Lantern_light_active_Avg"),
             lantern_current_avg:      g("Lantern_current_Avg"),
+            // Novi senzori — modularni program (Tip 2)
+            visibility_value_avg:     g("Visibility_value_Avg"),
+            visibility_alarm_avg:     g("Visibility_alarm_Avg"),
+            fog_signal_current_avg:   g("Fog_signal_current_Avg"),
         })
     }).collect()
 }
@@ -217,8 +235,12 @@ pub fn parse_measurements_24h(payload: &DataloggerPayload, station_id: &str) -> 
             battery_status_avg:       g("Battery_status_Avg"),
             solar_daylight_avg:       g("Solar_panel_day_light_Avg"),
             modem_power_avg:          g("Modem_power_state_Avg"),
+            internet_ok_avg:          g("Internet_connection_ok_Avg"),
             lantern_light_active_avg: g("Lantern_light_active_Avg"),
             lantern_current_avg:      g("Lantern_current_Avg"),
+            // Novi senzori — modularni program (Tip 2)
+            visibility_value_avg:     g("Visibility_value_Avg"),
+            fog_signal_current_avg:   g("Fog_signal_current_Avg"),
         })
     }).collect()
 }
