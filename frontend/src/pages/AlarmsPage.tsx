@@ -7,7 +7,7 @@ import {
   AlertTriangle, Battery, Wifi, WifiOff,
   MapPin, Thermometer, Zap, Check, Trash2,
   ExternalLink, Filter, ChevronLeft, ChevronRight,
-  Clock, CheckCircle, X,
+  Clock, CheckCircle, X, Wind, Eye,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { bs } from 'date-fns/locale';
@@ -20,7 +20,9 @@ type AlarmKey = keyof Pick<AlarmListItem,
   'alarm_garmin_comm_failed' | 'alarm_garmin_other_error' | 'alarm_station_out_of_radius' |
   'alarm_lantern_night_light_off' | 'alarm_lantern_day_light_on' |
   'alarm_lantern_comm_failed' | 'alarm_lantern_other_error' |
-  'alarm_modem_network_error' | 'alarm_modem_other_error' | 'alarm_station_other_error'
+  'alarm_modem_network_error' | 'alarm_modem_other_error' | 'alarm_station_other_error' |
+  'alarm_visibility_comm_failed' | 'alarm_visibility_error' |
+  'alarm_fog_signal_off_during_fog' | 'alarm_fog_signal_on_while_no_fog'
 >;
 
 const ALARM_DEFS: { key: AlarmKey; label: string; icon: React.ReactNode; severity: 'danger' | 'warning' }[] = [
@@ -37,9 +39,13 @@ const ALARM_DEFS: { key: AlarmKey; label: string; icon: React.ReactNode; severit
   { key: 'alarm_lantern_day_light_on',    label: 'Svjetlo upaljeno danju',   icon: <Zap size={12} />,           severity: 'warning' },
   { key: 'alarm_lantern_comm_failed',     label: 'Svjetlo komun. pala',      icon: <WifiOff size={12} />,       severity: 'danger' },
   { key: 'alarm_lantern_other_error',     label: 'Svjetlo greška',           icon: <Zap size={12} />,           severity: 'warning' },
-  { key: 'alarm_modem_network_error',     label: 'Greška mreže',             icon: <Wifi size={12} />,          severity: 'warning' },
-  { key: 'alarm_modem_other_error',       label: 'Greška modema',            icon: <WifiOff size={12} />,       severity: 'warning' },
-  { key: 'alarm_station_other_error',     label: 'Greška stanice',           icon: <AlertTriangle size={12} />, severity: 'warning' },
+  { key: 'alarm_modem_network_error',          label: 'Greška mreže',               icon: <Wifi size={12} />,          severity: 'warning' },
+  { key: 'alarm_modem_other_error',            label: 'Greška modema',              icon: <WifiOff size={12} />,       severity: 'warning' },
+  { key: 'alarm_station_other_error',          label: 'Greška stanice',             icon: <AlertTriangle size={12} />, severity: 'warning' },
+  { key: 'alarm_visibility_comm_failed',       label: 'Vidljivost: greška veze',    icon: <Eye size={12} />,           severity: 'danger'  },
+  { key: 'alarm_visibility_error',             label: 'Vidljivost: greška senzora', icon: <Eye size={12} />,           severity: 'warning' },
+  { key: 'alarm_fog_signal_off_during_fog',    label: 'Sirena: nije aktivna u magli', icon: <Wind size={12} />,        severity: 'danger'  },
+  { key: 'alarm_fog_signal_on_while_no_fog',   label: 'Sirena: aktivna bez magle',  icon: <Wind size={12} />,          severity: 'warning' },
 ];
 
 function AlarmTags({ item }: { item: AlarmListItem }) {
@@ -61,7 +67,9 @@ function isCriticalAlarm(item: AlarmListItem) {
     item.alarm_garmin_comm_failed > 0 ||
     item.alarm_lantern_night_light_off > 0 ||
     item.alarm_lantern_comm_failed > 0 ||
-    item.alarm_station_out_of_radius > 0;
+    item.alarm_station_out_of_radius > 0 ||
+    item.alarm_fog_signal_off_during_fog > 0 ||
+    item.alarm_visibility_comm_failed > 0;
 }
 
 // ── Modalna forma za potvrdu ────────────────────────────────────────────────
