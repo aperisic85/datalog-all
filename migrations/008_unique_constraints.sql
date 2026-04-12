@@ -12,6 +12,8 @@ WHERE a.id > b.id
   AND a.recorded_at = b.recorded_at;
 
 ALTER TABLE measurements_10min
+    DROP CONSTRAINT IF EXISTS uq_m10_obj_time;
+ALTER TABLE measurements_10min
     ADD CONSTRAINT uq_m10_obj_time UNIQUE (object_id, recorded_at);
 
 -- ── Deduplikacija measurements_1h ────────────────────────────────
@@ -21,6 +23,8 @@ WHERE a.id > b.id
   AND a.object_id  = b.object_id
   AND a.recorded_at = b.recorded_at;
 
+ALTER TABLE measurements_1h
+    DROP CONSTRAINT IF EXISTS uq_m1h_obj_time;
 ALTER TABLE measurements_1h
     ADD CONSTRAINT uq_m1h_obj_time UNIQUE (object_id, recorded_at);
 
@@ -32,6 +36,8 @@ WHERE a.id > b.id
   AND a.recorded_at = b.recorded_at;
 
 ALTER TABLE measurements_24h
+    DROP CONSTRAINT IF EXISTS uq_m24_obj_time;
+ALTER TABLE measurements_24h
     ADD CONSTRAINT uq_m24_obj_time UNIQUE (object_id, recorded_at);
 
 -- ── Deduplikacija alarms ──────────────────────────────────────────
@@ -41,6 +47,8 @@ WHERE a.id > b.id
   AND a.object_id  = b.object_id
   AND a.recorded_at = b.recorded_at;
 
+ALTER TABLE alarms
+    DROP CONSTRAINT IF EXISTS uq_alarms_obj_time;
 ALTER TABLE alarms
     ADD CONSTRAINT uq_alarms_obj_time UNIQUE (object_id, recorded_at);
 
@@ -54,5 +62,7 @@ WHERE a.id > b.id
   AND a.recorded_at = b.recorded_at
   AND a.log_message = b.log_message;
 
+ALTER TABLE event_logs
+    DROP CONSTRAINT IF EXISTS uq_evlog_obj_time_msg;
 ALTER TABLE event_logs
     ADD CONSTRAINT uq_evlog_obj_time_msg UNIQUE (object_id, recorded_at, log_message);
