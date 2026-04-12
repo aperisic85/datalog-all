@@ -464,7 +464,7 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
              "sub.acknowledged_at DESC NULLS LAST"),
         "all" =>
             ("DISTINCT ON (o.id)",
-             "TRUE",
+             "a.any_alarm_active = TRUE",
              "o.id, a.recorded_at DESC",
              "sub.recorded_at DESC"),
         _ =>  // "active"
