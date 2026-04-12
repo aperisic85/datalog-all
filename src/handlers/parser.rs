@@ -58,13 +58,30 @@ fn as_i16(v: &Value) -> Option<i16> {
 }
 
 fn parse_ts(val: &Value) -> Option<DateTime<Utc>> {
-    val.as_str().and_then(|s| {
+    let ts = val.as_str().and_then(|s| {
         DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&Utc))
             .or_else(|| {
                 chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
                     .ok().map(|ndt| ndt.and_utc())
             })
-    })
+    })?;
+
+    // Zaštita od pomaknutih satova na CR300: ako timestamp dolazi s
+    // budućim vremenom (> 2 min), koristimo server-side "now".
+    // Tipičan uzrok: CR300 šalje lokalno CET/CEST vrijeme bez TZ oznake
+    // a parser ga tretira kao UTC — rezultat je 1-2h u budućnosti.
+    let now = Utc::now();
+    if ts > now + chrono::Duration::minutes(2) {
+        tracing::warn!(
+            device_ts = %ts,
+            server_now = %now,
+            diff_secs = (ts - now).num_seconds(),
+            "CR300 timestamp u budućnosti — koristimo server now()"
+        );
+        Some(now)
+    } else {
+        Some(ts)
+    }
 }
 
 pub fn detect_station_name(payload: &DataloggerPayload) -> Option<String> {
