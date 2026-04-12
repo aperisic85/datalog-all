@@ -104,6 +104,8 @@
   flex: 1;
   min-height: 0;
   border-radius: 0;
+  /* Contain Leaflet's internal z-indexes so they don't escape above the sidebar/overlay */
+  isolation: isolate;
 }
 
 /* Leaflet popup overrides */
