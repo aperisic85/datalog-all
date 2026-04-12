@@ -22,7 +22,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
 

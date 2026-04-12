@@ -33,6 +33,90 @@
   pointer-events: none;
 }
 
+/* ── Ocean theme overrides ── */
+[data-theme="light"] .login-page {
+  background: linear-gradient(180deg,
+    #a8d8f0 0%,
+    #bee8fa 18%,
+    #d6f0fd 40%,
+    #e4f3fb 70%,
+    #edf8fd 100%
+  );
+}
+
+[data-theme="light"] .login-page::before {
+  background: radial-gradient(circle, rgba(0,119,182,0.14) 0%, transparent 70%);
+  top: -80px;
+}
+
+[data-theme="light"] .login-page::after {
+  background: radial-gradient(circle, rgba(0,180,216,0.1) 0%, transparent 70%);
+}
+
+/* Login box glassmorphism */
+[data-theme="light"] .login-box {
+  background: rgba(255,255,255,0.90);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(255,255,255,0.55);
+  box-shadow: 0 8px 48px rgba(0,55,110,0.18), 0 0 0 1px rgba(255,255,255,0.55);
+}
+
+[data-theme="light"] .login-logo-wrap {
+  background: linear-gradient(135deg, rgba(0,119,182,0.14), rgba(0,180,216,0.1));
+  border-color: rgba(0,119,182,0.22);
+}
+
+/* ── Animated ocean waves (light mode only) ── */
+.ocean-waves {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 180px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+[data-theme="light"] .ocean-waves {
+  display: block;
+}
+
+.wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-repeat: repeat-x;
+}
+
+/* Wave 1 — deepest, darkest ocean blue, slowest */
+.wave-1 {
+  bottom: 0;
+  height: 110px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 110'%3E%3Cpath d='M0,55 C160,30 320,80 480,55 C640,30 800,80 960,55 C1120,30 1280,80 1440,55 L1440,110 L0,110 Z' fill='%230077b6' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 1440px 110px;
+  animation: waveScroll 14s linear infinite;
+}
+
+/* Wave 2 — middle layer, medium blue, medium speed, reverse */
+.wave-2 {
+  bottom: 15px;
+  height: 90px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 90'%3E%3Cpath d='M0,45 C200,20 400,70 600,45 C800,20 1000,70 1200,45 L1200,90 L0,90 Z' fill='%230096c7' opacity='0.60'/%3E%3C/svg%3E");
+  background-size: 1200px 90px;
+  animation: waveScrollRev 10s linear infinite;
+}
+
+/* Wave 3 — front layer, lightest, fastest */
+.wave-3 {
+  bottom: 30px;
+  height: 70px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 70'%3E%3Cpath d='M0,35 C150,15 300,55 450,35 C600,15 750,55 900,35 L900,70 L0,70 Z' fill='%2348cae4' opacity='0.65'/%3E%3C/svg%3E");
+  background-size: 900px 70px;
+  animation: waveScrollFast 7s linear infinite;
+}
+
 .login-box {
   width: 100%;
   max-width: 390px;

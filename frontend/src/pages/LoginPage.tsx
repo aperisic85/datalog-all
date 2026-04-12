@@ -29,6 +29,11 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
+      <div className="ocean-waves" aria-hidden="true">
+        <div className="wave wave-1" />
+        <div className="wave wave-2" />
+        <div className="wave wave-3" />
+      </div>
       <div className="login-box card">
         <div className="login-header">
           <div className="login-logo-wrap">
