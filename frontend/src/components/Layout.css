@@ -15,7 +15,7 @@
   top: 0;
   left: 0;
   height: 100vh;
-  z-index: 200;
+  z-index: 1000;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -195,10 +195,24 @@
     width: 280px;
     min-width: 280px;
     box-shadow: 6px 0 32px rgba(0, 0, 0, 0.5);
+    /* dvh shrinks when Chrome's browser UI is visible, preventing footer cut-off */
+    height: 100dvh;
+  }
+
+  /* Fallback for browsers without dvh support */
+  @supports not (height: 100dvh) {
+    .sidebar {
+      height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
   }
 
   .sidebar.sidebar-open {
     transform: translateX(0);
+  }
+
+  .sidebar-footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
   }
 
   .sidebar-close-btn {
@@ -210,7 +224,7 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    z-index: 199;
+    z-index: 999;
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
     animation: fadeIn 0.2s ease;
@@ -239,7 +253,7 @@
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 900;
     flex-shrink: 0;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -285,7 +299,7 @@
     right: 0;
     background: var(--bg2);
     border-top: 1px solid var(--border);
-    z-index: 150;
+    z-index: 950;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);

@@ -264,8 +264,8 @@ pub async fn delete_image(pool: &PgPool, image_id: Uuid, object_id: Uuid) -> App
 // MEASUREMENTS
 // ================================================================
 
-pub async fn insert_measurement_10min(pool: &PgPool, r: &Measurement10minInsert) -> AppResult<i64> {
-    Ok(sqlx::query_scalar(
+pub async fn insert_measurement_10min(pool: &PgPool, r: &Measurement10minInsert) -> AppResult<()> {
+    sqlx::query(
         "INSERT INTO measurements_10min (object_id, station_id, recorded_at,
              datalogger_temp_avg, battery_voltage_avg, battery_current_avg,
              battery_status_smp, battery_status_avg, solar_voltage_avg,
@@ -278,7 +278,7 @@ pub async fn insert_measurement_10min(pool: &PgPool, r: &Measurement10minInsert)
              visibility_error_smp, fog_signal_active_avg, fog_signal_current_avg)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
                  $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
-         RETURNING id")
+         ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
         .bind(r.battery_status_smp).bind(r.battery_status_avg).bind(r.solar_voltage_avg)
@@ -290,43 +290,48 @@ pub async fn insert_measurement_10min(pool: &PgPool, r: &Measurement10minInsert)
         .bind(r.lantern_distance_avg).bind(r.visibility_comm_ok_avg).bind(r.visibility_value_avg)
         .bind(r.visibility_alarm_avg).bind(r.visibility_error_smp).bind(r.fog_signal_active_avg)
         .bind(r.fog_signal_current_avg)
-        .fetch_one(pool).await?)
+        .execute(pool).await?;
+    Ok(())
 }
 
-pub async fn insert_measurement_1h(pool: &PgPool, r: &Measurement1hInsert) -> AppResult<i64> {
-    Ok(sqlx::query_scalar(
+pub async fn insert_measurement_1h(pool: &PgPool, r: &Measurement1hInsert) -> AppResult<()> {
+    sqlx::query(
         "INSERT INTO measurements_1h (object_id, station_id, recorded_at,
              datalogger_temp_avg, battery_voltage_avg, battery_current_avg,
              battery_charge_tot, battery_discharge_tot, battery_status_avg,
              solar_voltage_avg, solar_daylight_avg, modem_power_avg, internet_ok_avg,
              lantern_light_active_avg, lantern_current_avg,
              visibility_value_avg, visibility_alarm_avg, fog_signal_current_avg)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
         .bind(r.battery_charge_tot).bind(r.battery_discharge_tot).bind(r.battery_status_avg)
         .bind(r.solar_voltage_avg).bind(r.solar_daylight_avg).bind(r.modem_power_avg)
         .bind(r.internet_ok_avg).bind(r.lantern_light_active_avg).bind(r.lantern_current_avg)
         .bind(r.visibility_value_avg).bind(r.visibility_alarm_avg).bind(r.fog_signal_current_avg)
-        .fetch_one(pool).await?)
+        .execute(pool).await?;
+    Ok(())
 }
 
-pub async fn insert_measurement_24h(pool: &PgPool, r: &Measurement24hInsert) -> AppResult<i64> {
-    Ok(sqlx::query_scalar(
+pub async fn insert_measurement_24h(pool: &PgPool, r: &Measurement24hInsert) -> AppResult<()> {
+    sqlx::query(
         "INSERT INTO measurements_24h (object_id, station_id, recorded_at,
              datalogger_temp_avg, battery_voltage_avg, battery_current_avg,
              battery_current_min, battery_current_max, battery_charge_tot,
              battery_discharge_tot, battery_status_avg, solar_daylight_avg,
              modem_power_avg, internet_ok_avg, lantern_light_active_avg, lantern_current_avg,
              visibility_value_avg, fog_signal_current_avg)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
         .bind(r.battery_current_min).bind(r.battery_current_max).bind(r.battery_charge_tot)
         .bind(r.battery_discharge_tot).bind(r.battery_status_avg).bind(r.solar_daylight_avg)
         .bind(r.modem_power_avg).bind(r.internet_ok_avg).bind(r.lantern_light_active_avg)
         .bind(r.lantern_current_avg).bind(r.visibility_value_avg).bind(r.fog_signal_current_avg)
-        .fetch_one(pool).await?)
+        .execute(pool).await?;
+    Ok(())
 }
 
 pub async fn get_measurements_10min(
@@ -382,8 +387,8 @@ pub async fn get_latest_measurement(pool: &PgPool, object_id: Uuid) -> AppResult
 // ALARMS
 // ================================================================
 
-pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<i64> {
-    Ok(sqlx::query_scalar(
+pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<()> {
+    sqlx::query(
         "INSERT INTO alarms (object_id, station_id, recorded_at,
              alarm_datalogger_high_temp, alarm_datalogger_high_voltage, alarm_datalogger_other_error,
              alarm_battery_voltage_low, alarm_battery_voltage_flat, alarm_battery_other_error,
@@ -394,7 +399,7 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<i64> {
              alarm_visibility_comm_failed, alarm_visibility_error,
              alarm_fog_signal_off_during_fog, alarm_fog_signal_on_while_no_fog)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
-         RETURNING id")
+         ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.alarm_datalogger_high_temp).bind(r.alarm_datalogger_high_voltage).bind(r.alarm_datalogger_other_error)
         .bind(r.alarm_battery_voltage_low).bind(r.alarm_battery_voltage_flat).bind(r.alarm_battery_other_error)
@@ -404,7 +409,8 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<i64> {
         .bind(r.alarm_modem_network_error).bind(r.alarm_modem_other_error).bind(r.alarm_station_other_error)
         .bind(r.alarm_visibility_comm_failed).bind(r.alarm_visibility_error)
         .bind(r.alarm_fog_signal_off_during_fog).bind(r.alarm_fog_signal_on_while_no_fog)
-        .fetch_one(pool).await?)
+        .execute(pool).await?;
+    Ok(())
 }
 
 pub async fn get_alarms(
@@ -587,13 +593,15 @@ pub async fn clear_object_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<u6
 // EVENT LOGS
 // ================================================================
 
-pub async fn insert_event_log(pool: &PgPool, r: &EventLogInsert) -> AppResult<i64> {
-    Ok(sqlx::query_scalar(
+pub async fn insert_event_log(pool: &PgPool, r: &EventLogInsert) -> AppResult<()> {
+    sqlx::query(
         "INSERT INTO event_logs (object_id, station_id, recorded_at, log_level, log_message)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id")
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (object_id, recorded_at, log_message) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.log_level).bind(&r.log_message)
-        .fetch_one(pool).await?)
+        .execute(pool).await?;
+    Ok(())
 }
 
 pub async fn get_event_logs(

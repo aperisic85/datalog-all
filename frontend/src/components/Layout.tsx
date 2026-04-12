@@ -122,6 +122,9 @@ export default function Layout() {
             <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
+            <button className="icon-btn" onClick={handleLogout} title="Odjavi se">
+              <LogOut size={18} />
+            </button>
             <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Više">
               <Menu size={22} />
             </button>
