@@ -291,6 +291,91 @@
   border: 1px solid var(--border);
 }
 
+/* GPS Drift analiza */
+.drift-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drift-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drift-range-selector {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.drift-range-selector .filter-tab {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.loc-dot.drift-trail   { background: #f97316; }
+.loc-dot.drift-current { background: #ef4444; }
+
+.location-map-drift {
+  height: 380px;
+}
+
+.drift-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drift-stats {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.drift-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 16px;
+  border-right: 1px solid var(--border);
+  min-width: 110px;
+}
+
+.drift-stat:last-child { border-right: none; }
+
+.drift-stat-label {
+  font-size: 11px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.drift-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.drift-stat-nodata {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  border-right: none;
+  min-width: unset;
+}
+
+.drift-stat-nodata .drift-stat-label {
+  text-transform: none;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
 /* ── Mobile ── */
 @media (max-width: 640px) {
   .metrics-grid {
@@ -317,4 +402,25 @@
   .location-map-wrap {
     height: 240px;
   }
+
+  .location-map-drift {
+    height: 280px;
+  }
+
+  .drift-stats {
+    flex-direction: column;
+  }
+
+  .drift-stat {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+  }
+
+  .drift-stat:last-child { border-bottom: none; }
+
+  .drift-stat-value { font-size: 15px; }
 }
