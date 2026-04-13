@@ -128,7 +128,7 @@ function StationSearch({
 // ────────────────────────────────────────────────────────────────────────────
 // Merged chart data
 // ────────────────────────────────────────────────────────────────────────────
-type MergedPoint = { time: string } & Record<string, number | undefined>;
+type MergedPoint = { time: string; [key: string]: number | string | undefined };
 
 function mergeData(
   dataList: (Measurement10min[] | Measurement1h[])[],
