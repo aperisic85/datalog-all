@@ -1,0 +1,278 @@
+.compare-page {
+  max-width: 1200px;
+}
+
+/* ── Header ── */
+.compare-header {
+  margin-bottom: 20px;
+}
+
+.compare-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.compare-title-row h2 {
+  font-size: 20px;
+}
+
+.compare-desc {
+  font-size: 13px;
+  color: var(--text2);
+  margin: 0;
+}
+
+/* ── Selector card ── */
+.compare-selector {
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.compare-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+}
+
+/* ── Station chip ── */
+.station-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--chip-bg, rgba(59,130,246,0.12));
+  border: 1px solid var(--chip-stroke, var(--accent));
+  border-radius: 20px;
+  padding: 4px 10px 4px 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chip-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chip-id {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: monospace;
+}
+
+.chip-remove {
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text2);
+  border-radius: 50%;
+  opacity: 0.7;
+  transition: opacity var(--transition), background var(--transition);
+}
+
+.chip-remove:hover {
+  opacity: 1;
+  background: rgba(239,68,68,0.15);
+  color: var(--danger);
+}
+
+/* ── Search ── */
+.station-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.station-search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+
+.station-search-input-row .search-icon {
+  color: var(--text2);
+  flex-shrink: 0;
+}
+
+.station-search-input {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text);
+  width: 100%;
+  padding: 0;
+}
+
+.station-search-input::placeholder {
+  color: var(--text2);
+}
+
+.station-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.station-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.station-dropdown-item:hover {
+  background: var(--bg3);
+}
+
+.station-dropdown-item:first-child {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.station-dropdown-item:last-child {
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.dd-region-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dd-name {
+  font-weight: 500;
+  flex-shrink: 0;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dd-meta {
+  font-size: 11px;
+  color: var(--text2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dd-alarm {
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Controls row ── */
+.compare-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Empty state ── */
+.compare-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: var(--text2);
+  text-align: center;
+  gap: 8px;
+}
+
+.compare-empty p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.compare-empty-sub {
+  font-size: 13px !important;
+  opacity: 0.7;
+}
+
+/* ── Charts grid ── */
+.compare-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
+  gap: 14px;
+}
+
+.compare-chart-card {
+  padding: 16px;
+}
+
+.compare-chart-card h4 {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .compare-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .station-search-wrap {
+    min-width: 140px;
+    max-width: 100%;
+    flex: 1;
+  }
+
+  .compare-chips-row {
+    gap: 6px;
+  }
+
+  .chip-id {
+    display: none;
+  }
+}

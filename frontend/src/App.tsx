@@ -10,6 +10,7 @@ import AdminRegionsPage from './pages/AdminRegionsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import MapPage from './pages/MapPage';
 import AlarmsPage from './pages/AlarmsPage';
+import ComparePage from './pages/ComparePage';
 import type { ReactNode } from 'react';
 
 const qc = new QueryClient({
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route path="objects/:id" element={<ObjectDetailPage />} />
         <Route path="map" element={<MapPage />} />
         <Route path="alarms" element={<AlarmsPage />} />
+        <Route path="compare" element={<ComparePage />} />
         <Route
           path="admin/regions"
           element={
