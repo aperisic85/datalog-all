@@ -7,7 +7,6 @@ import {
   Users,
   MapPin,
   LogOut,
-  Activity,
   Sun,
   Moon,
   Map,
@@ -15,6 +14,31 @@ import {
   X,
   AlertTriangle,
 } from 'lucide-react';
+
+function LighthouseIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="8.5" y1="1.8" x2="9.5" y2="3.6" />
+      <line x1="15.5" y1="1.8" x2="14.5" y2="3.6" />
+      <rect x="9" y="4" width="6" height="3" rx="0.5" />
+      <path d="M10 7 L8.5 19 L15.5 19 L14 7" />
+      <line x1="9.1" y1="12" x2="14.9" y2="12" />
+      <rect x="7" y="19" width="10" height="2" rx="0.5" />
+      <path d="M3 22.5 Q5 21.5 7 22.5 Q9 23.5 11 22.5 Q13 21.5 15 22.5 Q17 23.5 19 22.5 Q21 21.5 23 22.5" />
+    </svg>
+  );
+}
 import './Layout.css';
 
 export default function Layout() {
@@ -56,8 +80,8 @@ export default function Layout() {
 
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
-          <Activity size={20} />
-          <span>DataLogger</span>
+          <LighthouseIcon size={20} />
+          <span>Beacon</span>
           <button className="sidebar-close-btn" onClick={closeSidebar} title="Zatvori">
             <X size={18} />
           </button>
@@ -115,8 +139,8 @@ export default function Layout() {
       <main className="content">
         <div className="mobile-topbar">
           <div className="mobile-logo">
-            <Activity size={18} />
-            <span>DataLogger</span>
+            <LighthouseIcon size={18} />
+            <span>Beacon</span>
           </div>
           <div className="mobile-topbar-actions">
             <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
