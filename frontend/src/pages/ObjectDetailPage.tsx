@@ -531,6 +531,38 @@ export default function ObjectDetailPage() {
               <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
                 prev={recentPositions?.[1]?.garmin_satellites_avg} />
             )}
+            {/* Tip 1 — Galija: GPS udaljenost od zadane pozicije */}
+            {!obj.program_features && (
+              <MetricCard
+                icon={<MapPin size={20} />}
+                label="GPS udaljenost"
+                value={latest?.garmin_distance_avg}
+                unit="m"
+                color={
+                  latest?.garmin_distance_avg == null ? undefined :
+                  obj.allowed_radius_m && obj.allowed_radius_m > 0
+                    ? (latest.garmin_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
+                    : 'var(--accent)'
+                }
+                prev={recentPositions?.[1]?.garmin_distance_avg}
+              />
+            )}
+            {/* Tip 2 — Modularni: udaljenost lanterne/modema od zadane pozicije */}
+            {obj.program_features?.modem && (
+              <MetricCard
+                icon={<MapPin size={20} />}
+                label="Udaljenost od pozicije"
+                value={latest?.lantern_distance_avg}
+                unit="m"
+                color={
+                  latest?.lantern_distance_avg == null ? undefined :
+                  obj.allowed_radius_m && obj.allowed_radius_m > 0
+                    ? (latest.lantern_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
+                    : 'var(--accent)'
+                }
+                prev={recentPositions?.[1]?.lantern_distance_avg}
+              />
+            )}
             {/* Tip 2 — Modularni: vidljivost i sirena */}
             {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
               <MetricCard
