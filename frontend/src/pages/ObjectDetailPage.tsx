@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapContainer, TileLayer, CircleMarker, Circle, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup, Polyline } from 'react-leaflet';
 import {
   getObject,
   getLatestMeasurement,
@@ -51,6 +51,17 @@ import './ObjectsPage.css';
 
 type Tab = 'overview' | 'charts' | 'alarms' | 'events';
 type Range = '6h' | '24h' | '7d';
+type DriftRange = '1h' | '6h' | '24h' | '7d';
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function MetricCard({
   icon,
@@ -365,6 +376,7 @@ export default function ObjectDetailPage() {
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [driftRange, setDriftRange] = useState<DriftRange>('24h');
 
   const { data: obj, isLoading: loadingObj } = useQuery({
     queryKey: ['object', id],
@@ -382,6 +394,19 @@ export default function ObjectDetailPage() {
   const { data: recentPositions } = useQuery({
     queryKey: ['positions', id],
     queryFn: () => getMeasurements10min(id!, { limit: 3 }),
+    enabled: !!id,
+    refetchInterval: 60_000,
+  });
+
+  const { data: driftMeasurements, isLoading: loadingDrift } = useQuery({
+    queryKey: ['drift', id, driftRange],
+    queryFn: () => {
+      const hoursMap: Record<string, number> = { '1h': 1, '6h': 6, '24h': 24 };
+      const from = driftRange === '7d'
+        ? subDays(new Date(), 7).toISOString()
+        : subHours(new Date(), hoursMap[driftRange]).toISOString();
+      return getMeasurements10min(id!, { from, limit: driftRange === '7d' ? 1000 : 500 });
+    },
     enabled: !!id,
     refetchInterval: 60_000,
   });
@@ -661,70 +686,212 @@ export default function ObjectDetailPage() {
           </div>
 
           {obj.latitude && obj.longitude && (() => {
-            const gpsPoints = (recentPositions ?? [])
-              .filter((m) => m.garmin_latitude_avg != null && m.garmin_longitude_avg != null)
-              .slice(0, 3);
-            const posColors = ['#f97316', '#fb923c', '#fdba74'];
+            const isModular = !!(obj.program_features?.modem || obj.program_features?.navlite || obj.program_features?.sealite);
+
+            // GPS trail in chronological order (API returns DESC → reverse to ASC)
+            const trailPoints = (driftMeasurements ?? [])
+              .filter((m) =>
+                isModular
+                  ? m.lantern_latitude_avg != null && m.lantern_longitude_avg != null
+                  : m.garmin_latitude_avg != null && m.garmin_longitude_avg != null
+              )
+              .map((m) => ({
+                id: m.id,
+                lat: isModular ? m.lantern_latitude_avg! : m.garmin_latitude_avg!,
+                lng: isModular ? m.lantern_longitude_avg! : m.garmin_longitude_avg!,
+                dist: isModular ? m.lantern_distance_avg : m.garmin_distance_avg,
+                time: m.recorded_at,
+              }))
+              .reverse();
+
+            const polylinePositions = trailPoints.map((p) => [p.lat, p.lng] as [number, number]);
+
+            // Stats
+            const maxDrift = trailPoints.reduce((max, p) =>
+              p.dist != null ? Math.max(max, p.dist) : max, 0
+            );
+            let trailLength = 0;
+            for (let i = 1; i < trailPoints.length; i++) {
+              trailLength += haversineDistance(
+                trailPoints[i - 1].lat, trailPoints[i - 1].lng,
+                trailPoints[i].lat, trailPoints[i].lng
+              );
+            }
+            const driftedOutside = obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && maxDrift > obj.allowed_radius_m;
+
             return (
               <div className="location-map-section card" style={{ marginTop: 16 }}>
                 <div className="location-map-header">
-                  <h3>Lokacija objekta</h3>
-                  <div className="location-map-legend">
-                    <span className="loc-legend-item"><span className="loc-dot default" />Zadana pozicija</span>
-                    {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
-                      <span className="loc-legend-item"><span className="loc-dot radius" />Dozvoljeni radijus</span>
-                    )}
-                    {gpsPoints.length > 0 && (
-                      <span className="loc-legend-item"><span className="loc-dot gps" />Zadnje GPS pozicije</span>
+                  <div className="drift-title-row">
+                    <h3>GPS drift analiza</h3>
+                    {driftedOutside && (
+                      <span className="badge badge-danger" style={{ fontSize: 11 }}>
+                        <AlertTriangle size={11} /> Van radijusa
+                      </span>
                     )}
                   </div>
+                  <div className="drift-controls">
+                    <div className="drift-range-selector">
+                      {(['1h', '6h', '24h', '7d'] as DriftRange[]).map((r) => (
+                        <button
+                          key={r}
+                          className={`filter-tab ${driftRange === r ? 'active' : ''}`}
+                          onClick={() => setDriftRange(r)}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className="location-map-wrap">
-                  <MapContainer
-                    center={[obj.latitude, obj.longitude]}
-                    zoom={15}
-                    style={{ height: '100%', width: '100%' }}
-                    scrollWheelZoom={false}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    {/* Radius circle */}
-                    {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
-                      <Circle
-                        center={[obj.latitude, obj.longitude]}
-                        radius={obj.allowed_radius_m}
-                        pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.08, weight: 2, dashArray: '6 4' }}
-                      />
-                    )}
-                    {/* Default position */}
-                    <CircleMarker
+
+                <div className="location-map-legend">
+                  <span className="loc-legend-item"><span className="loc-dot default" />Zadana pozicija</span>
+                  {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
+                    <span className="loc-legend-item"><span className="loc-dot radius" />Dozvoljeni radijus</span>
+                  )}
+                  {trailPoints.length > 0 && (
+                    <span className="loc-legend-item"><span className="loc-dot drift-trail" />GPS trag</span>
+                  )}
+                  {trailPoints.length > 0 && (
+                    <span className="loc-legend-item"><span className="loc-dot drift-current" />Trenutna pozicija</span>
+                  )}
+                </div>
+
+                <div className="location-map-wrap location-map-drift">
+                  {loadingDrift ? (
+                    <div className="drift-loading"><div className="spinner" /></div>
+                  ) : (
+                    <MapContainer
                       center={[obj.latitude, obj.longitude]}
-                      radius={9}
-                      pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.9, weight: 2 }}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom={true}
                     >
-                      <Popup>
-                        <strong>Zadana pozicija</strong><br />
-                        {obj.latitude.toFixed(5)}, {obj.longitude.toFixed(5)}
-                      </Popup>
-                    </CircleMarker>
-                    {/* Last 3 GPS positions */}
-                    {gpsPoints.map((m, i) => (
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      {/* Radius circle */}
+                      {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
+                        <Circle
+                          center={[obj.latitude, obj.longitude]}
+                          radius={obj.allowed_radius_m}
+                          pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.08, weight: 2, dashArray: '6 4' }}
+                        />
+                      )}
+                      {/* GPS trail polyline */}
+                      {polylinePositions.length > 1 && (
+                        <Polyline
+                          positions={polylinePositions}
+                          pathOptions={{ color: '#f97316', weight: 3, opacity: 0.75 }}
+                        />
+                      )}
+                      {/* Trail points — all intermediate points */}
+                      {trailPoints.slice(1, -1).map((p) => (
+                        <CircleMarker
+                          key={p.id}
+                          center={[p.lat, p.lng]}
+                          radius={3}
+                          pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.55, weight: 1 }}
+                        >
+                          <Popup>
+                            <strong>GPS točka</strong><br />
+                            {p.lat.toFixed(5)}, {p.lng.toFixed(5)}<br />
+                            {p.dist != null && <><span>Udaljenost: </span>{p.dist.toFixed(0)} m<br /></>}
+                            <span style={{ fontSize: 11, color: '#6b7280' }}>
+                              {format(parseISO(p.time), 'dd.MM.yyyy HH:mm')}
+                            </span>
+                          </Popup>
+                        </CircleMarker>
+                      ))}
+                      {/* Oldest point */}
+                      {trailPoints.length > 1 && (
+                        <CircleMarker
+                          center={[trailPoints[0].lat, trailPoints[0].lng]}
+                          radius={5}
+                          pathOptions={{ color: '#64748b', fillColor: '#64748b', fillOpacity: 0.8, weight: 1.5 }}
+                        >
+                          <Popup>
+                            <strong>Početna točka traga</strong><br />
+                            {trailPoints[0].lat.toFixed(5)}, {trailPoints[0].lng.toFixed(5)}<br />
+                            {trailPoints[0].dist != null && <><span>Udaljenost: </span>{trailPoints[0].dist.toFixed(0)} m<br /></>}
+                            <span style={{ fontSize: 11, color: '#6b7280' }}>
+                              {format(parseISO(trailPoints[0].time), 'dd.MM.yyyy HH:mm')}
+                            </span>
+                          </Popup>
+                        </CircleMarker>
+                      )}
+                      {/* Newest / current point */}
+                      {trailPoints.length > 0 && (
+                        <CircleMarker
+                          center={[trailPoints[trailPoints.length - 1].lat, trailPoints[trailPoints.length - 1].lng]}
+                          radius={8}
+                          pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.95, weight: 2 }}
+                        >
+                          <Popup>
+                            <strong>Trenutna GPS pozicija</strong><br />
+                            {trailPoints[trailPoints.length - 1].lat.toFixed(5)}, {trailPoints[trailPoints.length - 1].lng.toFixed(5)}<br />
+                            {trailPoints[trailPoints.length - 1].dist != null && (
+                              <><span>Udaljenost: </span>{trailPoints[trailPoints.length - 1].dist!.toFixed(0)} m<br /></>
+                            )}
+                            <span style={{ fontSize: 11, color: '#6b7280' }}>
+                              {format(parseISO(trailPoints[trailPoints.length - 1].time), 'dd.MM.yyyy HH:mm')}
+                            </span>
+                          </Popup>
+                        </CircleMarker>
+                      )}
+                      {/* Home / anchor position */}
                       <CircleMarker
-                        key={m.id}
-                        center={[m.garmin_latitude_avg!, m.garmin_longitude_avg!]}
-                        radius={6}
-                        pathOptions={{ color: posColors[i], fillColor: posColors[i], fillOpacity: 0.85, weight: 2 }}
+                        center={[obj.latitude, obj.longitude]}
+                        radius={9}
+                        pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.9, weight: 2 }}
                       >
                         <Popup>
-                          <strong>GPS pozicija #{i + 1}</strong><br />
-                          {m.garmin_latitude_avg!.toFixed(5)}, {m.garmin_longitude_avg!.toFixed(5)}<br />
-                          <span style={{ fontSize: 11, color: '#6b7280' }}>{m.recorded_at.replace('T', ' ').slice(0, 16)}</span>
+                          <strong>Zadana pozicija (sidro)</strong><br />
+                          {obj.latitude.toFixed(5)}, {obj.longitude.toFixed(5)}
                         </Popup>
                       </CircleMarker>
-                    ))}
-                  </MapContainer>
+                    </MapContainer>
+                  )}
+                </div>
+
+                {/* Drift stats */}
+                <div className="drift-stats">
+                  <div className="drift-stat">
+                    <span className="drift-stat-label">Maks. drift</span>
+                    <span
+                      className="drift-stat-value"
+                      style={{ color: driftedOutside ? 'var(--danger)' : 'var(--text)' }}
+                    >
+                      {trailPoints.length > 0 ? `${maxDrift.toFixed(0)} m` : '—'}
+                    </span>
+                  </div>
+                  <div className="drift-stat">
+                    <span className="drift-stat-label">Duljina traga</span>
+                    <span className="drift-stat-value">
+                      {trailLength >= 1000
+                        ? `${(trailLength / 1000).toFixed(2)} km`
+                        : trailLength > 0 ? `${trailLength.toFixed(0)} m` : '—'}
+                    </span>
+                  </div>
+                  <div className="drift-stat">
+                    <span className="drift-stat-label">GPS točaka</span>
+                    <span className="drift-stat-value">{trailPoints.length}</span>
+                  </div>
+                  {trailPoints.length > 0 && (
+                    <div className="drift-stat">
+                      <span className="drift-stat-label">Posljednje GPS</span>
+                      <span className="drift-stat-value" style={{ fontSize: 12 }}>
+                        {format(parseISO(trailPoints[trailPoints.length - 1].time), 'dd.MM. HH:mm')}
+                      </span>
+                    </div>
+                  )}
+                  {trailPoints.length === 0 && !loadingDrift && (
+                    <div className="drift-stat drift-stat-nodata">
+                      <span className="drift-stat-label">Nema GPS podataka za odabrani period</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
