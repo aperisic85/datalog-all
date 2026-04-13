@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   AlertTriangle,
+  GitCompare,
 } from 'lucide-react';
 
 function LighthouseIcon({ size = 24 }: { size?: number }) {
@@ -104,6 +105,10 @@ export default function Layout() {
             <AlertTriangle size={16} />
             Alarmi
           </NavLink>
+          <NavLink to="/compare" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <GitCompare size={16} />
+            Usporedi
+          </NavLink>
           {isAdmin && (
             <>
               <div className="nav-section">Admin</div>
@@ -181,6 +186,13 @@ export default function Layout() {
         >
           <AlertTriangle size={22} />
           <span>Alarmi</span>
+        </NavLink>
+        <NavLink
+          to="/compare"
+          className={`bottom-nav-item${location.pathname === '/compare' ? ' active' : ''}`}
+        >
+          <GitCompare size={22} />
+          <span>Usporedi</span>
         </NavLink>
         <NavLink
           to="/map"
