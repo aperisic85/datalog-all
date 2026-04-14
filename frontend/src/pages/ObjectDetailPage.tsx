@@ -10,6 +10,7 @@ import {
   getActiveAlarms,
   getEventLogs,
   getBatteryPrediction,
+  getBatteryCapacity,
   getSolarEfficiency,
   getWeather,
   pollObject,
@@ -42,6 +43,7 @@ import {
   Thermometer,
   Wifi,
   AlertTriangle,
+  Clock,
   MapPin,
   Radio,
   Sun,
@@ -55,6 +57,8 @@ import {
   Cpu,
   Cloud,
 } from 'lucide-react';
+import { formatDistanceToNow, parseISO as parseDateISO } from 'date-fns';
+import { hr } from 'date-fns/locale';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
 import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
@@ -289,6 +293,129 @@ const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
   4: { label: 'Greška', cls: 'badge-danger' },
   5: { label: 'Kritično', cls: 'badge-danger' },
 };
+
+// ─── Battery Capacity Section ─────────────────────────────────────────────────
+
+const CAPACITY_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  good:             { label: 'Baterija dobra',              color: 'var(--success)' },
+  degraded:         { label: 'Baterija degradirana',        color: 'var(--warning)' },
+  replace:          { label: 'Preporučena zamjena',         color: 'var(--danger)'  },
+  no_nominal:       { label: 'Nominalni kapacitet nije postavljen', color: 'var(--text2)' },
+  insufficient_data:{ label: 'Nedovoljno podataka',         color: 'var(--text2)'   },
+};
+
+function BatteryCapacitySection({ objectId }: { objectId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['battery-capacity', objectId],
+    queryFn: () => getBatteryCapacity(objectId),
+    refetchInterval: 60 * 60_000, // osvježi jednom na sat
+    retry: 1,
+  });
+
+  if (isLoading) return null;
+  if (!data) return null;
+
+  const cfg = CAPACITY_STATUS_CONFIG[data.status] ?? CAPACITY_STATUS_CONFIG.insufficient_data;
+  const healthPct = data.health_percent != null ? Math.round(data.health_percent) : null;
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 10 }}>
+      {/* Zaglavlje */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+      }}>
+        <Battery size={14} style={{ color: cfg.color }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Kapacitet baterije — procjena
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text3)' }}>
+          {data.sample_days} dana podataka
+        </span>
+      </div>
+
+      <div style={{ padding: '10px 14px' }}>
+        {/* Status + health bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+
+          {healthPct != null && (
+            <span style={{ fontSize: 18, fontWeight: 700, color: cfg.color }}>
+              {healthPct}%
+            </span>
+          )}
+
+          {data.status === 'no_nominal' && (
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              Postavi nominalni kapacitet u postavkama objekta za usporedbu
+            </span>
+          )}
+          {data.status === 'insufficient_data' && (
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              Potrebno min. 7 dana 24h mjerenja
+            </span>
+          )}
+        </div>
+
+        {/* Health progress bar */}
+        {healthPct != null && (
+          <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{
+              height: '100%',
+              width: `${healthPct}%`,
+              background: cfg.color,
+              borderRadius: 3,
+              transition: 'width 0.5s',
+            }} />
+          </div>
+        )}
+
+        {/* Detalji */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px', fontSize: 12, color: 'var(--text2)' }}>
+          {data.nominal_capacity_ah != null && (
+            <span>Nominalni: <strong style={{ color: 'var(--text)' }}>{data.nominal_capacity_ah} Ah</strong></span>
+          )}
+          {data.estimated_capacity_ah != null && (
+            <span>
+              Procijenjeni:{' '}
+              <strong style={{ color: cfg.color }}>
+                {data.estimated_capacity_ah.toFixed(1)} Ah
+              </strong>
+            </span>
+          )}
+          {data.max_deficit_run_ah != null && data.max_deficit_run_ah !== data.estimated_capacity_ah && (
+            <span>Max deficit run: <strong>{data.max_deficit_run_ah.toFixed(1)} Ah</strong></span>
+          )}
+          {data.max_daily_discharge_ah != null && (
+            <span>Max dnevno pražnjenje: <strong>{data.max_daily_discharge_ah.toFixed(1)} Ah</strong></span>
+          )}
+        </div>
+
+        {/* Upozorenje o zamjeni */}
+        {data.status === 'replace' && (
+          <div style={{
+            marginTop: 8, padding: '6px 10px',
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: 6, fontSize: 12, color: 'var(--danger)',
+          }}>
+            ⚠ Efektivni kapacitet baterije je ispod 60% nominalnog — kandidat za zamjenu
+          </div>
+        )}
+        {data.status === 'degraded' && (
+          <div style={{
+            marginTop: 8, padding: '6px 10px',
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.2)',
+            borderRadius: 6, fontSize: 12, color: 'var(--warning)',
+          }}>
+            ⚠ Efektivni kapacitet između 60–80% nominalnog — pratite trend
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Solar Efficiency Section ─────────────────────────────────────────────────
 
@@ -540,6 +667,10 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
     polling_enabled: obj.polling_enabled,
     is_active: obj.is_active,
     description: obj.description ?? '',
+    // Battery capacity estimator
+    nominal_battery_capacity_ah: obj.nominal_battery_capacity_ah != null ? String(obj.nominal_battery_capacity_ah) : '',
+    // Silent station alert
+    silence_timeout_minutes: String(obj.silence_timeout_minutes ?? 120),
     // Program tip
     is_modular: pf != null,
     program_version: obj.program_version ?? '',
@@ -589,6 +720,10 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
       polling_enabled: form.polling_enabled,
       is_active: form.is_active,
       description: form.description || undefined,
+      nominal_battery_capacity_ah: form.nominal_battery_capacity_ah
+        ? Number(form.nominal_battery_capacity_ah)
+        : undefined,
+      silence_timeout_minutes: Number(form.silence_timeout_minutes) || 120,
       program_version: form.is_modular && form.program_version ? form.program_version : undefined,
       program_features: form.is_modular ? {
         sealite: form.pf_sealite,
@@ -688,6 +823,37 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
           <div className="form-group">
             <label>Opis</label>
             <input value={form.description} onChange={(e) => set('description', e.target.value)} />
+          </div>
+
+          {/* Battery capacity estimator + Silent station */}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+              Baterija i monitoring
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Nominalni kapacitet baterije (Ah)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="npr. 200"
+                  value={form.nominal_battery_capacity_ah}
+                  onChange={(e) => set('nominal_battery_capacity_ah', e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Timeout tihosti (min)</label>
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  placeholder="120"
+                  value={form.silence_timeout_minutes}
+                  onChange={(e) => set('silence_timeout_minutes', e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Program tip */}
@@ -903,6 +1069,18 @@ export default function ObjectDetailPage() {
               : <span className="badge badge-success">OK</span>
             }
             {!obj.is_active && <span className="badge badge-neutral">Neaktivan</span>}
+            {obj.is_silent && (
+              <span
+                className="badge badge-danger"
+                title={`Zadnji kontakt: ${obj.last_measurement_at ? new Date(obj.last_measurement_at).toLocaleString('hr-HR') : '—'}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <Clock size={11} />
+                Tiha stanica — {obj.last_measurement_at
+                  ? formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: false, locale: hr }) + ' ago'
+                  : 'nema podataka'}
+              </span>
+            )}
             {isAdmin && (
               <button className="btn-secondary" style={{ marginLeft: 8, padding: '4px 10px', fontSize: 13 }} onClick={() => setShowEdit(true)}>
                 <Pencil size={13} /> Uredi
@@ -957,6 +1135,7 @@ export default function ObjectDetailPage() {
             prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
             prevCurrent={recentPositions?.[1]?.battery_current_avg}
           />
+          <BatteryCapacitySection objectId={id!} />
           {hasCoords && <SolarEfficiencySection objectId={id!} />}
           <div className="metrics-grid" style={{ marginTop: 10 }}>
             <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
@@ -1101,6 +1280,19 @@ export default function ObjectDetailPage() {
                 <div><span>Tip pozicije:</span> Fiksni objekt</div>
               )}
               <div><span>Polling:</span> {obj.polling_enabled ? `${obj.poll_interval_sec}s` : 'isključen'}</div>
+              {obj.nominal_battery_capacity_ah != null && (
+                <div><span>Nominalni kapacitet baterije:</span> {obj.nominal_battery_capacity_ah} Ah</div>
+              )}
+              <div>
+                <span>Timeout tihosti:</span> {obj.silence_timeout_minutes} min
+                {obj.last_measurement_at && (
+                  <span style={{ marginLeft: 8, color: obj.is_silent ? 'var(--danger)' : 'var(--text3)', fontSize: 12 }}>
+                    (zadnji kontakt:{' '}
+                    {formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: true, locale: hr })}
+                    )
+                  </span>
+                )}
+              </div>
               {obj.description && <div className="info-full"><span>Opis:</span> {obj.description}</div>}
             </div>
           </div>

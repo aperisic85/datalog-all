@@ -15,6 +15,7 @@ import type {
   UserPublic,
   UserRegionAccessView,
   BatteryPrediction,
+  BatteryCapacityEstimate,
   AlarmHeatmapData,
   WeatherResponse,
   SolarEfficiency,
@@ -128,6 +129,10 @@ export const getAlarmHeatmap = (id: string) =>
 // Battery prediction
 export const getBatteryPrediction = (id: string) =>
   api.get<BatteryPrediction>(`/api/v1/objects/${id}/battery/prediction`).then((r) => r.data);
+
+// Battery capacity estimate
+export const getBatteryCapacity = (id: string) =>
+  api.get<BatteryCapacityEstimate>(`/api/v1/objects/${id}/battery/capacity`).then((r) => r.data);
 
 // Weather (Open-Meteo)
 export const getWeather = (id: string, days?: number) =>

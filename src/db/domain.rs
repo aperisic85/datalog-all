@@ -166,24 +166,26 @@ pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<
 pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -> AppResult<ObjectView> {
     sqlx::query(
         "UPDATE objects SET
-             name              = COALESCE($2,  name),
-             short_name        = COALESCE($3,  short_name),
-             region_id         = COALESCE($4,  region_id),
-             station_type_id   = COALESCE($5,  station_type_id),
-             latitude          = COALESCE($6,  latitude),
-             longitude         = COALESCE($7,  longitude),
-             location_name     = COALESCE($8,  location_name),
-             allowed_radius_m  = COALESCE($9,  allowed_radius_m),
-             description       = COALESCE($10, description),
-             notes             = COALESCE($11, notes),
-             datalogger_url    = COALESCE($12, datalogger_url),
-             datalogger_user   = COALESCE($13, datalogger_user),
-             datalogger_pass   = COALESCE($14, datalogger_pass),
-             poll_interval_sec = COALESCE($15, poll_interval_sec),
-             polling_enabled   = COALESCE($16, polling_enabled),
-             is_active         = COALESCE($17, is_active),
-             program_version   = COALESCE($18, program_version),
-             program_features  = COALESCE($19, program_features)
+             name                       = COALESCE($2,  name),
+             short_name                 = COALESCE($3,  short_name),
+             region_id                  = COALESCE($4,  region_id),
+             station_type_id            = COALESCE($5,  station_type_id),
+             latitude                   = COALESCE($6,  latitude),
+             longitude                  = COALESCE($7,  longitude),
+             location_name              = COALESCE($8,  location_name),
+             allowed_radius_m           = COALESCE($9,  allowed_radius_m),
+             description                = COALESCE($10, description),
+             notes                      = COALESCE($11, notes),
+             datalogger_url             = COALESCE($12, datalogger_url),
+             datalogger_user            = COALESCE($13, datalogger_user),
+             datalogger_pass            = COALESCE($14, datalogger_pass),
+             poll_interval_sec          = COALESCE($15, poll_interval_sec),
+             polling_enabled            = COALESCE($16, polling_enabled),
+             is_active                  = COALESCE($17, is_active),
+             program_version            = COALESCE($18, program_version),
+             program_features           = COALESCE($19, program_features),
+             nominal_battery_capacity_ah = COALESCE($20, nominal_battery_capacity_ah),
+             silence_timeout_minutes    = COALESCE($21, silence_timeout_minutes)
          WHERE id = $1")
         .bind(id).bind(&req.name).bind(&req.short_name).bind(req.region_id)
         .bind(req.station_type_id).bind(req.latitude).bind(req.longitude)
@@ -191,6 +193,7 @@ pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -
         .bind(&req.datalogger_url).bind(&req.datalogger_user).bind(&req.datalogger_pass)
         .bind(req.poll_interval_sec).bind(req.polling_enabled).bind(req.is_active)
         .bind(&req.program_version).bind(&req.program_features)
+        .bind(req.nominal_battery_capacity_ah).bind(req.silence_timeout_minutes)
         .execute(pool).await?;
 
     get_object_by_id(pool, id).await?
@@ -381,6 +384,30 @@ pub async fn get_latest_measurement(pool: &PgPool, object_id: Uuid) -> AppResult
         "SELECT * FROM v_latest_measurements WHERE object_id = $1")
         .bind(object_id)
         .fetch_optional(pool).await?)
+}
+
+/// Vraća dnevne ukupne vrijednosti punjenja i pražnjenja baterije za zadani
+/// objekt iz measurements_24h tablice — za procjenu efektivnog kapaciteta.
+/// Sortira uzlazno (od najstarijeg prema najnovijem).
+pub async fn get_daily_battery_totals(
+    pool: &PgPool,
+    object_id: Uuid,
+    days: i64,
+) -> AppResult<Vec<(chrono::DateTime<chrono::Utc>, f32, f32)>> {
+    let rows: Vec<(chrono::DateTime<chrono::Utc>, f32, f32)> = sqlx::query_as(
+        "SELECT recorded_at,
+                COALESCE(battery_charge_tot,    0) AS battery_charge_tot,
+                COALESCE(battery_discharge_tot, 0) AS battery_discharge_tot
+         FROM measurements_24h
+         WHERE object_id = $1
+           AND (battery_charge_tot IS NOT NULL OR battery_discharge_tot IS NOT NULL)
+           AND recorded_at >= NOW() - ($2::bigint * INTERVAL '1 day')
+         ORDER BY recorded_at ASC")
+        .bind(object_id)
+        .bind(days)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows)
 }
 
 /// Vraća zadnjih `n` satnih mjerenja napona baterije za zadani objekt,

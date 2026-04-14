@@ -86,6 +86,12 @@ pub struct ObjectView {
     // Slike
     pub primary_image_url:   Option<String>,
     pub image_count:         Option<i64>,
+    // Battery capacity estimator
+    pub nominal_battery_capacity_ah: Option<f32>,
+    // Silent station detection
+    pub silence_timeout_minutes: i32,
+    pub last_measurement_at:     Option<DateTime<Utc>>,
+    pub is_silent:               bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +137,8 @@ pub struct UpdateObjectRequest {
     pub is_active:         Option<bool>,
     pub program_version:   Option<String>,
     pub program_features:  Option<JsonValue>,
+    pub nominal_battery_capacity_ah: Option<f32>,
+    pub silence_timeout_minutes:     Option<i32>,
 }
 
 // ================================================================
@@ -712,6 +720,34 @@ pub struct BatteryPrediction {
     pub sample_count:      i32,
     /// Koeficijent determinacije R² (0–1)
     pub r_squared:         Option<f64>,
+}
+
+// ================================================================
+// BATTERY CAPACITY ESTIMATE
+// ================================================================
+
+/// Procjena efektivnog kapaciteta baterije iz dnevnih totalizatora.
+/// Vraćen od GET /api/v1/objects/:id/battery/capacity
+#[derive(Debug, Serialize)]
+pub struct BatteryCapacityEstimate {
+    pub object_id:               Uuid,
+    pub computed_at:             DateTime<Utc>,
+    /// Nominalni kapacitet (Ah) — iz konfiguracije objekta
+    pub nominal_capacity_ah:     Option<f32>,
+    /// Procijenjeni efektivni kapacitet (Ah) — iz analize totalizatora
+    pub estimated_capacity_ah:   Option<f64>,
+    /// Zdravlje baterije (estimated / nominal × 100), max 100
+    pub health_percent:          Option<f64>,
+    /// Maksimalno jednodnevno pražnjenje (Ah) — konzervativna donja granica
+    pub max_daily_discharge_ah:  Option<f64>,
+    /// Kumulativni deficit u najduljem deficit runu (Ah) — bolji estimat
+    pub max_deficit_run_ah:      Option<f64>,
+    /// Broj dana uzetih u analizu
+    pub sample_days:             i32,
+    /// "good" | "degraded" | "replace" | "no_nominal" | "insufficient_data"
+    pub status:                  String,
+    /// Opis statusa na hrvatskom
+    pub status_label:            String,
 }
 
 // ================================================================

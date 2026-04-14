@@ -285,6 +285,12 @@
   border: 1px solid var(--border);
 }
 
+.cell-silent {
+  background: rgba(249,115,22,0.12);
+  color: #ea580c;
+  border: 1px solid rgba(249,115,22,0.3);
+}
+
 .cell-name {
   overflow: hidden;
   display: -webkit-box;

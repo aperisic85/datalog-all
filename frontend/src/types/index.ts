@@ -60,6 +60,12 @@ export interface ObjectView {
   region_color: string;
   primary_image_url?: string;
   image_count?: number;
+  // Battery capacity estimator
+  nominal_battery_capacity_ah?: number;
+  // Silent station detection
+  silence_timeout_minutes: number;
+  last_measurement_at?: string;
+  is_silent: boolean;
 }
 
 export interface Measurement10min {
@@ -337,6 +343,31 @@ export interface SolarEfficiency {
   sample_count_baseline: number;
   sample_count_recent: number;
   daily_scores: SolarDayScore[];
+}
+
+/**
+ * Procjena efektivnog kapaciteta baterije iz dnevnih totalizatora.
+ * Vraćen od GET /api/v1/objects/:id/battery/capacity
+ */
+export interface BatteryCapacityEstimate {
+  object_id: string;
+  computed_at: string;
+  /** Nominalni kapacitet (Ah) iz konfiguracije objekta */
+  nominal_capacity_ah?: number;
+  /** Procijenjeni efektivni kapacitet (Ah) iz analize totalizatora */
+  estimated_capacity_ah?: number;
+  /** Zdravlje baterije (%) — estimated / nominal × 100, max 100 */
+  health_percent?: number;
+  /** Maksimalno jednodnevno pražnjenje (Ah) */
+  max_daily_discharge_ah?: number;
+  /** Kumulativni deficit u najduljem deficit runu (Ah) */
+  max_deficit_run_ah?: number;
+  /** Broj dana analiziranih */
+  sample_days: number;
+  /** "good" | "degraded" | "replace" | "no_nominal" | "insufficient_data" */
+  status: string;
+  /** Opis statusa na hrvatskom */
+  status_label: string;
 }
 
 /**
