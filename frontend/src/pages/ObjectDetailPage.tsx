@@ -106,15 +106,15 @@ function MetricCard({
   );
 }
 
-// ─── Battery prediction card ────────────────────────────────────────────────
+// ─── Battery section (napon + struja + predikcija) ──────────────────────────
 
-const TREND_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  stable:            { label: 'Stabilan',         color: 'var(--success)',  bg: 'rgba(22,163,74,0.08)' },
-  charging:          { label: 'Puni se',           color: 'var(--success)',  bg: 'rgba(22,163,74,0.08)' },
-  degrading:         { label: 'Pada',              color: 'var(--warning)',  bg: 'rgba(234,179,8,0.08)' },
-  warning:           { label: 'Upozorenje',        color: 'var(--warning)',  bg: 'rgba(234,179,8,0.12)' },
-  critical:          { label: 'KRITIČNO',          color: 'var(--danger)',   bg: 'rgba(220,38,38,0.10)' },
-  insufficient_data: { label: 'Nedovoljno podataka', color: 'var(--text2)', bg: 'var(--bg2)' },
+const TREND_CONFIG: Record<string, { label: string; color: string }> = {
+  stable:            { label: 'Stabilan',            color: 'var(--success)' },
+  charging:          { label: 'Puni se',              color: 'var(--success)' },
+  degrading:         { label: 'Pada',                 color: 'var(--warning)' },
+  warning:           { label: 'Upozorenje',           color: 'var(--warning)' },
+  critical:          { label: 'KRITIČNO',             color: 'var(--danger)'  },
+  insufficient_data: { label: 'Nedovoljno podataka',  color: 'var(--text2)'   },
 };
 
 function formatDays(days: number): string {
@@ -125,73 +125,123 @@ function formatDays(days: number): string {
   return `~${days.toFixed(1)} dan${days < 2 ? '' : 'a'}`;
 }
 
-function BatteryPredictionCard({ objectId }: { objectId: string }) {
-  const { data, isLoading, isError } = useQuery({
+function BatterySection({
+  objectId,
+  voltage,
+  current,
+  prevVoltage,
+  prevCurrent,
+}: {
+  objectId: string;
+  voltage?: number | null;
+  current?: number | null;
+  prevVoltage?: number | null;
+  prevCurrent?: number | null;
+}) {
+  const { data } = useQuery({
     queryKey: ['battery-prediction', objectId],
     queryFn: () => getBatteryPrediction(objectId),
-    refetchInterval: 5 * 60_000, // osvježi svakih 5 min
+    refetchInterval: 5 * 60_000,
   });
 
-  if (isLoading) return null;
-  if (isError || !data) return null;
+  const cfg = data ? (TREND_CONFIG[data.trend] ?? TREND_CONFIG.insufficient_data) : null;
 
-  const cfg = TREND_CONFIG[data.trend] ?? TREND_CONFIG.insufficient_data;
-  const voltage = data.trend_voltage ?? data.current_voltage;
+  // Inline delta helper (zamjena za MetricCard trend strelicu)
+  const delta = (cur?: number | null, prev?: number | null) => {
+    if (cur == null || prev == null) return null;
+    const thr = Math.max(Math.abs(prev), 0.01) * 0.02;
+    if (cur - prev > thr) return <TrendingUp size={13} style={{ color: 'var(--success)', marginLeft: 3 }} />;
+    if (prev - cur > thr) return <TrendingDown size={13} style={{ color: 'var(--danger)', marginLeft: 3 }} />;
+    return null;
+  };
 
   return (
-    <div className="card" style={{
-      borderLeft: `3px solid ${cfg.color}`,
-      background: cfg.bg,
-      padding: '12px 16px',
-      marginBottom: 16,
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '12px 24px',
-      alignItems: 'center',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Battery size={18} style={{ color: cfg.color }} />
-        <span style={{ fontWeight: 600, color: cfg.color, fontSize: 13 }}>
-          Predikcija baterije — {cfg.label}
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Zaglavlje */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+      }}>
+        <Battery size={14} style={{ color: 'var(--success)' }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Baterija
         </span>
       </div>
 
-      {voltage != null && (
-        <span style={{ fontSize: 13, color: 'var(--text1)' }}>
-          <span style={{ color: 'var(--text2)', marginRight: 4 }}>Trend napon:</span>
-          <strong>{voltage.toFixed(2)} V</strong>
-        </span>
-      )}
+      {/* Napon + Struja — inline, bez ugniježđenih kartica */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
+        {/* Napon */}
+        <div style={{ flex: 1, padding: '14px', borderRight: '1px solid var(--border)' }}>
+          <div className="metric-label">Napon</div>
+          <div className="metric-value" style={{ marginTop: 4 }}>
+            {voltage != null ? (
+              <>
+                <span style={{ color: 'var(--success)' }}>{voltage.toFixed(2)}</span>
+                <span className="metric-unit">V</span>
+                {delta(voltage, prevVoltage)}
+              </>
+            ) : <span className="metric-na">N/A</span>}
+          </div>
+        </div>
+        {/* Struja */}
+        <div style={{ flex: 1, padding: '14px' }}>
+          <div className="metric-label">Struja</div>
+          <div className="metric-value" style={{ marginTop: 4 }}>
+            {current != null ? (
+              <>
+                <span>{current.toFixed(2)}</span>
+                <span className="metric-unit">A</span>
+                {delta(current, prevCurrent)}
+              </>
+            ) : <span className="metric-na">N/A</span>}
+          </div>
+        </div>
+      </div>
 
-      <span style={{ fontSize: 13, color: 'var(--text1)' }}>
-        <span style={{ color: 'var(--text2)', marginRight: 4 }}>Promjena:</span>
-        <strong style={{ color: data.slope_v_per_hour < -0.01 ? 'var(--danger)' : data.slope_v_per_hour > 0.005 ? 'var(--success)' : 'var(--text1)' }}>
-          {data.slope_v_per_hour >= 0 ? '+' : ''}{data.slope_v_per_hour.toFixed(4)} V/h
-        </strong>
-      </span>
+      {/* Predikcija */}
+      {data && cfg && (
+        <div style={{
+          padding: '9px 14px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '5px 18px',
+          alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: cfg.color }}>
+            {cfg.label}
+          </span>
 
-      {data.days_to_warning != null && data.days_to_warning > 0 && (
-        <span style={{ fontSize: 13, color: 'var(--warning)' }}>
-          ⚠ Upozorenje za <strong>{formatDays(data.days_to_warning)}</strong>
-        </span>
-      )}
+          {data.trend !== 'insufficient_data' && (
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              {data.slope_v_per_hour >= 0 ? '+' : ''}
+              {data.slope_v_per_hour.toFixed(4)} V/h
+            </span>
+          )}
 
-      {data.days_to_critical != null && data.days_to_critical > 0 && (
-        <span style={{ fontSize: 13, color: 'var(--danger)' }}>
-          ⛔ Kritično za <strong>{formatDays(data.days_to_critical)}</strong>
-        </span>
-      )}
+          {data.days_to_warning != null && data.days_to_warning > 0 && (
+            <span style={{ fontSize: 12, color: 'var(--warning)', fontWeight: 500 }}>
+              ⚠ upoz. za {formatDays(data.days_to_warning)}
+            </span>
+          )}
 
-      {data.trend === 'insufficient_data' && (
-        <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-          Potrebno min. 6 satnih mjerenja za predikciju
-        </span>
-      )}
+          {data.days_to_critical != null && data.days_to_critical > 0 && (
+            <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 600 }}>
+              ⛔ kritično za {formatDays(data.days_to_critical)}
+            </span>
+          )}
 
-      {data.r_squared != null && data.trend !== 'insufficient_data' && (
-        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>
-          R²={data.r_squared.toFixed(2)} · {data.sample_count} uzoraka
-        </span>
+          {data.trend === 'insufficient_data' && (
+            <span style={{ fontSize: 11, color: 'var(--text2)' }}>
+              Potrebno min. 6 satnih mjerenja
+            </span>
+          )}
+
+          {data.r_squared != null && data.trend !== 'insufficient_data' && (
+            <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>
+              R²={data.r_squared.toFixed(2)} · {data.sample_count} uzoraka
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -628,12 +678,14 @@ export default function ObjectDetailPage() {
 
       {tab === 'overview' && (
         <div className="overview-tab">
-          <BatteryPredictionCard objectId={id!} />
-          <div className="metrics-grid">
-            <MetricCard icon={<Battery size={20} />} label="Napon baterije" value={latest?.battery_voltage_avg} unit="V" color="var(--success)"
-              prev={recentPositions?.[1]?.battery_voltage_avg} />
-            <MetricCard icon={<Battery size={20} />} label="Struja baterije" value={latest?.battery_current_avg} unit="A"
-              prev={recentPositions?.[1]?.battery_current_avg} />
+          <BatterySection
+            objectId={id!}
+            voltage={latest?.battery_voltage_avg}
+            current={latest?.battery_current_avg}
+            prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
+            prevCurrent={recentPositions?.[1]?.battery_current_avg}
+          />
+          <div className="metrics-grid" style={{ marginTop: 10 }}>
             <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
               prev={recentPositions?.[1]?.solar_voltage_avg} />
             <MetricCard icon={<Thermometer size={20} />} label="Temp. datalogera" value={latest?.datalogger_temp_avg} unit="°C" color="var(--danger)"
