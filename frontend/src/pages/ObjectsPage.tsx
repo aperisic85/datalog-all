@@ -3,12 +3,30 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { listObjects, listRegions, listStationTypes, createObject } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, Search, ChevronLeft, ChevronRight, MapPin, Radio, Plus, X, LayoutGrid, List } from 'lucide-react';
+import { AlertTriangle, Clock, Search, ChevronLeft, ChevronRight, MapPin, Radio, Plus, X, LayoutGrid, List } from 'lucide-react';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { hr } from 'date-fns/locale';
 import './ObjectsPage.css';
 
 function AlarmBadge({ active, count }: { active: boolean; count: number }) {
   if (!active) return <span className="badge badge-success">OK</span>;
   return <span className="badge badge-danger"><AlertTriangle size={11} />{count} alarm{count !== 1 ? 'a' : ''}</span>;
+}
+
+function SilentBadge({ lastAt }: { lastAt?: string }) {
+  const ago = lastAt
+    ? formatDistanceToNow(parseISO(lastAt), { addSuffix: false, locale: hr })
+    : 'nepoznato';
+  return (
+    <span
+      className="badge badge-danger"
+      title={`Zadnji kontakt: ${lastAt ? new Date(lastAt).toLocaleString('hr-HR') : '—'}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}
+    >
+      <Clock size={11} />
+      {ago} ago
+    </span>
+  );
 }
 
 function CreateObjectModal({ onClose }: { onClose: () => void }) {
@@ -278,11 +296,12 @@ export default function ObjectsPage() {
                 <Link
                   to={`/objects/${obj.id}`}
                   key={obj.id}
-                  className={`obj-status-cell ${obj.alarm_active ? 'cell-alarm' : obj.is_active ? 'cell-active' : 'cell-inactive'}`}
-                  title={`${obj.name} · ${obj.station_id}${obj.alarm_active ? ' · ⚠ Alarm aktivan' : ''}`}
+                  className={`obj-status-cell ${obj.alarm_active ? 'cell-alarm' : obj.is_silent ? 'cell-silent' : obj.is_active ? 'cell-active' : 'cell-inactive'}`}
+                  title={`${obj.name} · ${obj.station_id}${obj.alarm_active ? ' · ⚠ Alarm aktivan' : ''}${obj.is_silent ? ` · Tiha stanica (zadnji kontakt: ${obj.last_measurement_at ? new Date(obj.last_measurement_at).toLocaleString('hr-HR') : '—'})` : ''}`}
                 >
                   <span className="cell-name">{obj.short_name || obj.name}</span>
                   {obj.alarm_active && <AlertTriangle size={10} />}
+                  {!obj.alarm_active && obj.is_silent && <Clock size={10} />}
                 </Link>
               ))}
             </div>
@@ -338,10 +357,15 @@ export default function ObjectsPage() {
                           )}
                         </td>
                         <td>
-                          {obj.is_active
-                            ? <span className="badge badge-success">Aktivan</span>
-                            : <span className="badge badge-neutral">Neaktivan</span>
-                          }
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {obj.is_active
+                              ? <span className="badge badge-success">Aktivan</span>
+                              : <span className="badge badge-neutral">Neaktivan</span>
+                            }
+                            {obj.is_silent && (
+                              <SilentBadge lastAt={obj.last_measurement_at} />
+                            )}
+                          </div>
                         </td>
                         <td>
                           <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
@@ -391,6 +415,9 @@ export default function ObjectsPage() {
                       ? <span className="badge badge-success" style={{ fontSize: 11 }}>Aktivan</span>
                       : <span className="badge badge-neutral" style={{ fontSize: 11 }}>Neaktivan</span>
                     }
+                    {obj.is_silent && (
+                      <SilentBadge lastAt={obj.last_measurement_at} />
+                    )}
                   </div>
                 </Link>
               ))}

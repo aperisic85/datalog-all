@@ -1,4 +1,5 @@
 mod auth;
+mod battery_capacity;
 mod battery_prediction;
 mod db;
 mod errors;
@@ -125,6 +126,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/measurements/latest", get(handlers::domain::get_latest_measurement))
         // Predikcija kvara baterije
         .route("/api/v1/objects/:id/battery/prediction",  get(handlers::domain::predict_battery))
+        // Procjena kapaciteta baterije
+        .route("/api/v1/objects/:id/battery/capacity",    get(handlers::domain::estimate_battery_capacity))
         // Vremenski uvjeti (Open-Meteo)
         .route("/api/v1/objects/:id/weather",             get(handlers::domain::get_weather))
         // Solarni efikasnost score

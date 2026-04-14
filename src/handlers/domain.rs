@@ -329,6 +329,48 @@ pub async fn predict_battery(
     Ok(Json(prediction))
 }
 
+/// GET /api/v1/objects/:id/battery/capacity
+///
+/// Procjenjuje efektivni kapacitet baterije iz dnevnih totalizatora
+/// battery_charge_tot i battery_discharge_tot (zadnjih 60 dana).
+pub async fn estimate_battery_capacity(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<BatteryCapacityEstimate>> {
+    check_object_access(&pool, &claims, id).await?;
+
+    let obj = db::get_object_by_id(&pool, id).await?
+        .ok_or_else(|| crate::errors::AppError::NotFound("Object not found".into()))?;
+
+    // Dohvati dnevne totalizatore za zadnjih 60 dana
+    let daily_data = db::get_daily_battery_totals(&pool, id, 60).await?;
+
+    let points: Vec<crate::battery_capacity::DailyTotal> = daily_data
+        .into_iter()
+        .map(|(ts, ch, dis)| crate::battery_capacity::DailyTotal {
+            recorded_at: ts,
+            charge_ah:    ch as f64,
+            discharge_ah: dis as f64,
+        })
+        .collect();
+
+    let est = crate::battery_capacity::estimate_capacity(&points, obj.nominal_battery_capacity_ah);
+
+    Ok(Json(BatteryCapacityEstimate {
+        object_id:              id,
+        computed_at:            chrono::Utc::now(),
+        nominal_capacity_ah:    obj.nominal_battery_capacity_ah,
+        estimated_capacity_ah:  est.estimated_ah,
+        health_percent:         est.health_percent,
+        max_daily_discharge_ah: est.max_daily_discharge_ah,
+        max_deficit_run_ah:     est.max_deficit_run_ah,
+        sample_days:            est.sample_days as i32,
+        status:                 est.status.to_string(),
+        status_label:           est.status_label.to_string(),
+    }))
+}
+
 /// GET /api/v1/objects/:id/measurements/latest
 pub async fn get_latest_measurement(
     State(pool): State<PgPool>,
