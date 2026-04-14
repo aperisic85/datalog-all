@@ -673,6 +673,37 @@ pub struct TimeRangeQuery {
 }
 
 // ================================================================
+// BATTERY PREDICTION
+// ================================================================
+
+/// Rezultat predikcije kvara baterije za jedan objekt.
+/// Vraćen od GET /api/v1/objects/:id/battery/prediction
+#[derive(Debug, Serialize)]
+pub struct BatteryPrediction {
+    pub object_id:         Uuid,
+    pub computed_at:       DateTime<Utc>,
+    /// Zadnji izmjereni napon iz measurements_1h (V)
+    pub current_voltage:   Option<f32>,
+    /// Linearno ekstrapolirani napon u trenutku izračuna (V)
+    pub trend_voltage:     Option<f64>,
+    /// Nagib trenda (V/h); negativan = baterija se prazni
+    pub slope_v_per_hour:  f64,
+    /// Klasifikacija: "stable" | "charging" | "degrading" | "warning" | "critical" | "insufficient_data"
+    pub trend:             String,
+    /// Za koliko sati se očekuje pad ispod 11.5 V (upozorenje)
+    pub hours_to_warning:  Option<f64>,
+    /// Za koliko sati se očekuje pad ispod 10.5 V (kritično)
+    pub hours_to_critical: Option<f64>,
+    /// Isto u danima (radi lakšeg prikaza)
+    pub days_to_warning:   Option<f64>,
+    pub days_to_critical:  Option<f64>,
+    /// Broj satnih uzoraka korištenih u regresiji
+    pub sample_count:      i32,
+    /// Koeficijent determinacije R² (0–1)
+    pub r_squared:         Option<f64>,
+}
+
+// ================================================================
 // PAGINATION
 // ================================================================
 #[derive(Debug, Serialize)]

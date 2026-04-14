@@ -275,3 +275,26 @@ export interface Page<T> {
   page_size: number;
   total_pages: number;
 }
+
+/**
+ * Predikcija kvara baterije — linearni trend nad satnim mjerenjima napona.
+ * Vraćen od GET /api/v1/objects/:id/battery/prediction
+ */
+export interface BatteryPrediction {
+  object_id: string;
+  computed_at: string;
+  /** Zadnji izmjereni napon (V) */
+  current_voltage?: number;
+  /** Ekstrapolirani napon u trenutku izračuna (V) */
+  trend_voltage?: number;
+  /** Nagib trenda V/h — negativan = pražnjenje */
+  slope_v_per_hour: number;
+  /** "stable" | "charging" | "degrading" | "warning" | "critical" | "insufficient_data" */
+  trend: string;
+  hours_to_warning?: number;
+  hours_to_critical?: number;
+  days_to_warning?: number;
+  days_to_critical?: number;
+  sample_count: number;
+  r_squared?: number;
+}

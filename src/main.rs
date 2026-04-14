@@ -1,4 +1,5 @@
 mod auth;
+mod battery_prediction;
 mod db;
 mod errors;
 mod handlers;
@@ -121,6 +122,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/measurements/1h",     get(handlers::domain::get_measurements_1h))
         .route("/api/v1/objects/:id/measurements/24h",    get(handlers::domain::get_measurements_24h))
         .route("/api/v1/objects/:id/measurements/latest", get(handlers::domain::get_latest_measurement))
+        // Predikcija kvara baterije
+        .route("/api/v1/objects/:id/battery/prediction",  get(handlers::domain::predict_battery))
         // Globalni alarmi
         .route("/api/v1/alarms",                          get(handlers::domain::list_alarms))
         .route("/api/v1/alarms/:id",                      delete(handlers::domain::delete_alarm))

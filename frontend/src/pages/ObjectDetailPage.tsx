@@ -9,6 +9,7 @@ import {
   getMeasurements1h,
   getActiveAlarms,
   getEventLogs,
+  getBatteryPrediction,
   pollObject,
   updateObject,
   listRegions,
@@ -104,6 +105,99 @@ function MetricCard({
     </div>
   );
 }
+
+// ─── Battery prediction card ────────────────────────────────────────────────
+
+const TREND_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  stable:            { label: 'Stabilan',         color: 'var(--success)',  bg: 'rgba(22,163,74,0.08)' },
+  charging:          { label: 'Puni se',           color: 'var(--success)',  bg: 'rgba(22,163,74,0.08)' },
+  degrading:         { label: 'Pada',              color: 'var(--warning)',  bg: 'rgba(234,179,8,0.08)' },
+  warning:           { label: 'Upozorenje',        color: 'var(--warning)',  bg: 'rgba(234,179,8,0.12)' },
+  critical:          { label: 'KRITIČNO',          color: 'var(--danger)',   bg: 'rgba(220,38,38,0.10)' },
+  insufficient_data: { label: 'Nedovoljno podataka', color: 'var(--text2)', bg: 'var(--bg2)' },
+};
+
+function formatDays(days: number): string {
+  if (days < 1) {
+    const h = Math.round(days * 24);
+    return `~${h} sat${h === 1 ? '' : 'a'}`;
+  }
+  return `~${days.toFixed(1)} dan${days < 2 ? '' : 'a'}`;
+}
+
+function BatteryPredictionCard({ objectId }: { objectId: string }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['battery-prediction', objectId],
+    queryFn: () => getBatteryPrediction(objectId),
+    refetchInterval: 5 * 60_000, // osvježi svakih 5 min
+  });
+
+  if (isLoading) return null;
+  if (isError || !data) return null;
+
+  const cfg = TREND_CONFIG[data.trend] ?? TREND_CONFIG.insufficient_data;
+  const voltage = data.trend_voltage ?? data.current_voltage;
+
+  return (
+    <div className="card" style={{
+      borderLeft: `3px solid ${cfg.color}`,
+      background: cfg.bg,
+      padding: '12px 16px',
+      marginBottom: 16,
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '12px 24px',
+      alignItems: 'center',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Battery size={18} style={{ color: cfg.color }} />
+        <span style={{ fontWeight: 600, color: cfg.color, fontSize: 13 }}>
+          Predikcija baterije — {cfg.label}
+        </span>
+      </div>
+
+      {voltage != null && (
+        <span style={{ fontSize: 13, color: 'var(--text1)' }}>
+          <span style={{ color: 'var(--text2)', marginRight: 4 }}>Trend napon:</span>
+          <strong>{voltage.toFixed(2)} V</strong>
+        </span>
+      )}
+
+      <span style={{ fontSize: 13, color: 'var(--text1)' }}>
+        <span style={{ color: 'var(--text2)', marginRight: 4 }}>Promjena:</span>
+        <strong style={{ color: data.slope_v_per_hour < -0.01 ? 'var(--danger)' : data.slope_v_per_hour > 0.005 ? 'var(--success)' : 'var(--text1)' }}>
+          {data.slope_v_per_hour >= 0 ? '+' : ''}{data.slope_v_per_hour.toFixed(4)} V/h
+        </strong>
+      </span>
+
+      {data.days_to_warning != null && data.days_to_warning > 0 && (
+        <span style={{ fontSize: 13, color: 'var(--warning)' }}>
+          ⚠ Upozorenje za <strong>{formatDays(data.days_to_warning)}</strong>
+        </span>
+      )}
+
+      {data.days_to_critical != null && data.days_to_critical > 0 && (
+        <span style={{ fontSize: 13, color: 'var(--danger)' }}>
+          ⛔ Kritično za <strong>{formatDays(data.days_to_critical)}</strong>
+        </span>
+      )}
+
+      {data.trend === 'insufficient_data' && (
+        <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+          Potrebno min. 6 satnih mjerenja za predikciju
+        </span>
+      )}
+
+      {data.r_squared != null && data.trend !== 'insufficient_data' && (
+        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>
+          R²={data.r_squared.toFixed(2)} · {data.sample_count} uzoraka
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 const ALARM_LABELS: Record<string, string> = {
   alarm_datalogger_high_temp: 'Datalogger visoka temp.',
@@ -534,6 +628,7 @@ export default function ObjectDetailPage() {
 
       {tab === 'overview' && (
         <div className="overview-tab">
+          <BatteryPredictionCard objectId={id!} />
           <div className="metrics-grid">
             <MetricCard icon={<Battery size={20} />} label="Napon baterije" value={latest?.battery_voltage_avg} unit="V" color="var(--success)"
               prev={recentPositions?.[1]?.battery_voltage_avg} />
