@@ -609,7 +609,7 @@ function WeatherChart({
                 const label = String(name);
                 if (label === 'Oblačnost') return [`${n.toFixed(0)}%`, label] as [string, string];
                 if (label === 'Vjetar')    return [`${n.toFixed(1)} km/h`, label] as [string, string];
-                if (label === 'Padavine')  return [`${n.toFixed(1)} mm`, label] as [string, string];
+                if (label === 'Oborine')  return [`${n.toFixed(1)} mm`, label] as [string, string];
                 return [`${n}`, label] as [string, string];
               }}
             />
@@ -618,7 +618,7 @@ function WeatherChart({
               dot={false} name="Oblačnost" />
             <Line yAxisId="wind" type="monotone" dataKey="wind_speed_10m" stroke="var(--accent)"
               dot={false} name="Vjetar" />
-            <Bar yAxisId="pct" dataKey="precipitation" fill="#60a5fa80" name="Padavine" />
+            <Bar yAxisId="pct" dataKey="precipitation" fill="#60a5fa80" name="Oborine" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -843,7 +843,7 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
                 />
               </div>
               <div className="form-group">
-                <label>Timeout tihosti (min)</label>
+                <label>Timeout komunikacije (min)</label>
                 <input
                   type="number"
                   min="5"
@@ -1179,7 +1179,7 @@ export default function ObjectDetailPage() {
                 <div><span>Nominalni kapacitet baterije:</span> {obj.nominal_battery_capacity_ah} Ah</div>
               )}
               <div>
-                <span>Timeout tihosti:</span> {obj.silence_timeout_minutes} min
+                <span>Timeout komunikacije:</span> {obj.silence_timeout_minutes} min
                 {obj.last_measurement_at && (
                   <span style={{ marginLeft: 8, color: obj.is_silent ? 'var(--danger)' : 'var(--text3)', fontSize: 12 }}>
                     (zadnji kontakt:{' '}
