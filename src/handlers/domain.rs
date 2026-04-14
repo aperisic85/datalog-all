@@ -527,6 +527,123 @@ pub async fn revoke_region_access(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// WEATHER & SOLAR EFFICIENCY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// GET /api/v1/objects/:id/weather
+///
+/// Dohvati satne vremenske podatke (Open-Meteo) za koordinate objekta.
+/// Query param `days` (1–30, default 7) određuje koliko dana unatrag.
+pub async fn get_weather(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<crate::models::domain::WeatherQuery>,
+) -> AppResult<axum::Json<crate::weather::WeatherResponse>> {
+    check_object_access(&pool, &claims, id).await?;
+
+    let obj = db::get_object_by_id(&pool, id).await?
+        .ok_or_else(|| AppError::NotFound(format!("Object {}", id)))?;
+
+    let (lat, lon) = match (obj.latitude, obj.longitude) {
+        (Some(lat), Some(lon)) => (lat, lon),
+        _ => return Err(AppError::BadRequest("Objekt nema koordinate".into())),
+    };
+
+    let days = q.days.unwrap_or(7).clamp(1, 30);
+
+    let weather = crate::weather::fetch_weather(lat, lon, days)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+
+    Ok(axum::Json(weather))
+}
+
+/// GET /api/v1/objects/:id/solar-efficiency
+///
+/// Izračuna solarni score za objekt uspoređujući stvarnu solarnu napetost
+/// s teorijskom (na temelju Open-Meteo iradijancije za lokaciju).
+/// Koristi zadnjih 30 dana za baseline i 7 dana za "recent" score.
+pub async fn get_solar_efficiency(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<axum::Json<crate::weather::SolarEfficiencyResponse>> {
+    check_object_access(&pool, &claims, id).await?;
+
+    let obj = db::get_object_by_id(&pool, id).await?
+        .ok_or_else(|| AppError::NotFound(format!("Object {}", id)))?;
+
+    let (lat, lon) = match (obj.latitude, obj.longitude) {
+        (Some(lat), Some(lon)) => (lat, lon),
+        _ => return Err(AppError::BadRequest("Objekt nema koordinate".into())),
+    };
+
+    // Dohvati Open-Meteo iradijanciju za zadnjih 30 dana
+    let weather = crate::weather::fetch_weather(lat, lon, 30)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+
+    // Dohvati satna mjerenja za zadnjih 30 dana
+    let from = chrono::Utc::now() - chrono::Duration::days(30);
+    let measurements = db::get_measurements_1h(
+        &pool, id,
+        &crate::models::domain::TimeRangeQuery {
+            from: Some(from),
+            to:   None,
+            limit: Some(750), // 30 dana * 25 sati/dan
+        },
+    ).await?;
+
+    // Izgradi lookup: sati iradijancije po UTC timestamp
+    use std::collections::HashMap;
+    let irr_map: HashMap<i64, f64> = weather
+        .hours
+        .iter()
+        .filter_map(|h| {
+            h.shortwave_radiation.map(|irr| (h.time.timestamp(), irr))
+        })
+        .collect();
+
+    // Pariranje mjerenja s iradijancijom (zaokruži na sat)
+    let points: Vec<crate::weather::EfficiencyPoint> = measurements
+        .iter()
+        .filter_map(|m| {
+            let volt = m.solar_voltage_avg? as f64;
+            // Zaokruži recorded_at na sat
+            let ts = m.recorded_at.timestamp();
+            let ts_rounded = (ts / 3600) * 3600;
+            let irr = *irr_map.get(&ts_rounded).or_else(|| {
+                // ±30 min fallback
+                irr_map.get(&(ts_rounded - 1800))
+                    .or_else(|| irr_map.get(&(ts_rounded + 1800)))
+            })?;
+            Some(crate::weather::EfficiencyPoint {
+                date_str:      m.recorded_at.format("%Y-%m-%d").to_string(),
+                solar_voltage: volt,
+                irradiance:    irr,
+            })
+        })
+        .collect();
+
+    let result = crate::weather::compute_solar_efficiency(&points, &weather.hours);
+
+    Ok(axum::Json(crate::weather::SolarEfficiencyResponse {
+        object_id:             id,
+        computed_at:           chrono::Utc::now(),
+        score:                 result.score,
+        status:                result.status,
+        status_label:          result.status_label,
+        message:               result.message,
+        baseline_ratio:        result.baseline_ratio,
+        recent_ratio:          result.recent_ratio,
+        sample_count_baseline: result.sample_count_baseline,
+        sample_count_recent:   result.sample_count_recent,
+        daily_scores:          result.daily_scores,
+    }))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 

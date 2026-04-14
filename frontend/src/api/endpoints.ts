@@ -16,6 +16,8 @@ import type {
   UserRegionAccessView,
   BatteryPrediction,
   AlarmHeatmapData,
+  WeatherResponse,
+  SolarEfficiency,
 } from '../types';
 
 // Auth
@@ -126,6 +128,15 @@ export const getAlarmHeatmap = (id: string) =>
 // Battery prediction
 export const getBatteryPrediction = (id: string) =>
   api.get<BatteryPrediction>(`/api/v1/objects/${id}/battery/prediction`).then((r) => r.data);
+
+// Weather (Open-Meteo)
+export const getWeather = (id: string, days?: number) =>
+  api.get<WeatherResponse>(`/api/v1/objects/${id}/weather`, { params: days ? { days } : undefined })
+    .then((r) => r.data);
+
+// Solar efficiency score
+export const getSolarEfficiency = (id: string) =>
+  api.get<SolarEfficiency>(`/api/v1/objects/${id}/solar-efficiency`).then((r) => r.data);
 
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
