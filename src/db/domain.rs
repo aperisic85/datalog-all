@@ -584,7 +584,7 @@ pub async fn get_alarm_heatmap(
     let daily: Vec<AlarmHeatmapDay> = sqlx::query_as(
         "SELECT
            DATE(recorded_at AT TIME ZONE 'UTC') AS date,
-           COUNT(*) FILTER (WHERE any_alarm_active)::bigint AS count
+           COUNT(*) FILTER (WHERE any_alarm_active) AS count
          FROM alarms
          WHERE object_id = $1
            AND recorded_at >= NOW() - INTERVAL '365 days'
@@ -596,14 +596,16 @@ pub async fn get_alarm_heatmap(
     // Prosječna učestalost po satu (0–23) i danu u tjednu (0=pon, 6=ned) — zadnjih 90 dana
     let hourly: Vec<AlarmHeatmapHour> = sqlx::query_as(
         "SELECT
-           EXTRACT(HOUR FROM recorded_at AT TIME ZONE 'UTC')::smallint AS hour,
-           (EXTRACT(ISODOW FROM recorded_at AT TIME ZONE 'UTC')::smallint - 1) AS dow,
-           AVG(CASE WHEN any_alarm_active THEN 1.0 ELSE 0.0 END) AS count
+           EXTRACT(HOUR FROM recorded_at AT TIME ZONE 'UTC')::integer AS hour,
+           (EXTRACT(ISODOW FROM recorded_at AT TIME ZONE 'UTC') - 1)::integer AS dow,
+           AVG(CASE WHEN any_alarm_active THEN 1.0 ELSE 0.0 END)::float8 AS count
          FROM alarms
          WHERE object_id = $1
            AND recorded_at >= NOW() - INTERVAL '90 days'
-         GROUP BY 1, 2
-         ORDER BY 2, 1")
+         GROUP BY
+           EXTRACT(HOUR FROM recorded_at AT TIME ZONE 'UTC'),
+           EXTRACT(ISODOW FROM recorded_at AT TIME ZONE 'UTC')
+         ORDER BY dow, hour")
         .bind(object_id)
         .fetch_all(pool).await?;
 
