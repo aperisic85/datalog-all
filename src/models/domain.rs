@@ -719,8 +719,8 @@ pub struct AlarmHeatmapDay {
 /// Prosječna učestalost alarma po satu i danu u tjednu — za hour-of-day heatmap
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct AlarmHeatmapHour {
-    pub hour:  i16,   // 0–23
-    pub dow:   i16,   // 0=Mon, 6=Sun (ISO tjedan − 1)
+    pub hour:  i32,   // 0–23
+    pub dow:   i32,   // 0=Mon, 6=Sun (ISO tjedan − 1)
     pub count: f64,   // prosjek (0.0–1.0) — udio perioda s aktivnim alarmom
 }
 
