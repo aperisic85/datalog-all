@@ -350,6 +350,16 @@ pub async fn get_alarms(
     Ok(Json(db::get_alarms(&pool, id, &q).await?))
 }
 
+/// GET /api/v1/objects/:id/alarms/heatmap
+pub async fn get_alarm_heatmap(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<AlarmHeatmapResponse>> {
+    check_object_access(&pool, &claims, id).await?;
+    Ok(Json(db::get_alarm_heatmap(&pool, id).await?))
+}
+
 /// GET /api/v1/objects/:id/alarms/active
 pub async fn get_active_alarms(
     State(pool): State<PgPool>,

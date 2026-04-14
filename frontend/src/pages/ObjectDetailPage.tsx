@@ -49,8 +49,9 @@ import {
 } from 'lucide-react';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
+import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
 
-type Tab = 'overview' | 'charts' | 'alarms' | 'events';
+type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap';
 type Range = '6h' | '24h' | '7d';
 type DriftRange = '1h' | '6h' | '24h' | '7d';
 
@@ -660,7 +661,7 @@ export default function ObjectDetailPage() {
       </div>
 
       <div className="detail-tabs">
-        {(['overview', 'charts', 'alarms', 'events'] as Tab[]).map((t) => (
+        {(['overview', 'charts', 'alarms', 'heatmap', 'events'] as Tab[]).map((t) => (
           <button
             key={t}
             className={`tab-btn ${tab === t ? 'active' : ''}`}
@@ -670,6 +671,7 @@ export default function ObjectDetailPage() {
               overview: 'Pregled',
               charts: 'Grafovi',
               alarms: 'Alarmi',
+              heatmap: 'Heatmap',
               events: 'Log',
             }[t]}
           </button>
@@ -1216,6 +1218,10 @@ export default function ObjectDetailPage() {
             );
           })()}
         </div>
+      )}
+
+      {tab === 'heatmap' && (
+        <AlarmHeatmapTab objectId={id!} />
       )}
 
       {tab === 'events' && (

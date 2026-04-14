@@ -276,6 +276,26 @@ export interface Page<T> {
   total_pages: number;
 }
 
+// ── Alarm heatmap ─────────────────────────────────────────────────────────────
+
+export interface AlarmHeatmapDay {
+  /** ISO datum "YYYY-MM-DD" */
+  date: string;
+  /** Broj 10-min perioda s aktivnim alarmom taj dan */
+  count: number;
+}
+
+export interface AlarmHeatmapHour {
+  hour: number;   // 0–23
+  dow: number;    // 0=pon, 6=ned
+  count: number;  // udio perioda s aktivnim alarmom (0.0–1.0)
+}
+
+export interface AlarmHeatmapData {
+  daily: AlarmHeatmapDay[];
+  hourly: AlarmHeatmapHour[];
+}
+
 /**
  * Predikcija kvara baterije — linearni trend nad satnim mjerenjima napona.
  * Vraćen od GET /api/v1/objects/:id/battery/prediction
