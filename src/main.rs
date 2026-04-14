@@ -6,7 +6,6 @@ mod handlers;
 mod middleware;
 mod models;
 mod poller;
-mod weather;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -125,10 +124,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/measurements/latest", get(handlers::domain::get_latest_measurement))
         // Predikcija kvara baterije
         .route("/api/v1/objects/:id/battery/prediction",  get(handlers::domain::predict_battery))
-        // Vremenski uvjeti (Open-Meteo)
-        .route("/api/v1/objects/:id/weather",             get(handlers::domain::get_weather))
-        // Solarni efikasnost score
-        .route("/api/v1/objects/:id/solar-efficiency",    get(handlers::domain::get_solar_efficiency))
         // Globalni alarmi
         .route("/api/v1/alarms",                          get(handlers::domain::list_alarms))
         .route("/api/v1/alarms/:id",                      delete(handlers::domain::delete_alarm))
