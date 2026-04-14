@@ -296,49 +296,6 @@ export interface AlarmHeatmapData {
   hourly: AlarmHeatmapHour[];
 }
 
-// ── Vremenski uvjeti (Open-Meteo) ─────────────────────────────────────────────
-
-export interface WeatherHour {
-  time: string;                   // ISO8601 UTC
-  shortwave_radiation?: number;  // W/m²
-  cloud_cover?: number;          // %
-  wind_speed_10m?: number;       // km/h
-  precipitation?: number;        // mm
-  temperature_2m?: number;       // °C
-}
-
-export interface WeatherResponse {
-  latitude: number;
-  longitude: number;
-  timezone: string;
-  hours: WeatherHour[];
-}
-
-// ── Solarni efikasnost score ───────────────────────────────────────────────────
-
-export interface SolarDayScore {
-  date: string;             // "YYYY-MM-DD"
-  insolation_kwh: number;  // kWh/m²
-  score?: number;           // 0–120 (100 = nominalno, >100 moguće uz povoljan kut)
-  sample_count: number;
-}
-
-export interface SolarEfficiency {
-  object_id: string;
-  computed_at: string;
-  /** Ukupni score 0–120, 100 = nominalna efikasnost */
-  score?: number;
-  /** "good" | "warn" | "critical" | "insufficient_data" */
-  status: string;
-  status_label: string;
-  message: string;
-  baseline_ratio?: number;
-  recent_ratio?: number;
-  sample_count_baseline: number;
-  sample_count_recent: number;
-  daily_scores: SolarDayScore[];
-}
-
 /**
  * Predikcija kvara baterije — linearni trend nad satnim mjerenjima napona.
  * Vraćen od GET /api/v1/objects/:id/battery/prediction

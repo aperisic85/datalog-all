@@ -653,17 +653,6 @@ pub struct ObjectPollConfig {
 }
 
 // ================================================================
-// WEATHER & SOLAR EFFICIENCY QUERY PARAMS
-// ================================================================
-
-/// Query params za GET /objects/:id/weather
-#[derive(Debug, Deserialize, Default)]
-pub struct WeatherQuery {
-    /// Broj dana unatrag (1–30, default 7)
-    pub days: Option<u32>,
-}
-
-// ================================================================
 // QUERY PARAMS
 // ================================================================
 #[derive(Debug, Deserialize, Default)]
