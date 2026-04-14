@@ -10,6 +10,8 @@ import {
   getActiveAlarms,
   getEventLogs,
   getBatteryPrediction,
+  getSolarEfficiency,
+  getWeather,
   pollObject,
   updateObject,
   listRegions,
@@ -26,6 +28,11 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Legend,
+  BarChart,
+  Bar,
+  Cell,
+  ComposedChart,
+  Area,
 } from 'recharts';
 import { format, parseISO, subHours, subDays } from 'date-fns';
 import {
@@ -46,6 +53,7 @@ import {
   Eye,
   Wind,
   Cpu,
+  Cloud,
 } from 'lucide-react';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
@@ -281,6 +289,237 @@ const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
   4: { label: 'Greška', cls: 'badge-danger' },
   5: { label: 'Kritično', cls: 'badge-danger' },
 };
+
+// ─── Solar Efficiency Section ─────────────────────────────────────────────────
+
+const SOLAR_STATUS_COLOR: Record<string, string> = {
+  good:             'var(--success)',
+  warn:             'var(--warning)',
+  critical:         'var(--danger)',
+  insufficient_data:'var(--text2)',
+};
+
+function SolarEfficiencySection({ objectId }: { objectId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['solar-efficiency', objectId],
+    queryFn:  () => getSolarEfficiency(objectId),
+    refetchInterval: 15 * 60_000,
+    retry: 1,
+  });
+
+  if (isLoading) return (
+    <div className="card" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="spinner" style={{ width: 16, height: 16 }} />
+      <span style={{ fontSize: 13, color: 'var(--text2)' }}>Računam solarni score...</span>
+    </div>
+  );
+
+  if (error || !data) return null;
+
+  const scoreColor = SOLAR_STATUS_COLOR[data.status] ?? 'var(--text2)';
+  const scoreVal   = data.score != null ? Math.round(data.score) : null;
+
+  // Last 7 daily scores for mini-chart
+  const last7 = data.daily_scores.slice(-7);
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderBottom: '1px solid var(--border)' }}>
+        <Sun size={14} style={{ color: 'var(--warning)' }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Solarni panel — efikasnost
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text3)' }}>Open-Meteo</span>
+      </div>
+
+      {/* Score row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        {/* Big score */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 56 }}>
+          <span style={{ fontSize: 28, fontWeight: 700, color: scoreColor, lineHeight: 1 }}>
+            {scoreVal != null ? `${scoreVal}%` : '—'}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>score</span>
+        </div>
+
+        <div style={{ flex: 1 }}>
+          {/* Progress bar */}
+          {scoreVal != null && (
+            <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(scoreVal, 100)}%`,
+                background: scoreColor,
+                borderRadius: 3,
+                transition: 'width 0.5s',
+              }} />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 12px', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: scoreColor }}>{data.status_label}</span>
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>{data.message}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Daily scores mini bar chart */}
+      {last7.length > 0 && (
+        <div style={{ padding: '8px 14px 4px' }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Dnevni score (zadnjih 7 dana)</div>
+          <ResponsiveContainer width="100%" height={60}>
+            <BarChart data={last7} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text3)' }}
+                tickFormatter={(v: string) => v.slice(5)} />
+              <YAxis domain={[0, 120]} tick={false} />
+              <Tooltip
+                contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                formatter={(val: unknown) => [`${Math.round(Number(val) || 0)}%`, 'Score']}
+                labelFormatter={(label: unknown) => `Datum: ${label}`}
+              />
+              <Bar dataKey="score" radius={[2, 2, 0, 0]} name="Score">
+                {last7.map((entry, idx) => (
+                  <Cell
+                    key={idx}
+                    fill={
+                      entry.score == null     ? 'var(--border)' :
+                      entry.score >= 95       ? 'var(--success)' :
+                      entry.score >= 75       ? 'var(--warning)' : 'var(--danger)'
+                    }
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Footer stats */}
+      <div style={{ padding: '6px 14px 8px', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+          Baseline (30d): {data.sample_count_baseline} uzoraka
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+          Zadnjih 7d: {data.sample_count_recent} uzoraka
+        </span>
+        {data.baseline_ratio != null && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Ref. omjer: {(data.baseline_ratio * 1000).toFixed(2)} mV/(W/m²)
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Weather Conditions Chart ─────────────────────────────────────────────────
+
+function WeatherChart({
+  objectId,
+  range,
+  hasCoords,
+}: {
+  objectId: string;
+  range: Range;
+  hasCoords: boolean;
+}) {
+  const days = range === '7d' ? 7 : range === '24h' ? 2 : 1;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['weather', objectId, days],
+    queryFn:  () => getWeather(objectId, days),
+    enabled:  hasCoords,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+
+  if (!hasCoords) return null;
+
+  if (isLoading) return (
+    <div className="chart-card card chart-wide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160 }}>
+      <div className="spinner" style={{ width: 20, height: 20 }} />
+    </div>
+  );
+
+  if (!data?.hours.length) return null;
+
+  const now = new Date();
+  const fromMs = now.getTime() - days * 24 * 60 * 60 * 1000;
+
+  const weatherChartData = data.hours
+    .filter((h) => new Date(h.time).getTime() >= fromMs)
+    .map((h) => ({
+      time: format(parseISO(h.time), range === '7d' ? 'dd.MM HH:mm' : 'HH:mm'),
+      cloud_cover:        h.cloud_cover,
+      wind_speed_10m:     h.wind_speed_10m,
+      precipitation:      h.precipitation,
+      shortwave_radiation: h.shortwave_radiation,
+      temperature_2m:     h.temperature_2m,
+    }));
+
+  if (weatherChartData.length === 0) return null;
+
+  const tooltipStyle = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 };
+
+  return (
+    <>
+      {/* Cloud + wind + precipitation combined */}
+      <div className="chart-card card chart-wide">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+          <Cloud size={14} style={{ color: 'var(--accent)' }} />
+          <h4 style={{ margin: 0 }}>Vremenski uvjeti (Open-Meteo)</h4>
+        </div>
+        <ResponsiveContainer width="100%" height={180}>
+          <ComposedChart data={weatherChartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+            <YAxis yAxisId="pct"  domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+            <YAxis yAxisId="wind" orientation="right" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+            <Tooltip contentStyle={tooltipStyle}
+              formatter={(val: unknown, name: unknown) => {
+                const n = Number(val);
+                const label = String(name);
+                if (label === 'Oblačnost') return [`${n.toFixed(0)}%`, label] as [string, string];
+                if (label === 'Vjetar')    return [`${n.toFixed(1)} km/h`, label] as [string, string];
+                if (label === 'Padavine')  return [`${n.toFixed(1)} mm`, label] as [string, string];
+                return [`${n}`, label] as [string, string];
+              }}
+            />
+            <Legend />
+            <Area yAxisId="pct" type="monotone" dataKey="cloud_cover" stroke="#94a3b8" fill="#94a3b820"
+              dot={false} name="Oblačnost" />
+            <Line yAxisId="wind" type="monotone" dataKey="wind_speed_10m" stroke="var(--accent)"
+              dot={false} name="Vjetar" />
+            <Bar yAxisId="pct" dataKey="precipitation" fill="#60a5fa80" name="Padavine" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Solar irradiance */}
+      <div className="chart-card card chart-wide">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+          <Sun size={14} style={{ color: 'var(--warning)' }} />
+          <h4 style={{ margin: 0 }}>Sunčevo zračenje (W/m²)</h4>
+        </div>
+        <ResponsiveContainer width="100%" height={150}>
+          <ComposedChart data={weatherChartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+            <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+            <Tooltip contentStyle={tooltipStyle}
+              formatter={(val: unknown) => [`${Number(val).toFixed(0)} W/m²`, 'Iradijancija']}
+            />
+            <Area type="monotone" dataKey="shortwave_radiation" stroke="var(--warning)" fill="var(--warning)33"
+              dot={false} name="Iradijancija" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView; onClose: () => void }) {
   const qc = useQueryClient();
@@ -587,6 +826,20 @@ export default function ObjectDetailPage() {
     enabled: !!id && tab === 'events',
   });
 
+  // Solar efficiency (only when object has coordinates)
+  // hasCoords se može izračunati iz obj koji je možda još null — OK jer useQuery prima enabled flag
+  const hasCoords = !!(obj?.latitude && obj?.longitude);
+
+  // Weather data for chart overlay — mora biti PRIJE early return-ova (Rules of Hooks)
+  const chartWeatherDays = range === '7d' ? 7 : range === '24h' ? 2 : 1;
+  const { data: chartWeatherData } = useQuery({
+    queryKey: ['weather', id, chartWeatherDays],
+    queryFn: () => getWeather(id!, chartWeatherDays),
+    enabled: !!id && tab === 'charts' && hasCoords,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+
   const handlePoll = async () => {
     if (!id) return;
     setPolling(true);
@@ -612,10 +865,27 @@ export default function ObjectDetailPage() {
   if (loadingObj) return <div className="page-spinner"><div className="spinner" /></div>;
   if (!obj) return <div className="error-msg">Objekt nije pronađen</div>;
 
-  const chartData = (range === '7d' ? measurements1h : measurements10min)?.map((m) => ({
-    ...m,
-    time: format(parseISO(m.recorded_at), range === '7d' ? 'dd.MM HH:mm' : 'HH:mm'),
-  })) ?? [];
+  // Build irradiance lookup: hour-rounded UTC ms → W/m²
+  const irrByHour = new Map<number, number>(
+    (chartWeatherData?.hours ?? [])
+      .filter((h) => h.shortwave_radiation != null)
+      .map((h) => {
+        const d = new Date(h.time);
+        d.setMinutes(0, 0, 0);
+        return [d.getTime(), h.shortwave_radiation!] as [number, number];
+      })
+  );
+
+  const chartData = (range === '7d' ? measurements1h : measurements10min)?.map((m) => {
+    const d = new Date(m.recorded_at);
+    d.setMinutes(0, 0, 0);
+    const irr = irrByHour.get(d.getTime()) ?? irrByHour.get(d.getTime() - 3_600_000);
+    return {
+      ...m,
+      irr,
+      time: format(parseISO(m.recorded_at), range === '7d' ? 'dd.MM HH:mm' : 'HH:mm'),
+    };
+  }) ?? [];
 
   return (
     <div className="object-detail">
@@ -687,6 +957,7 @@ export default function ObjectDetailPage() {
             prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
             prevCurrent={recentPositions?.[1]?.battery_current_avg}
           />
+          {hasCoords && <SolarEfficiencySection objectId={id!} />}
           <div className="metrics-grid" style={{ marginTop: 10 }}>
             <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
               prev={recentPositions?.[1]?.solar_voltage_avg} />
@@ -1095,15 +1366,26 @@ export default function ObjectDetailPage() {
               </div>
 
               <div className="chart-card card">
-                <h4>Solarni panel (V)</h4>
+                <h4>Solarni panel (V) + Iradijancija (W/m²)</h4>
                 <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={chartData}>
+                  <ComposedChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
-                    <Line type="monotone" dataKey="solar_voltage_avg" stroke="var(--warning)" dot={false} name="Solar (V)" />
-                  </LineChart>
+                    <YAxis yAxisId="v"   tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                    <YAxis yAxisId="irr" orientation="right" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }}
+                      formatter={(val: unknown, name: unknown) => {
+                        const n = Number(val);
+                        const label = String(name);
+                        if (label === 'Solar (V)')    return [`${n.toFixed(2)} V`, label] as [string, string];
+                        if (label === 'Iradijancija') return [`${n.toFixed(0)} W/m²`, label] as [string, string];
+                        return [`${n}`, label] as [string, string];
+                      }}
+                    />
+                    <Legend />
+                    <Line yAxisId="v" type="monotone" dataKey="solar_voltage_avg" stroke="var(--warning)" dot={false} name="Solar (V)" />
+                    <Area yAxisId="irr" type="monotone" dataKey="irr" stroke="#f59e0b44" fill="#f59e0b22" dot={false} name="Iradijancija" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
 
@@ -1170,6 +1452,9 @@ export default function ObjectDetailPage() {
                   </ResponsiveContainer>
                 </div>
               )}
+
+              {/* Weather correlation charts — samo ako objekt ima koordinate */}
+              <WeatherChart objectId={id!} range={range} hasCoords={hasCoords} />
             </div>
           )}
         </div>
