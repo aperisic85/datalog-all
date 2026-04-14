@@ -383,6 +383,31 @@ pub async fn get_latest_measurement(pool: &PgPool, object_id: Uuid) -> AppResult
         .fetch_optional(pool).await?)
 }
 
+/// Vraća zadnjih `n` satnih mjerenja napona baterije za zadani objekt,
+/// sortiranih uzlazno (od najstarijeg prema najnovijem) — za linearnu regresiju.
+pub async fn get_battery_voltage_history(
+    pool: &PgPool,
+    object_id: Uuid,
+    n: i64,
+) -> AppResult<Vec<(chrono::DateTime<chrono::Utc>, f32)>> {
+    let rows: Vec<(chrono::DateTime<chrono::Utc>, f32)> = sqlx::query_as(
+        r#"SELECT recorded_at, battery_voltage_avg
+           FROM (
+               SELECT recorded_at, battery_voltage_avg
+               FROM measurements_1h
+               WHERE object_id = $1
+                 AND battery_voltage_avg IS NOT NULL
+               ORDER BY recorded_at DESC
+               LIMIT $2
+           ) sub
+           ORDER BY recorded_at ASC"#)
+        .bind(object_id)
+        .bind(n)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows)
+}
+
 // ================================================================
 // ALARMS
 // ================================================================

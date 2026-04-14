@@ -269,6 +269,66 @@ pub async fn get_measurements_24h(
     Ok(Json(db::get_measurements_24h(&pool, id, &q).await?))
 }
 
+/// GET /api/v1/objects/:id/battery/prediction
+///
+/// Vraća predikciju kvara baterije na temelju linearne regresije
+/// nad zadnjih 72 satnih mjerenja napona.
+pub async fn predict_battery(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<BatteryPrediction>> {
+    check_object_access(&pool, &claims, id).await?;
+
+    // Dohvati zadnjih 72 satna mjerenja (= do 3 dana podataka)
+    let history = db::get_battery_voltage_history(&pool, id, 72).await?;
+
+    // Zadnji izmjereni napon (najnoviji uzorak)
+    let current_voltage = history.last().map(|(_, v)| *v);
+
+    // Pretvori u VoltagePoint za regresijski modul
+    let points: Vec<crate::battery_prediction::VoltagePoint> = history
+        .into_iter()
+        .map(|(ts, v)| crate::battery_prediction::VoltagePoint {
+            recorded_at: ts,
+            voltage: v as f64,
+        })
+        .collect();
+
+    let prediction = match crate::battery_prediction::compute_trend(&points) {
+        Some(trend) => BatteryPrediction {
+            object_id:         id,
+            computed_at:       chrono::Utc::now(),
+            current_voltage,
+            trend_voltage:     Some(trend.trend_voltage),
+            slope_v_per_hour:  trend.slope_v_per_hour,
+            trend:             trend.trend.to_string(),
+            hours_to_warning:  trend.hours_to_warning,
+            hours_to_critical: trend.hours_to_critical,
+            days_to_warning:   trend.hours_to_warning.map(|h| h / 24.0),
+            days_to_critical:  trend.hours_to_critical.map(|h| h / 24.0),
+            sample_count:      trend.sample_count as i32,
+            r_squared:         Some(trend.r_squared),
+        },
+        None => BatteryPrediction {
+            object_id:         id,
+            computed_at:       chrono::Utc::now(),
+            current_voltage,
+            trend_voltage:     None,
+            slope_v_per_hour:  0.0,
+            trend:             "insufficient_data".to_string(),
+            hours_to_warning:  None,
+            hours_to_critical: None,
+            days_to_warning:   None,
+            days_to_critical:  None,
+            sample_count:      points.len() as i32,
+            r_squared:         None,
+        },
+    };
+
+    Ok(Json(prediction))
+}
+
 /// GET /api/v1/objects/:id/measurements/latest
 pub async fn get_latest_measurement(
     State(pool): State<PgPool>,

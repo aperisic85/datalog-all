@@ -14,6 +14,7 @@ import type {
   LatestMeasurement,
   UserPublic,
   UserRegionAccessView,
+  BatteryPrediction,
 } from '../types';
 
 // Auth
@@ -116,6 +117,10 @@ export const listAlarmHistory = (params?: AlarmHistoryParams) =>
 
 export const deleteAlarm = (alarmId: number) =>
   api.delete(`/api/v1/alarms/${alarmId}`);
+
+// Battery prediction
+export const getBatteryPrediction = (id: string) =>
+  api.get<BatteryPrediction>(`/api/v1/objects/${id}/battery/prediction`).then((r) => r.data);
 
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
