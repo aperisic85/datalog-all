@@ -1128,6 +1128,72 @@ export default function ObjectDetailPage() {
 
       {tab === 'overview' && (
         <div className="overview-tab">
+          {/* ── Opće informacije ── */}
+          <div className="info-section card">
+            <div className="section-header-row">
+              <Radio size={14} style={{ color: 'var(--accent)' }} />
+              <h3>Informacije o objektu</h3>
+            </div>
+            <div className="info-grid">
+              {obj.type_name && <div><span>Fizički tip:</span> {obj.type_name}</div>}
+              <div>
+                <span>Program tip:</span>{' '}
+                {obj.program_features != null ? 'Tip 2 — Modularni' : 'Tip 1 — Galija'}
+              </div>
+              {obj.program_version && <div><span>Verzija programa:</span> {obj.program_version}</div>}
+              {obj.program_features && (
+                <div className="info-full">
+                  <span>Instalirani moduli:</span>{' '}
+                  {[
+                    obj.program_features.sealite && 'SeaLite',
+                    obj.program_features.navlite && 'NavLite',
+                    obj.program_features.modem && 'Modem',
+                    obj.program_features.modem_on_other_station && 'Modem (druga stanica)',
+                    obj.program_features.vaisala_pwd20 && 'Vaisala PWD20',
+                    obj.program_features.visibility_on_other_station && 'Vidljivost (druga stanica)',
+                    obj.program_features.fog_signal && 'Sirena SFH',
+                  ].filter(Boolean).join(', ') || '—'}
+                </div>
+              )}
+              {obj.commissioned_at && <div><span>Puštanje u rad:</span> {obj.commissioned_at}</div>}
+              {obj.latitude && obj.longitude && (
+                <div>
+                  <span>Koordinate:</span>{' '}
+                  <a
+                    href={`https://www.google.com/maps?q=${obj.latitude},${obj.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {obj.latitude.toFixed(5)}, {obj.longitude.toFixed(5)}
+                  </a>
+                </div>
+              )}
+              {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
+                <div><span>Dozvoljeni radijus:</span> {obj.allowed_radius_m} m</div>
+              )}
+              {(obj.allowed_radius_m == null || obj.allowed_radius_m === 0) && (
+                <div><span>Tip pozicije:</span> Fiksni objekt</div>
+              )}
+              <div><span>Polling:</span> {obj.polling_enabled ? `${obj.poll_interval_sec}s` : 'isključen'}</div>
+              {obj.nominal_battery_capacity_ah != null && (
+                <div><span>Nominalni kapacitet baterije:</span> {obj.nominal_battery_capacity_ah} Ah</div>
+              )}
+              <div>
+                <span>Timeout tihosti:</span> {obj.silence_timeout_minutes} min
+                {obj.last_measurement_at && (
+                  <span style={{ marginLeft: 8, color: obj.is_silent ? 'var(--danger)' : 'var(--text3)', fontSize: 12 }}>
+                    (zadnji kontakt:{' '}
+                    {formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: true, locale: hr })}
+                    )
+                  </span>
+                )}
+              </div>
+              {obj.description && <div className="info-full"><span>Opis:</span> {obj.description}</div>}
+            </div>
+          </div>
+
+          {/* ── Trenutna mjerenja ── */}
+          <div className="overview-section-label">Trenutna mjerenja</div>
           <BatterySection
             objectId={id!}
             voltage={latest?.battery_voltage_avg}
@@ -1135,8 +1201,6 @@ export default function ObjectDetailPage() {
             prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
             prevCurrent={recentPositions?.[1]?.battery_current_avg}
           />
-          <BatteryCapacitySection objectId={id!} />
-          {hasCoords && <SolarEfficiencySection objectId={id!} />}
           <div className="metrics-grid" style={{ marginTop: 10 }}>
             <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
               prev={recentPositions?.[1]?.solar_voltage_avg} />
@@ -1237,65 +1301,10 @@ export default function ObjectDetailPage() {
             </div>
           )}
 
-          <div className="info-section card" style={{ marginTop: 16 }}>
-            <h3>Informacije o objektu</h3>
-            <div className="info-grid">
-              {obj.type_name && <div><span>Fizički tip:</span> {obj.type_name}</div>}
-              <div>
-                <span>Program tip:</span>{' '}
-                {obj.program_features != null ? 'Tip 2 — Modularni' : 'Tip 1 — Galija'}
-              </div>
-              {obj.program_version && <div><span>Verzija programa:</span> {obj.program_version}</div>}
-              {obj.program_features && (
-                <div className="info-full">
-                  <span>Instalirani moduli:</span>{' '}
-                  {[
-                    obj.program_features.sealite && 'SeaLite',
-                    obj.program_features.navlite && 'NavLite',
-                    obj.program_features.modem && 'Modem',
-                    obj.program_features.modem_on_other_station && 'Modem (druga stanica)',
-                    obj.program_features.vaisala_pwd20 && 'Vaisala PWD20',
-                    obj.program_features.visibility_on_other_station && 'Vidljivost (druga stanica)',
-                    obj.program_features.fog_signal && 'Sirena SFH',
-                  ].filter(Boolean).join(', ') || '—'}
-                </div>
-              )}
-              {obj.commissioned_at && <div><span>Puštanje u rad:</span> {obj.commissioned_at}</div>}
-              {obj.latitude && obj.longitude && (
-                <div>
-                  <span>Koordinate:</span>{' '}
-                  <a
-                    href={`https://www.google.com/maps?q=${obj.latitude},${obj.longitude}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {obj.latitude.toFixed(5)}, {obj.longitude.toFixed(5)}
-                  </a>
-                </div>
-              )}
-              {obj.allowed_radius_m != null && obj.allowed_radius_m > 0 && (
-                <div><span>Dozvoljeni radijus:</span> {obj.allowed_radius_m} m</div>
-              )}
-              {(obj.allowed_radius_m == null || obj.allowed_radius_m === 0) && (
-                <div><span>Tip pozicije:</span> Fiksni objekt</div>
-              )}
-              <div><span>Polling:</span> {obj.polling_enabled ? `${obj.poll_interval_sec}s` : 'isključen'}</div>
-              {obj.nominal_battery_capacity_ah != null && (
-                <div><span>Nominalni kapacitet baterije:</span> {obj.nominal_battery_capacity_ah} Ah</div>
-              )}
-              <div>
-                <span>Timeout tihosti:</span> {obj.silence_timeout_minutes} min
-                {obj.last_measurement_at && (
-                  <span style={{ marginLeft: 8, color: obj.is_silent ? 'var(--danger)' : 'var(--text3)', fontSize: 12 }}>
-                    (zadnji kontakt:{' '}
-                    {formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: true, locale: hr })}
-                    )
-                  </span>
-                )}
-              </div>
-              {obj.description && <div className="info-full"><span>Opis:</span> {obj.description}</div>}
-            </div>
-          </div>
+          {/* ── Analitika ── */}
+          <div className="overview-section-label">Analitika</div>
+          <BatteryCapacitySection objectId={id!} />
+          {hasCoords && <SolarEfficiencySection objectId={id!} />}
 
           {obj.latitude && obj.longitude && (() => {
             const isModular = !!(obj.program_features?.modem || obj.program_features?.navlite || obj.program_features?.sealite);
