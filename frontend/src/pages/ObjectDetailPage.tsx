@@ -827,7 +827,18 @@ export default function ObjectDetailPage() {
   });
 
   // Solar efficiency (only when object has coordinates)
+  // hasCoords se može izračunati iz obj koji je možda još null — OK jer useQuery prima enabled flag
   const hasCoords = !!(obj?.latitude && obj?.longitude);
+
+  // Weather data for chart overlay — mora biti PRIJE early return-ova (Rules of Hooks)
+  const chartWeatherDays = range === '7d' ? 7 : range === '24h' ? 2 : 1;
+  const { data: chartWeatherData } = useQuery({
+    queryKey: ['weather', id, chartWeatherDays],
+    queryFn: () => getWeather(id!, chartWeatherDays),
+    enabled: !!id && tab === 'charts' && hasCoords,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
 
   const handlePoll = async () => {
     if (!id) return;
@@ -853,16 +864,6 @@ export default function ObjectDetailPage() {
 
   if (loadingObj) return <div className="page-spinner"><div className="spinner" /></div>;
   if (!obj) return <div className="error-msg">Objekt nije pronađen</div>;
-
-  // Weather data for chart overlay (fetched when on charts tab with coords)
-  const chartWeatherDays = range === '7d' ? 7 : range === '24h' ? 2 : 1;
-  const { data: chartWeatherData } = useQuery({
-    queryKey: ['weather', id, chartWeatherDays],
-    queryFn: () => getWeather(id!, chartWeatherDays),
-    enabled: !!id && tab === 'charts' && hasCoords,
-    staleTime: 30 * 60_000,
-    retry: 1,
-  });
 
   // Build irradiance lookup: hour-rounded UTC ms → W/m²
   const irrByHour = new Map<number, number>(
