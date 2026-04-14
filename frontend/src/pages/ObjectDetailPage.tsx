@@ -1210,16 +1210,15 @@ export default function ObjectDetailPage() {
               value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null} unit="%" color="var(--accent)"
               prev={recentPositions?.[1]?.internet_ok_avg != null ? recentPositions[1].internet_ok_avg! * 100 : null} />
             <MetricCard icon={<Zap size={20} />} label="Svjetlo aktivno"
-              value={latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null} unit="%" color="var(--warning)"
-              prev={recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null} />
+              value={obj.program_features?.navlite
+                ? (latest?.lantern_current_active_avg != null ? latest.lantern_current_active_avg * 100 : null)
+                : (latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null)}
+              unit="%" color="var(--warning)"
+              prev={obj.program_features?.navlite
+                ? (recentPositions?.[1]?.lantern_current_active_avg != null ? recentPositions[1].lantern_current_active_avg! * 100 : null)
+                : (recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null)} />
             <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A"
               prev={recentPositions?.[1]?.lantern_current_avg} />
-            {/* Tip 2 — Modularni NavLite: detekcija struje (svjetlo aktivno po struji) */}
-            {obj.program_features?.navlite && (
-              <MetricCard icon={<Zap size={20} />} label="Struja aktivna"
-                value={latest?.lantern_current_active_avg != null ? latest.lantern_current_active_avg * 100 : null} unit="%" color="var(--success)"
-                prev={recentPositions?.[1]?.lantern_current_active_avg != null ? recentPositions[1].lantern_current_active_avg! * 100 : null} />
-            )}
             {/* Tip 1 — Galija: GPS sateliti */}
             {!obj.program_features && (
               <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
@@ -1618,11 +1617,11 @@ export default function ObjectDetailPage() {
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
                     <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
                     <Legend />
-                    <Line type="monotone" dataKey="lantern_light_active_avg" stroke="var(--warning)" dot={false} name="Svjetlo aktivno" />
+                    {obj.program_features?.navlite
+                      ? <Line type="monotone" dataKey="lantern_current_active_avg" stroke="var(--warning)" dot={false} name="Svjetlo aktivno" />
+                      : <Line type="monotone" dataKey="lantern_light_active_avg" stroke="var(--warning)" dot={false} name="Svjetlo aktivno" />
+                    }
                     <Line type="monotone" dataKey="lantern_current_avg" stroke="var(--accent)" dot={false} name="Struja (A)" />
-                    {obj.program_features?.navlite && (
-                      <Line type="monotone" dataKey="lantern_current_active_avg" stroke="var(--success)" dot={false} name="Struja aktivna (0/1)" />
-                    )}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
