@@ -574,6 +574,42 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
     Ok(Page::new(rows, total, page, page_size))
 }
 
+/// Heatmap agregacija alarma — dnevni sažetak + hour-of-day × day-of-week matrica
+pub async fn get_alarm_heatmap(
+    pool: &PgPool, object_id: Uuid,
+) -> AppResult<crate::models::domain::AlarmHeatmapResponse> {
+    use crate::models::domain::{AlarmHeatmapDay, AlarmHeatmapHour, AlarmHeatmapResponse};
+
+    // Dnevni broj perioda s aktivnim alarmom za zadnjih 365 dana
+    let daily: Vec<AlarmHeatmapDay> = sqlx::query_as(
+        "SELECT
+           DATE(recorded_at AT TIME ZONE 'UTC') AS date,
+           COUNT(*) FILTER (WHERE any_alarm_active)::bigint AS count
+         FROM alarms
+         WHERE object_id = $1
+           AND recorded_at >= NOW() - INTERVAL '365 days'
+         GROUP BY DATE(recorded_at AT TIME ZONE 'UTC')
+         ORDER BY date")
+        .bind(object_id)
+        .fetch_all(pool).await?;
+
+    // Prosječna učestalost po satu (0–23) i danu u tjednu (0=pon, 6=ned) — zadnjih 90 dana
+    let hourly: Vec<AlarmHeatmapHour> = sqlx::query_as(
+        "SELECT
+           EXTRACT(HOUR FROM recorded_at AT TIME ZONE 'UTC')::smallint AS hour,
+           (EXTRACT(ISODOW FROM recorded_at AT TIME ZONE 'UTC')::smallint - 1) AS dow,
+           AVG(CASE WHEN any_alarm_active THEN 1.0 ELSE 0.0 END) AS count
+         FROM alarms
+         WHERE object_id = $1
+           AND recorded_at >= NOW() - INTERVAL '90 days'
+         GROUP BY 1, 2
+         ORDER BY 2, 1")
+        .bind(object_id)
+        .fetch_all(pool).await?;
+
+    Ok(AlarmHeatmapResponse { daily, hourly })
+}
+
 /// Briši jedan alarm zapis po ID-u
 pub async fn delete_alarm_by_id(pool: &PgPool, alarm_id: i64) -> AppResult<Option<Uuid>> {
     // Vrati object_id da bi mogli ažurirati cached stanje

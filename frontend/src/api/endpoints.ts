@@ -15,6 +15,7 @@ import type {
   UserPublic,
   UserRegionAccessView,
   BatteryPrediction,
+  AlarmHeatmapData,
 } from '../types';
 
 // Auth
@@ -117,6 +118,10 @@ export const listAlarmHistory = (params?: AlarmHistoryParams) =>
 
 export const deleteAlarm = (alarmId: number) =>
   api.delete(`/api/v1/alarms/${alarmId}`);
+
+// Alarm heatmap
+export const getAlarmHeatmap = (id: string) =>
+  api.get<AlarmHeatmapData>(`/api/v1/objects/${id}/alarms/heatmap`).then((r) => r.data);
 
 // Battery prediction
 export const getBatteryPrediction = (id: string) =>

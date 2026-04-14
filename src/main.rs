@@ -130,6 +130,7 @@ async fn main() -> anyhow::Result<()> {
         // Alarmi po objektu
         .route("/api/v1/objects/:id/alarms",              get(handlers::domain::get_alarms))
         .route("/api/v1/objects/:id/alarms",              delete(handlers::domain::delete_alarms))
+        .route("/api/v1/objects/:id/alarms/heatmap",      get(handlers::domain::get_alarm_heatmap))
         .route("/api/v1/objects/:id/alarms/active",       get(handlers::domain::get_active_alarms))
         .route("/api/v1/objects/:id/alarms/acknowledge",  post(handlers::domain::acknowledge_alarm))
         // Event log po objektu
