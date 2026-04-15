@@ -19,6 +19,7 @@ import type {
   AlarmHeatmapData,
   WeatherResponse,
   SolarEfficiency,
+  AuditLogEntry,
 } from '../types';
 
 // Auth
@@ -170,3 +171,20 @@ export const grantRegionAccess = (data: {
 
 export const revokeRegionAccess = (userId: string, regionId: string) =>
   api.delete(`/api/v1/users/${userId}/regions/${regionId}`);
+
+// Audit log (admin only)
+export interface AuditLogQueryParams {
+  action?: string;
+  username?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export const listAuditLog = (params?: AuditLogQueryParams) =>
+  api.get<Page<AuditLogEntry>>('/api/v1/admin/audit-log', { params }).then((r) => r.data);
+
+// Change password (any authenticated user)
+export const changePassword = (data: { current_password: string; new_password: string }) =>
+  api.post('/api/v1/auth/change-password', data);

@@ -719,6 +719,12 @@ pub async fn find_user_by_username(pool: &PgPool, username: &str) -> AppResult<O
         .fetch_optional(pool).await?)
 }
 
+pub async fn find_user_full(pool: &PgPool, id: Uuid) -> AppResult<Option<User>> {
+    Ok(sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool).await?)
+}
+
 pub async fn find_user_by_id(pool: &PgPool, id: Uuid) -> AppResult<Option<UserPublic>> {
     Ok(sqlx::query_as!(UserPublic,
         "SELECT id,username,email,full_name,role,is_active,last_login_at,created_at FROM users WHERE id=$1", id)
@@ -741,6 +747,12 @@ pub async fn create_user(pool: &PgPool, req: &CreateUserRequest, hash: &str, by:
          RETURNING id,username,email,full_name,role,is_active,last_login_at,created_at",
         req.username, req.email, hash, req.full_name, req.role, by)
         .fetch_one(pool).await?)
+}
+
+pub async fn update_user_password(pool: &PgPool, user_id: Uuid, new_hash: &str) -> AppResult<()> {
+    sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
+        .bind(new_hash).bind(user_id).execute(pool).await?;
+    Ok(())
 }
 
 pub async fn update_last_login(pool: &PgPool, id: Uuid) -> AppResult<()> {
@@ -828,6 +840,44 @@ pub async fn revoke_refresh_token(pool: &PgPool, hash: &str) -> AppResult<()> {
 // ================================================================
 // AUDIT LOG
 // ================================================================
+
+pub async fn list_audit_log(pool: &PgPool, q: &AuditLogQuery) -> AppResult<crate::models::domain::Page<AuditLogEntry>> {
+    let page      = q.page.unwrap_or(1).max(1);
+    let page_size = q.page_size.unwrap_or(50).clamp(1, 200);
+    let offset    = (page - 1) * page_size;
+
+    let rows = sqlx::query_as::<_, AuditLogEntry>(
+        r#"SELECT id, user_id, username, action, entity_type, entity_id, details,
+                  ip_address::text AS ip_address, created_at
+           FROM audit_log
+           WHERE ($1::text IS NULL OR action = $1)
+             AND ($2::text IS NULL OR username ILIKE '%' || $2 || '%')
+             AND ($3::timestamptz IS NULL OR created_at >= $3)
+             AND ($4::timestamptz IS NULL OR created_at <= $4)
+           ORDER BY created_at DESC
+           LIMIT $5 OFFSET $6"#)
+        .bind(&q.action)
+        .bind(&q.username)
+        .bind(q.from)
+        .bind(q.to)
+        .bind(page_size)
+        .bind(offset)
+        .fetch_all(pool).await?;
+
+    let total = sqlx::query_scalar::<_, i64>(
+        r#"SELECT COUNT(*) FROM audit_log
+           WHERE ($1::text IS NULL OR action = $1)
+             AND ($2::text IS NULL OR username ILIKE '%' || $2 || '%')
+             AND ($3::timestamptz IS NULL OR created_at >= $3)
+             AND ($4::timestamptz IS NULL OR created_at <= $4)"#)
+        .bind(&q.action)
+        .bind(&q.username)
+        .bind(q.from)
+        .bind(q.to)
+        .fetch_one(pool).await?;
+
+    Ok(crate::models::domain::Page::new(rows, total, page, page_size))
+}
 
 pub async fn write_audit(pool: &PgPool, user_id: Option<Uuid>, username: Option<&str>,
     action: &str, entity_type: Option<&str>, entity_id: Option<&str>,

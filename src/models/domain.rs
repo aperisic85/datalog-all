@@ -779,6 +779,41 @@ pub struct AlarmHeatmapResponse {
 }
 
 // ================================================================
+// AUDIT LOG
+// ================================================================
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AuditLogEntry {
+    pub id:          i64,
+    pub user_id:     Option<Uuid>,
+    pub username:    Option<String>,
+    pub action:      String,
+    pub entity_type: Option<String>,
+    pub entity_id:   Option<String>,
+    pub details:     Option<serde_json::Value>,
+    pub ip_address:  Option<String>,
+    pub created_at:  DateTime<Utc>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct AuditLogQuery {
+    pub action:    Option<String>,
+    pub username:  Option<String>,
+    pub from:      Option<DateTime<Utc>>,
+    pub to:        Option<DateTime<Utc>>,
+    pub page:      Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+// ================================================================
+// CHANGE PASSWORD
+// ================================================================
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password:     String,
+}
+
+// ================================================================
 // PAGINATION
 // ================================================================
 #[derive(Debug, Serialize)]

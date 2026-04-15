@@ -686,6 +686,47 @@ pub async fn get_solar_efficiency(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// AUDIT LOG  [admin only]
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// GET /api/v1/admin/audit-log
+pub async fn get_audit_log(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Query(q): Query<AuditLogQuery>,
+) -> AppResult<Json<Page<AuditLogEntry>>> {
+    require_admin(&claims)?;
+    Ok(Json(db::list_audit_log(&pool, &q).await?))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHANGE PASSWORD  [any authenticated user]
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// POST /api/v1/auth/change-password
+pub async fn change_password(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Json(req): Json<ChangePasswordRequest>,
+) -> AppResult<StatusCode> {
+    let uid  = parse_uid(&claims.sub)?;
+    let user = db::find_user_full(&pool, uid).await?.ok_or(AppError::Unauthorized)?;
+
+    if !auth_svc::verify_password(&req.current_password, &user.password_hash)? {
+        return Err(AppError::BadRequest("Pogrešna trenutna lozinka".into()));
+    }
+    if req.new_password.len() < 8 {
+        return Err(AppError::Validation("Nova lozinka mora imati najmanje 8 znakova".into()));
+    }
+
+    let new_hash = auth_svc::hash_password(&req.new_password)?;
+    db::update_user_password(&pool, uid, &new_hash).await?;
+    let _ = db::write_audit(&pool, Some(uid), Some(&claims.username),
+        "CHANGE_PASSWORD", Some("user"), Some(&uid.to_string()), None, None).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 

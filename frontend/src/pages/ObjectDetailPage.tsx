@@ -17,6 +17,7 @@ import {
   updateObject,
   listRegions,
   listStationTypes,
+  acknowledgeAlarm,
 } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
@@ -56,6 +57,7 @@ import {
   Wind,
   Cpu,
   Cloud,
+  Check,
 } from 'lucide-react';
 import { formatDistanceToNow, parseISO as parseDateISO } from 'date-fns';
 import { hr } from 'date-fns/locale';
@@ -920,13 +922,15 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
 export default function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user: authUser } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [range, setRange] = useState<Range>('24h');
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [driftRange, setDriftRange] = useState<DriftRange>('24h');
+  const [acking, setAcking] = useState(false);
+  const [ackError, setAckError] = useState('');
 
   const { data: obj, isLoading: loadingObj } = useQuery({
     queryKey: ['object', id],
@@ -1671,6 +1675,14 @@ export default function ObjectDetailPage() {
 
       {tab === 'alarms' && (
         <div className="alarms-tab">
+          {ackError && (
+            <div className="error-msg" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {ackError}
+              <button style={{ background: 'none', padding: 4, color: 'inherit' }} onClick={() => setAckError('')}>
+                <X size={14} />
+              </button>
+            </div>
+          )}
           {loadingAlarms ? (
             <div className="page-spinner"><div className="spinner" /></div>
           ) : (() => {
@@ -1690,6 +1702,21 @@ export default function ObjectDetailPage() {
                 </div>
               );
             }
+            const handleAck = async () => {
+              if (!id) return;
+              setAcking(true);
+              setAckError('');
+              try {
+                await acknowledgeAlarm(id);
+                qc.invalidateQueries({ queryKey: ['alarms-active', id] });
+                qc.invalidateQueries({ queryKey: ['object', id] });
+                qc.invalidateQueries({ queryKey: ['region-summary'] });
+              } catch {
+                setAckError('Greška pri potvrdi alarma. Pokušaj ponovo.');
+              } finally {
+                setAcking(false);
+              }
+            };
             return (
               <div className="alarm-current card">
                 <div className="alarm-current-header">
@@ -1708,6 +1735,20 @@ export default function ObjectDetailPage() {
                     </div>
                   ))}
                 </div>
+                {authUser?.role !== 'viewer' && (
+                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                    <button
+                      className="btn-secondary"
+                      onClick={handleAck}
+                      disabled={acking}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      {acking
+                        ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Potvrđuje...</>
+                        : <><Check size={13} /> Potvrdi alarm</>}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })()}

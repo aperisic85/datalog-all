@@ -149,6 +149,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/users/:id/regions",           get(handlers::domain::get_user_regions))
         .route("/api/v1/users/regions",               post(handlers::domain::grant_region_access))
         .route("/api/v1/users/:uid/regions/:rid",     delete(handlers::domain::revoke_region_access))
+        // Audit log (admin only)
+        .route("/api/v1/admin/audit-log",             get(handlers::domain::get_audit_log))
+        // Change password (any authenticated user)
+        .route("/api/v1/auth/change-password",        post(handlers::domain::change_password))
         // Poller control
         .route("/api/v1/control/setvalue",            post(handlers::poller_handler::set_datalogger_value))
         .route("/api/v1/objects/:id/poll",            post(handlers::poller_handler::poll_object_now))

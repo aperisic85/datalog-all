@@ -1,0 +1,181 @@
+.audit-page {
+  max-width: 1100px;
+  animation: fadeInUp 0.25s ease both;
+}
+
+.audit-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.audit-filters select { width: auto; min-width: 160px; }
+
+.audit-filter-input {
+  min-width: 160px;
+  width: auto;
+}
+
+.audit-date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.audit-date-range input[type="date"] {
+  width: auto;
+  min-width: 130px;
+}
+
+.audit-date-sep {
+  color: var(--text3);
+  font-size: 12px;
+}
+
+.clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+}
+.clear-filter-btn:hover { background: var(--border); color: var(--text); }
+
+/* ── Tablica ── */
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.audit-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text2);
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.audit-table th svg { vertical-align: -2px; margin-right: 4px; }
+
+.audit-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.audit-table tbody tr:last-child td { border-bottom: none; }
+.audit-table tbody tr:hover { background: var(--bg2); }
+
+/* ── Datum ── */
+.audit-time { white-space: nowrap; font-size: 12px; }
+.audit-time-sub { color: var(--text3); font-size: 11px; margin-top: 2px; }
+
+/* ── Korisnik ── */
+.audit-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.audit-user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Entitet ── */
+.audit-entity-type {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text2);
+  margin-right: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.audit-entity-id {
+  font-size: 11px;
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text2);
+  max-width: 180px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* ── Detalji ── */
+.audit-details {
+  font-size: 12px;
+  color: var(--text2);
+  max-width: 220px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* ── IP ── */
+.audit-ip {
+  font-size: 12px;
+  color: var(--text3);
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+/* ── No data ── */
+.audit-no-data { color: var(--text3); font-size: 12px; }
+
+/* ── Empty state ── */
+.audit-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  color: var(--text3);
+  font-size: 14px;
+}
+
+/* ── badge-accent helper (ako nije u globalnom CSS-u) ── */
+.badge-accent {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+}
+[data-theme="dark"] .badge-accent {
+  background: rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+}

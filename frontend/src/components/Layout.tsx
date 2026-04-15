@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { changePassword } from '../api/endpoints';
 import {
   LayoutDashboard,
   Radio,
@@ -14,6 +15,9 @@ import {
   X,
   AlertTriangle,
   GitCompare,
+  ClipboardList,
+  KeyRound,
+  Check,
 } from 'lucide-react';
 
 function LighthouseIcon({ size = 24 }: { size?: number }) {
@@ -42,6 +46,95 @@ function LighthouseIcon({ size = 24 }: { size?: number }) {
 }
 import './Layout.css';
 
+// ── Change Password Modal ─────────────────────────────────────────────────────
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+  const [err,  setErr]  = useState('');
+  const [ok,   setOk]   = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr('');
+    if (form.next !== form.confirm) { setErr('Lozinke se ne podudaraju'); return; }
+    if (form.next.length < 8)       { setErr('Nova lozinka mora imati najmanje 8 znakova'); return; }
+    setBusy(true);
+    try {
+      await changePassword({ current_password: form.current, new_password: form.next });
+      setOk(true);
+    } catch (ex: unknown) {
+      const msg = (ex as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setErr(msg || 'Greška pri promjeni lozinke');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box card" style={{ maxWidth: 400 }}>
+        <div className="modal-header">
+          <h3><KeyRound size={16} style={{ verticalAlign: -3, marginRight: 6 }} />Promjena lozinke</h3>
+          <button className="modal-close-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        {ok ? (
+          <div style={{ padding: '16px 0' }}>
+            <div className="success-msg" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Check size={16} /> Lozinka je uspješno promijenjena.
+            </div>
+            <div className="modal-actions" style={{ marginTop: 16 }}>
+              <button className="btn-primary" onClick={onClose}>Zatvori</button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="modal-form">
+            {err && <div className="error-msg" style={{ marginBottom: 12 }}>{err}</div>}
+            <div className="form-group">
+              <label>Trenutna lozinka</label>
+              <input
+                type="password"
+                value={form.current}
+                onChange={(e) => setForm({ ...form, current: e.target.value })}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>Nova lozinka</label>
+              <input
+                type="password"
+                value={form.next}
+                onChange={(e) => setForm({ ...form, next: e.target.value })}
+                required
+                minLength={8}
+                placeholder="Najmanje 8 znakova"
+              />
+            </div>
+            <div className="form-group">
+              <label>Potvrdi novu lozinku</label>
+              <input
+                type="password"
+                value={form.confirm}
+                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                required
+              />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={onClose}>Odustani</button>
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy
+                  ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Sprema...</>
+                  : <><Check size={14} /> Promijeni lozinku</>}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -49,7 +142,8 @@ export default function Layout() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
   });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen,      setSidebarOpen]      = useState(false);
+  const [showChangePw,     setShowChangePw]      = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -120,6 +214,10 @@ export default function Layout() {
                 <Users size={16} />
                 Korisnici
               </NavLink>
+              <NavLink to="/admin/audit" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+                <ClipboardList size={16} />
+                Audit Log
+              </NavLink>
             </>
           )}
         </nav>
@@ -132,6 +230,9 @@ export default function Layout() {
               <div className="user-role">{user?.role}</div>
             </div>
           </div>
+          <button className="logout-btn" onClick={() => setShowChangePw(true)} title="Promijeni lozinku">
+            <KeyRound size={16} />
+          </button>
           <button className="logout-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -140,6 +241,8 @@ export default function Layout() {
           </button>
         </div>
       </aside>
+
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
 
       <main className="content">
         <div className="mobile-topbar">

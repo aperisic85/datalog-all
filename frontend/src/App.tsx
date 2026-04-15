@@ -8,6 +8,7 @@ import ObjectsPage from './pages/ObjectsPage';
 import ObjectDetailPage from './pages/ObjectDetailPage';
 import AdminRegionsPage from './pages/AdminRegionsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
+import AdminAuditPage from './pages/AdminAuditPage';
 import MapPage from './pages/MapPage';
 import AlarmsPage from './pages/AlarmsPage';
 import ComparePage from './pages/ComparePage';
@@ -64,6 +65,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <AdminUsersPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/audit"
+          element={
+            <RequireAdmin>
+              <AdminAuditPage />
             </RequireAdmin>
           }
         />

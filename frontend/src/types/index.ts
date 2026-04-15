@@ -370,6 +370,20 @@ export interface BatteryCapacityEstimate {
   status_label: string;
 }
 
+// ── Audit log ─────────────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: number;
+  user_id?: string;
+  username?: string;
+  action: string;
+  entity_type?: string;
+  entity_id?: string;
+  details?: Record<string, unknown>;
+  ip_address?: string;
+  created_at: string;
+}
+
 /**
  * Predikcija kvara baterije — linearni trend nad satnim mjerenjima napona.
  * Vraćen od GET /api/v1/objects/:id/battery/prediction
