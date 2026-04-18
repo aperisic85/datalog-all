@@ -299,11 +299,12 @@ const LOG_LEVELS: Record<number, { label: string; cls: string }> = {
 // ─── Battery Capacity Section ─────────────────────────────────────────────────
 
 const CAPACITY_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  good:             { label: 'Baterija dobra',              color: 'var(--success)' },
-  degraded:         { label: 'Baterija degradirana',        color: 'var(--warning)' },
-  replace:          { label: 'Preporučena zamjena',         color: 'var(--danger)'  },
-  no_nominal:       { label: 'Nominalni kapacitet nije postavljen', color: 'var(--text2)' },
-  insufficient_data:{ label: 'Nedovoljno podataka',         color: 'var(--text2)'   },
+  good:                  { label: 'Baterija dobra',              color: 'var(--success)' },
+  degraded:              { label: 'Baterija degradirana',        color: 'var(--warning)' },
+  replace:               { label: 'Preporučena zamjena',         color: 'var(--danger)'  },
+  no_nominal:            { label: 'Nominalni kapacitet nije postavljen', color: 'var(--text2)' },
+  insufficient_data:     { label: 'Nedovoljno podataka',         color: 'var(--text2)'   },
+  insufficient_discharge:{ label: 'Nedovoljno pražnjenja za procjenu', color: 'var(--text2)' },
 };
 
 function BatteryCapacitySection({ objectId }: { objectId: string }) {
@@ -357,6 +358,11 @@ function BatteryCapacitySection({ objectId }: { objectId: string }) {
               Potrebno min. 7 dana 24h mjerenja
             </span>
           )}
+          {data.status === 'insufficient_discharge' && (
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              Solar pokriva potrošnju — baterija se nije dovoljno praznila
+            </span>
+          )}
         </div>
 
         {/* Health progress bar */}
@@ -379,7 +385,7 @@ function BatteryCapacitySection({ objectId }: { objectId: string }) {
           )}
           {data.estimated_capacity_ah != null && (
             <span>
-              Procijenjeni:{' '}
+              {data.status === 'insufficient_discharge' ? 'Donja granica:' : 'Procijenjeni:'}{' '}
               <strong style={{ color: cfg.color }}>
                 {data.estimated_capacity_ah.toFixed(1)} Ah
               </strong>

@@ -364,7 +364,7 @@ export interface BatteryCapacityEstimate {
   max_deficit_run_ah?: number;
   /** Broj dana analiziranih */
   sample_days: number;
-  /** "good" | "degraded" | "replace" | "no_nominal" | "insufficient_data" */
+  /** "good" | "degraded" | "replace" | "no_nominal" | "insufficient_data" | "insufficient_discharge" */
   status: string;
   /** Opis statusa na hrvatskom */
   status_label: string;
