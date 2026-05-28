@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapContainer, TileLayer, CircleMarker, Circle, Popup, Polyline } from 'react-leaflet';
 import {
@@ -15,6 +15,7 @@ import {
   getWeather,
   pollObject,
   updateObject,
+  deleteObject,
   listRegions,
   listStationTypes,
   acknowledgeAlarm,
@@ -50,6 +51,7 @@ import {
   Sun,
   RefreshCw,
   Pencil,
+  Trash2,
   X,
   TrendingUp,
   TrendingDown,
@@ -927,6 +929,7 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
 
 export default function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const { isAdmin, user: authUser } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
@@ -934,9 +937,26 @@ export default function ObjectDetailPage() {
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [driftRange, setDriftRange] = useState<DriftRange>('24h');
   const [acking, setAcking] = useState(false);
   const [ackError, setAckError] = useState('');
+
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteObject(id);
+      qc.invalidateQueries({ queryKey: ['objects'] });
+      navigate('/objects');
+    } catch {
+      setDeleteError('Greška pri brisanju objekta. Pokušaj ponovo.');
+      setDeleting(false);
+    }
+  };
 
   const { data: obj, isLoading: loadingObj } = useQuery({
     queryKey: ['object', id],
@@ -1066,6 +1086,38 @@ export default function ObjectDetailPage() {
   return (
     <div className="object-detail">
       {showEdit && <EditObjectModal obj={obj} onClose={() => setShowEdit(false)} />}
+
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && !deleting && setShowDeleteConfirm(false)}>
+          <div className="modal-box card" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h3>Brisanje objekta</h3>
+              <button className="modal-close" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '12px 0 8px' }}>
+              <p style={{ margin: 0, fontSize: 14, color: 'var(--text)' }}>
+                Jesi li siguran da želiš obrisati objekt <strong>{obj.name}</strong>?
+              </p>
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text2)' }}>
+                Ovo će soft-deletirati objekt. Svi podaci (mjerenja, alarmi, event log) ostaju u bazi.
+              </p>
+              {deleteError && <div className="error-msg" style={{ marginTop: 10 }}>{deleteError}</div>}
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Odustani</button>
+              <button
+                className="btn-danger"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                {deleting ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Briše...</> : <><Trash2 size={13} /> Obriši objekt</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="detail-header">
         <Link to="/objects" className="back-link">
           <ArrowLeft size={16} /> Objekti
@@ -1092,9 +1144,18 @@ export default function ObjectDetailPage() {
               </span>
             )}
             {isAdmin && (
-              <button className="btn-secondary" style={{ marginLeft: 8, padding: '4px 10px', fontSize: 13 }} onClick={() => setShowEdit(true)}>
-                <Pencil size={13} /> Uredi
-              </button>
+              <>
+                <button className="btn-secondary" style={{ marginLeft: 8, padding: '4px 10px', fontSize: 13 }} onClick={() => setShowEdit(true)}>
+                  <Pencil size={13} /> Uredi
+                </button>
+                <button
+                  className="btn-secondary"
+                  style={{ marginLeft: 4, padding: '4px 10px', fontSize: 13, color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                  onClick={() => { setDeleteError(''); setShowDeleteConfirm(true); }}
+                >
+                  <Trash2 size={13} /> Obriši
+                </button>
+              </>
             )}
           </div>
           <div className="detail-meta">
