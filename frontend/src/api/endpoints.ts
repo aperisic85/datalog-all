@@ -112,6 +112,7 @@ export const deleteAlarms = (id: string) =>
 
 export interface AlarmHistoryParams {
   region_id?: string;
+  object_id?: string;
   status?: 'active' | 'acknowledged' | 'all';
   page?: number;
   page_size?: number;

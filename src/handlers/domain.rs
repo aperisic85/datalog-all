@@ -442,6 +442,7 @@ pub async fn list_alarms(
     };
     let q2 = AlarmListQuery {
         region_id: effective_region,
+        object_id: q.object_id,
         status: q.status,
         page: q.page,
         page_size: q.page_size,

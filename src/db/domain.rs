@@ -481,7 +481,7 @@ pub async fn get_alarms(
 
 pub async fn get_active_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<Vec<AlarmRecord>> {
     Ok(sqlx::query_as(
-        "SELECT * FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE
+        "SELECT * FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE AND acknowledged_at IS NULL
          ORDER BY recorded_at DESC LIMIT 50")
         .bind(object_id)
         .fetch_all(pool).await?)
@@ -505,31 +505,45 @@ pub async fn acknowledge_object_alarm(pool: &PgPool, object_id: Uuid, by: &str) 
     Ok(())
 }
 
-/// Globalni popis alarm zapisa s filtrima po regiji i statusu — bez duplikata
+/// Globalni popis alarm zapisa s filtrima po regiji/objektu i statusu
 pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<Page<AlarmListItem>> {
     let page      = q.page.unwrap_or(1).max(1);
     let page_size = q.page_size.unwrap_or(50).min(200);
     let offset    = (page - 1) * page_size;
     let status    = q.status.as_deref().unwrap_or("active");
 
-    // DISTINCT ON (object_id) = jedan zapis po objektu (najnoviji)
-    // Za potvrđene: DISTINCT ON (object_id, datum potvrde)
-    let (distinct_clause, where_status, order_inner, order_outer) = match status {
-        "acknowledged" =>
-            ("DISTINCT ON (o.id, acknowledged_at::date)",
-             "a.acknowledged_at IS NOT NULL",
-             "o.id, acknowledged_at::date DESC, a.recorded_at DESC",
-             "sub.acknowledged_at DESC NULLS LAST"),
-        "all" =>
-            ("DISTINCT ON (o.id)",
-             "a.any_alarm_active = TRUE",
-             "o.id, a.recorded_at DESC",
-             "sub.recorded_at DESC"),
-        _ =>  // "active"
-            ("DISTINCT ON (o.id)",
-             "a.any_alarm_active = TRUE AND a.acknowledged_at IS NULL",
-             "o.id, a.recorded_at DESC",
-             "sub.recorded_at DESC"),
+    // Kad je object_id postavljen: prikaži sve zapise za taj objekt (bez DISTINCT).
+    // Inače: DISTINCT ON (o.id) = jedan (najnoviji) zapis po objektu.
+    let has_obj = q.object_id.is_some();
+
+    let (distinct_clause, where_status, order_inner, order_outer) = if has_obj {
+        let ws = match status {
+            "acknowledged" => "a.acknowledged_at IS NOT NULL",
+            "all"          => "a.any_alarm_active = TRUE",
+            _              => "a.any_alarm_active = TRUE AND a.acknowledged_at IS NULL",
+        };
+        ("", ws, "a.recorded_at DESC", "sub.recorded_at DESC")
+    } else {
+        match status {
+            "acknowledged" => (
+                "DISTINCT ON (o.id, acknowledged_at::date)",
+                "a.acknowledged_at IS NOT NULL",
+                "o.id, acknowledged_at::date DESC, a.recorded_at DESC",
+                "sub.acknowledged_at DESC NULLS LAST",
+            ),
+            "all" => (
+                "DISTINCT ON (o.id)",
+                "a.any_alarm_active = TRUE",
+                "o.id, a.recorded_at DESC",
+                "sub.recorded_at DESC",
+            ),
+            _ => (
+                "DISTINCT ON (o.id)",
+                "a.any_alarm_active = TRUE AND a.acknowledged_at IS NULL",
+                "o.id, a.recorded_at DESC",
+                "sub.recorded_at DESC",
+            ),
+        }
     };
 
     let cols = "a.id,
@@ -570,32 +584,36 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
          JOIN objects o ON o.id = a.object_id
          JOIN regions r ON r.id = o.region_id";
 
+    // $1=region_id  $2=page_size  $3=offset  $4=object_id
     let sql = format!(
         "SELECT sub.* FROM (
            SELECT {distinct_clause} {cols}
            {from_join}
            WHERE {where_status}
              AND ($1::uuid IS NULL OR r.id = $1)
+             AND ($4::uuid IS NULL OR o.id = $4)
            ORDER BY {order_inner}
          ) sub
          ORDER BY {order_outer}
          LIMIT $2 OFFSET $3");
 
+    // $1=region_id  $2=object_id
     let count_sql = format!(
         "SELECT COUNT(*) FROM (
            SELECT {distinct_clause} a.id
            {from_join}
            WHERE {where_status}
              AND ($1::uuid IS NULL OR r.id = $1)
+             AND ($2::uuid IS NULL OR o.id = $2)
            ORDER BY {order_inner}
          ) sub");
 
     let rows: Vec<AlarmListItem> = sqlx::query_as(&sql)
-        .bind(q.region_id).bind(page_size).bind(offset)
+        .bind(q.region_id).bind(page_size).bind(offset).bind(q.object_id)
         .fetch_all(pool).await?;
 
     let total: i64 = sqlx::query_scalar(&count_sql)
-        .bind(q.region_id)
+        .bind(q.region_id).bind(q.object_id)
         .fetch_one(pool).await?;
 
     Ok(Page::new(rows, total, page, page_size))

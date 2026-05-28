@@ -416,6 +416,7 @@ pub struct AlarmListItem {
 #[derive(Debug, Default, Deserialize)]
 pub struct AlarmListQuery {
     pub region_id:  Option<Uuid>,
+    pub object_id:  Option<Uuid>,
     /// "active" | "acknowledged" | "all"  (default: "active")
     pub status:     Option<String>,
     pub page:       Option<i64>,

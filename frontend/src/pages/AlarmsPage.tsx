@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
-import { listAlarmHistory, listRegions, acknowledgeAlarm, deleteAlarm } from '../api/endpoints';
+import { listAlarmHistory, listRegions, listObjects, acknowledgeAlarm, deleteAlarm } from '../api/endpoints';
 import type { AlarmListItem } from '../types';
 import {
   AlertTriangle, Battery, Wifi, WifiOff,
@@ -197,6 +197,7 @@ export default function AlarmsPage() {
     (searchParams.get('status') as Status) || 'active'
   );
   const [regionFilter, setRegionFilter] = useState(searchParams.get('region_id') || '');
+  const [objectFilter, setObjectFilter] = useState(searchParams.get('object_id') || '');
   const [page, setPage] = useState(1);
 
   // Modalne potvrde
@@ -210,10 +211,11 @@ export default function AlarmsPage() {
   const qc = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['alarms-history', status, regionFilter, page],
+    queryKey: ['alarms-history', status, regionFilter, objectFilter, page],
     queryFn: () => listAlarmHistory({
       status,
       region_id: regionFilter || undefined,
+      object_id: objectFilter || undefined,
       page,
       page_size: 30,
     }),
@@ -221,16 +223,24 @@ export default function AlarmsPage() {
   });
 
   const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
+  const { data: objectsPage } = useQuery({
+    queryKey: ['objects-all'],
+    queryFn: () => listObjects({ page_size: 1000 }),
+    staleTime: 5 * 60_000,
+  });
+  const allObjects = objectsPage?.data ?? [];
 
-  const syncParams = (s: Status, r: string) => {
+  const syncParams = (s: Status, r: string, o: string) => {
     const p: Record<string, string> = {};
     if (s !== 'active') p.status = s;
     if (r) p.region_id = r;
+    if (o) p.object_id = o;
     setSearchParams(p);
   };
 
-  const handleStatus = (s: Status) => { setStatus(s); setPage(1); syncParams(s, regionFilter); };
-  const handleRegion = (r: string) => { setRegionFilter(r); setPage(1); syncParams(status, r); };
+  const handleStatus = (s: Status) => { setStatus(s); setPage(1); syncParams(s, regionFilter, objectFilter); };
+  const handleRegion = (r: string) => { setRegionFilter(r); setPage(1); syncParams(status, r, objectFilter); };
+  const handleObject = (o: string) => { setObjectFilter(o); setPage(1); syncParams(status, regionFilter, o); };
 
   // Potvrdi alarm
   const doAcknowledge = async () => {
@@ -331,7 +341,7 @@ export default function AlarmsPage() {
         ))}
       </div>
 
-      {/* Region filter */}
+      {/* Filteri */}
       <div className="alarms-filters card">
         <Filter size={14} style={{ color: 'var(--text2)', flexShrink: 0 }} />
         <select value={regionFilter} onChange={e => handleRegion(e.target.value)}>
@@ -343,6 +353,17 @@ export default function AlarmsPage() {
         {regionFilter && (
           <button className="clear-filter-btn" onClick={() => handleRegion('')}>
             <X size={14} /> Sve regije
+          </button>
+        )}
+        <select value={objectFilter} onChange={e => handleObject(e.target.value)}>
+          <option value="">Svi objekti</option>
+          {allObjects.map(o => (
+            <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </select>
+        {objectFilter && (
+          <button className="clear-filter-btn" onClick={() => handleObject('')}>
+            <X size={14} /> Svi objekti
           </button>
         )}
       </div>

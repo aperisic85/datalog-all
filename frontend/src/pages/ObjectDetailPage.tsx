@@ -16,9 +16,11 @@ import {
   pollObject,
   updateObject,
   deleteObject,
+  listAlarmHistory,
+  acknowledgeAlarm,
+  deleteAlarm,
   listRegions,
   listStationTypes,
-  acknowledgeAlarm,
 } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
@@ -60,11 +62,14 @@ import {
   Cpu,
   Cloud,
   Check,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { formatDistanceToNow, parseISO as parseDateISO } from 'date-fns';
 import { hr } from 'date-fns/locale';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
+import './AlarmsPage.css';
 import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
 
 type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap';
@@ -943,6 +948,8 @@ export default function ObjectDetailPage() {
   const [driftRange, setDriftRange] = useState<DriftRange>('24h');
   const [acking, setAcking] = useState(false);
   const [ackError, setAckError] = useState('');
+  const [alarmSubTab, setAlarmSubTab] = useState<'active' | 'acknowledged' | 'all'>('active');
+  const [alarmHistoryPage, setAlarmHistoryPage] = useState(1);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -1014,6 +1021,12 @@ export default function ObjectDetailPage() {
     queryFn: () => getActiveAlarms(id!),
     enabled: !!id && tab === 'alarms',
     refetchInterval: 60_000,
+  });
+
+  const { data: alarmHistory, isLoading: loadingAlarmHistory } = useQuery({
+    queryKey: ['alarms-history-obj', id, alarmSubTab, alarmHistoryPage],
+    queryFn: () => listAlarmHistory({ object_id: id, status: alarmSubTab, page: alarmHistoryPage, page_size: 30 }),
+    enabled: !!id && tab === 'alarms' && alarmSubTab !== 'active',
   });
 
   const { data: events, isLoading: loadingEvents } = useQuery({
@@ -1742,6 +1755,21 @@ export default function ObjectDetailPage() {
 
       {tab === 'alarms' && (
         <div className="alarms-tab">
+          {/* Sub-tabovi: Aktivni / Potvrđeni / Svi */}
+          <div className="alarm-status-tabs" style={{ marginBottom: 12 }}>
+            {(['active', 'acknowledged', 'all'] as const).map((st) => (
+              <button
+                key={st}
+                className={`alarm-status-tab${alarmSubTab === st ? ' active' : ''}`}
+                onClick={() => { setAlarmSubTab(st); setAlarmHistoryPage(1); }}
+              >
+                {st === 'active' ? <><AlertTriangle size={13} /> Aktivni</> :
+                 st === 'acknowledged' ? <><Check size={13} /> Potvrđeni</> :
+                 <><Clock size={13} /> Svi</>}
+              </button>
+            ))}
+          </div>
+
           {ackError && (
             <div className="error-msg" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               {ackError}
@@ -1750,75 +1778,179 @@ export default function ObjectDetailPage() {
               </button>
             </div>
           )}
-          {loadingAlarms ? (
-            <div className="page-spinner"><div className="spinner" /></div>
-          ) : (() => {
-            const latest = activeAlarms?.[0];
-            const activeKeys = latest
-              ? Object.keys(ALARM_LABELS).filter((k) => (latest as unknown as Record<string, number>)[k] > 0)
-              : [];
-            if (!latest || activeKeys.length === 0) {
+
+          {/* ── Aktivni ── */}
+          {alarmSubTab === 'active' && (
+            loadingAlarms ? (
+              <div className="page-spinner"><div className="spinner" /></div>
+            ) : (() => {
+              const latest = activeAlarms?.[0];
+              const activeKeys = latest
+                ? Object.keys(ALARM_LABELS).filter((k) => (latest as unknown as Record<string, number>)[k] > 0)
+                : [];
+              if (!latest || activeKeys.length === 0) {
+                return (
+                  <div className="alarm-ok card">
+                    <span className="badge badge-success" style={{ fontSize: 14, padding: '6px 16px' }}>OK — nema aktivnih alarma</span>
+                    {latest && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)' }}>
+                        Zadnja provjera: {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm')}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              const handleAck = async () => {
+                if (!id) return;
+                setAcking(true);
+                setAckError('');
+                try {
+                  await acknowledgeAlarm(id);
+                  qc.invalidateQueries({ queryKey: ['alarms-active', id] });
+                  qc.invalidateQueries({ queryKey: ['alarms-history-obj', id] });
+                  qc.invalidateQueries({ queryKey: ['object', id] });
+                  qc.invalidateQueries({ queryKey: ['region-summary'] });
+                } catch {
+                  setAckError('Greška pri potvrdi alarma. Pokušaj ponovo.');
+                } finally {
+                  setAcking(false);
+                }
+              };
               return (
-                <div className="alarm-ok card">
-                  <span className="badge badge-success" style={{ fontSize: 14, padding: '6px 16px' }}>OK — nema aktivnih alarma</span>
-                  {latest && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)' }}>
-                      Zadnja provjera: {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm')}
+                <div className="alarm-current card">
+                  <div className="alarm-current-header">
+                    <span className="badge badge-danger" style={{ fontSize: 13 }}>
+                      <AlertTriangle size={13} /> Aktivni alarmi
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+                      od {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm')}
+                    </span>
+                  </div>
+                  <div className="alarm-tags" style={{ marginTop: 12 }}>
+                    {activeKeys.map((k) => (
+                      <div key={k} className="alarm-item">
+                        <AlertTriangle size={14} className="alarm-item-icon" />
+                        <span>{ALARM_LABELS[k]}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {authUser?.role !== 'viewer' && (
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                      <button
+                        className="btn-secondary"
+                        onClick={handleAck}
+                        disabled={acking}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        {acking
+                          ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Potvrđuje...</>
+                          : <><Check size={13} /> Potvrdi alarm</>}
+                      </button>
                     </div>
                   )}
                 </div>
               );
-            }
-            const handleAck = async () => {
-              if (!id) return;
-              setAcking(true);
-              setAckError('');
-              try {
-                await acknowledgeAlarm(id);
-                qc.invalidateQueries({ queryKey: ['alarms-active', id] });
-                qc.invalidateQueries({ queryKey: ['object', id] });
-                qc.invalidateQueries({ queryKey: ['region-summary'] });
-              } catch {
-                setAckError('Greška pri potvrdi alarma. Pokušaj ponovo.');
-              } finally {
-                setAcking(false);
-              }
-            };
-            return (
-              <div className="alarm-current card">
-                <div className="alarm-current-header">
-                  <span className="badge badge-danger" style={{ fontSize: 13 }}>
-                    <AlertTriangle size={13} /> Aktivni alarmi
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-                    od {format(parseISO(latest.recorded_at), 'dd.MM.yyyy HH:mm')}
-                  </span>
+            })()
+          )}
+
+          {/* ── Potvrđeni / Svi — povjesnica ── */}
+          {alarmSubTab !== 'active' && (
+            loadingAlarmHistory ? (
+              <div className="page-spinner"><div className="spinner" /></div>
+            ) : !alarmHistory?.data.length ? (
+              <div className="no-data">
+                {alarmSubTab === 'acknowledged' ? 'Nema potvrđenih alarma' : 'Nema alarm zapisa'}
+              </div>
+            ) : (
+              <>
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Zabilježeno</th>
+                          <th>Alarmi</th>
+                          {alarmSubTab !== 'acknowledged' && <th>Status</th>}
+                          <th>Potvrdio</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {alarmHistory.data.map((item) => {
+                          const activeKeys = Object.keys(ALARM_LABELS).filter(
+                            (k) => (item as unknown as Record<string, number>)[k] > 0
+                          );
+                          return (
+                            <tr key={item.id}>
+                              <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+                                {format(parseISO(item.recorded_at), 'dd.MM.yyyy HH:mm')}
+                              </td>
+                              <td style={{ fontSize: 12 }}>
+                                {activeKeys.length > 0
+                                  ? activeKeys.map((k) => ALARM_LABELS[k]).join(', ')
+                                  : <span className="text-muted">—</span>}
+                              </td>
+                              {alarmSubTab !== 'acknowledged' && (
+                                <td>
+                                  {item.acknowledged_at
+                                    ? <span className="badge badge-neutral"><Check size={10} /> Potvrđen</span>
+                                    : <span className="badge badge-danger">Aktivan</span>}
+                                </td>
+                              )}
+                              <td style={{ fontSize: 12 }}>
+                                {item.acknowledged_at ? (
+                                  <span>
+                                    <strong>{item.acknowledged_by || '—'}</strong>
+                                    <br />
+                                    <span style={{ color: 'var(--text2)' }}>
+                                      {format(parseISO(item.acknowledged_at), 'dd.MM. HH:mm')}
+                                    </span>
+                                  </span>
+                                ) : <span className="text-muted">—</span>}
+                              </td>
+                              <td>
+                                {authUser?.role !== 'viewer' && (
+                                  <button
+                                    className="btn-danger"
+                                    style={{ padding: '3px 8px', fontSize: 12 }}
+                                    onClick={async () => {
+                                      try {
+                                        await deleteAlarm(item.id);
+                                        qc.invalidateQueries({ queryKey: ['alarms-history-obj', id] });
+                                        qc.invalidateQueries({ queryKey: ['alarms-active', id] });
+                                        qc.invalidateQueries({ queryKey: ['region-summary'] });
+                                      } catch { /* ignore */ }
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="alarm-tags" style={{ marginTop: 12 }}>
-                  {activeKeys.map((k) => (
-                    <div key={k} className="alarm-item">
-                      <AlertTriangle size={14} className="alarm-item-icon" />
-                      <span>{ALARM_LABELS[k]}</span>
-                    </div>
-                  ))}
-                </div>
-                {authUser?.role !== 'viewer' && (
-                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                    <button
-                      className="btn-secondary"
-                      onClick={handleAck}
-                      disabled={acking}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                    >
-                      {acking
-                        ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Potvrđuje...</>
-                        : <><Check size={13} /> Potvrdi alarm</>}
+                {alarmHistory.total_pages > 1 && (
+                  <div className="pagination" style={{ marginTop: 10 }}>
+                    <button className="btn-secondary" disabled={alarmHistoryPage <= 1}
+                      onClick={() => setAlarmHistoryPage((p) => p - 1)}>
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="page-info">
+                      {alarmHistoryPage} / {alarmHistory.total_pages}
+                    </span>
+                    <button className="btn-secondary" disabled={alarmHistoryPage >= alarmHistory.total_pages}
+                      onClick={() => setAlarmHistoryPage((p) => p + 1)}>
+                      <ChevronRight size={16} />
                     </button>
                   </div>
                 )}
-              </div>
-            );
-          })()}
+              </>
+            )
+          )}
         </div>
       )}
 
