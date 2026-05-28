@@ -266,12 +266,19 @@ pub fn parse_measurements_24h(payload: &DataloggerPayload, station_id: &str) -> 
 
 pub fn parse_event_logs(payload: &DataloggerPayload, station_id: &str) -> AppResult<Vec<EventLogInsert>> {
     let fm = field_map(&payload.head.fields);
-    payload.data.iter().map(|row| {
-        let recorded_at = row.get("time").and_then(parse_ts)
-            .ok_or_else(|| AppError::BadRequest("Missing timestamp in event log".into()))?;
+    let mut result = Vec::new();
+    for row in &payload.data {
+        let recorded_at = match row.get("time").and_then(parse_ts) {
+            Some(ts) => ts,
+            None => {
+                tracing::warn!(station=%station_id, "Event_log row missing/invalid timestamp — skipping");
+                continue;
+            }
+        };
         let log_level   = get_val(row, &fm, "Log_level").and_then(|v| as_i16(v)).unwrap_or(1);
         let log_message = get_val(row, &fm, "Log_message")
             .and_then(|v| v.as_str()).unwrap_or("").to_string();
-        Ok(EventLogInsert { object_id: None, station_id: station_id.to_string(), recorded_at, log_level, log_message })
-    }).collect()
+        result.push(EventLogInsert { object_id: None, station_id: station_id.to_string(), recorded_at, log_level, log_message });
+    }
+    Ok(result)
 }
