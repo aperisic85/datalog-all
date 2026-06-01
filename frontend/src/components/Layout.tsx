@@ -18,6 +18,7 @@ import {
   ClipboardList,
   KeyRound,
   Check,
+  Bell,
 } from 'lucide-react';
 
 function LighthouseIcon({ size = 24 }: { size?: number }) {
@@ -213,6 +214,10 @@ export default function Layout() {
               <NavLink to="/admin/users" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                 <Users size={16} />
                 Korisnici
+              </NavLink>
+              <NavLink to="/admin/notifications" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+                <Bell size={16} />
+                Obavijesti
               </NavLink>
               <NavLink to="/admin/audit" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                 <ClipboardList size={16} />

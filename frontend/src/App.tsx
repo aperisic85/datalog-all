@@ -9,6 +9,7 @@ import ObjectDetailPage from './pages/ObjectDetailPage';
 import AdminRegionsPage from './pages/AdminRegionsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminAuditPage from './pages/AdminAuditPage';
+import AdminNotificationsPage from './pages/AdminNotificationsPage';
 import MapPage from './pages/MapPage';
 import AlarmsPage from './pages/AlarmsPage';
 import ComparePage from './pages/ComparePage';
@@ -73,6 +74,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <AdminAuditPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/notifications"
+          element={
+            <RequireAdmin>
+              <AdminNotificationsPage />
             </RequireAdmin>
           }
         />

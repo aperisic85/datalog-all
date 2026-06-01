@@ -1,4 +1,5 @@
 pub mod domain;
+pub mod notify;
 pub mod parser;
 pub mod poller_handler;
 
@@ -45,6 +46,8 @@ pub async fn ingest_alarms(
         if rec.alarm_battery_voltage_flat    > 0 { warn!(station=%station_id, "ALARM: Baterija prazna!"); }
         if rec.alarm_lantern_night_light_off > 0 { warn!(station=%station_id, "ALARM: Fenjer ugašen noću!"); }
         if rec.alarm_station_out_of_radius   > 0 { warn!(station=%station_id, "ALARM: Stanica van radijusa!"); }
+        // Pošalji obavijesti (Telegram/Slack/webhook) za prijelaze stanja alarma
+        crate::notify::dispatch_for_alarm(&pool, rec).await;
     }
 
     Ok((StatusCode::CREATED, Json(IngestResponse { status: "ok", records_inserted: count, table: "alarms".into() })))
