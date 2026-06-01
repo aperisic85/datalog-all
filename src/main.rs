@@ -6,6 +6,7 @@ mod errors;
 mod handlers;
 mod middleware;
 mod models;
+mod notify;
 mod poller;
 mod weather;
 
@@ -151,6 +152,17 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/users/:uid/regions/:rid",     delete(handlers::domain::revoke_region_access))
         // Audit log (admin only)
         .route("/api/v1/admin/audit-log",             get(handlers::domain::get_audit_log))
+        // Obavještavanje (admin only)
+        .route("/api/v1/notifications/channels",          get(handlers::notify::list_channels))
+        .route("/api/v1/notifications/channels",          post(handlers::notify::create_channel))
+        .route("/api/v1/notifications/channels/:id",      patch(handlers::notify::update_channel))
+        .route("/api/v1/notifications/channels/:id",      delete(handlers::notify::delete_channel))
+        .route("/api/v1/notifications/channels/:id/test", post(handlers::notify::test_channel))
+        .route("/api/v1/notifications/rules",             get(handlers::notify::list_rules))
+        .route("/api/v1/notifications/rules",             post(handlers::notify::create_rule))
+        .route("/api/v1/notifications/rules/:id",         patch(handlers::notify::update_rule))
+        .route("/api/v1/notifications/rules/:id",         delete(handlers::notify::delete_rule))
+        .route("/api/v1/notifications/log",              get(handlers::notify::list_log))
         // Change password (any authenticated user)
         .route("/api/v1/auth/change-password",        post(handlers::domain::change_password))
         // Poller control

@@ -384,6 +384,51 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
+// ── Obavještavanje (notifikacije) ───────────────────────────────────────────
+
+export type NotificationKind = 'telegram' | 'webhook' | 'slack';
+
+export interface NotificationChannel {
+  id: string;
+  name: string;
+  kind: NotificationKind;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationRule {
+  id: string;
+  name: string;
+  channel_id: string;
+  region_id?: string | null;
+  min_severity: number;        // 1=Info, 2=Upozorenje, 3=Greška, 4=Kritično
+  notify_on_clear: boolean;
+  quiet_hours_start?: number | null;
+  quiet_hours_end?: number | null;
+  cooldown_minutes: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationLogEntry {
+  id: number;
+  channel_id?: string;
+  channel_name?: string;
+  object_id?: string;
+  object_name?: string;
+  alarm_type?: string;
+  severity?: number;
+  event: string;               // raised | cleared | test
+  status: string;              // sent | failed
+  error?: string;
+  message?: string;
+  created_at: string;
+}
+
 /**
  * Predikcija kvara baterije — linearni trend nad satnim mjerenjima napona.
  * Vraćen od GET /api/v1/objects/:id/battery/prediction

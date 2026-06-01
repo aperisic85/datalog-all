@@ -20,6 +20,9 @@ import type {
   WeatherResponse,
   SolarEfficiency,
   AuditLogEntry,
+  NotificationChannel,
+  NotificationRule,
+  NotificationLogEntry,
 } from '../types';
 
 // Auth
@@ -188,3 +191,65 @@ export const listAuditLog = (params?: AuditLogQueryParams) =>
 // Change password (any authenticated user)
 export const changePassword = (data: { current_password: string; new_password: string }) =>
   api.post('/api/v1/auth/change-password', data);
+
+// ── Obavještavanje (admin only) ─────────────────────────────────────────────
+
+// Kanali
+export const listNotificationChannels = () =>
+  api.get<NotificationChannel[]>('/api/v1/notifications/channels').then((r) => r.data);
+
+export const createNotificationChannel = (data: {
+  name: string;
+  kind: string;
+  config: Record<string, unknown>;
+  enabled?: boolean;
+}) => api.post<NotificationChannel>('/api/v1/notifications/channels', data).then((r) => r.data);
+
+export const updateNotificationChannel = (id: string, data: {
+  name?: string;
+  config?: Record<string, unknown>;
+  enabled?: boolean;
+}) => api.patch<NotificationChannel>(`/api/v1/notifications/channels/${id}`, data).then((r) => r.data);
+
+export const deleteNotificationChannel = (id: string) =>
+  api.delete(`/api/v1/notifications/channels/${id}`);
+
+export const testNotificationChannel = (id: string) =>
+  api.post<{ status: string; error?: string }>(`/api/v1/notifications/channels/${id}/test`)
+    .then((r) => r.data);
+
+// Pravila
+export const listNotificationRules = () =>
+  api.get<NotificationRule[]>('/api/v1/notifications/rules').then((r) => r.data);
+
+export const createNotificationRule = (data: {
+  name: string;
+  channel_id: string;
+  region_id?: string | null;
+  min_severity?: number;
+  notify_on_clear?: boolean;
+  quiet_hours_start?: number | null;
+  quiet_hours_end?: number | null;
+  cooldown_minutes?: number;
+  enabled?: boolean;
+}) => api.post<NotificationRule>('/api/v1/notifications/rules', data).then((r) => r.data);
+
+export const updateNotificationRule = (id: string, data: {
+  name?: string;
+  channel_id?: string;
+  region_id?: string | null;
+  clear_region?: boolean;
+  min_severity?: number;
+  notify_on_clear?: boolean;
+  quiet_hours_start?: number | null;
+  quiet_hours_end?: number | null;
+  cooldown_minutes?: number;
+  enabled?: boolean;
+}) => api.patch<NotificationRule>(`/api/v1/notifications/rules/${id}`, data).then((r) => r.data);
+
+export const deleteNotificationRule = (id: string) =>
+  api.delete(`/api/v1/notifications/rules/${id}`);
+
+// Log
+export const listNotificationLog = (params?: { page?: number; page_size?: number }) =>
+  api.get<Page<NotificationLogEntry>>('/api/v1/notifications/log', { params }).then((r) => r.data);

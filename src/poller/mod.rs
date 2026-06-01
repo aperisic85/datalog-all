@@ -96,7 +96,10 @@ pub async fn poll_one_table(
 
     if tl.contains("alarm") {
         let recs = parse_alarms(&payload, station_id)?;
-        for r in &recs { db::insert_alarm(pool, r).await?; }
+        for r in &recs {
+            db::insert_alarm(pool, r).await?;
+            crate::notify::dispatch_for_alarm(pool, r).await;
+        }
     } else if tl.contains("10min") {
         let recs = parse_measurements_10min(&payload, station_id)?;
         for r in &recs { db::insert_measurement_10min(pool, r).await?; }

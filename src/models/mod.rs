@@ -1,4 +1,5 @@
 pub mod domain;
+pub mod notify;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Campbell CR300 push payload format
