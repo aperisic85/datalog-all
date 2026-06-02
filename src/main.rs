@@ -8,6 +8,7 @@ mod middleware;
 mod models;
 mod notify;
 mod poller;
+mod telegram;
 mod weather;
 
 use std::sync::Arc;
@@ -81,6 +82,9 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Starting {} poller(s)...", all_configs.len());
         poller::start_pollers(all_configs, pool.clone(), poller_status.clone());
     }
+
+    // ── Telegram bot (dvosmjerna komunikacija — upiti) ──────────────────────
+    telegram::start_bot(pool.clone());
 
     // ── CORS ──────────────────────────────────────────────────────────────
     let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);

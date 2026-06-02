@@ -226,3 +226,65 @@ pub async fn resolve_object(pool: &PgPool, station_id: &str)
         "SELECT id, name, region_id FROM objects WHERE station_id = $1")
         .bind(station_id).fetch_optional(pool).await?)
 }
+
+// ── Upiti za Telegram bota (dvosmjerna komunikacija) ──────────────────────────
+
+/// Chat ID-evi koji smiju slati upite botu = svi omogućeni Telegram kanali.
+pub async fn bot_authorized_chat_ids(pool: &PgPool) -> AppResult<Vec<String>> {
+    let rows = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT config->>'chat_id' FROM notification_channels
+         WHERE kind = 'telegram' AND enabled = TRUE")
+        .fetch_all(pool).await?;
+    Ok(rows.into_iter().flatten().collect())
+}
+
+/// Sažetak po regijama: (naziv, ukupno objekata, u alarmu).
+pub async fn bot_region_status(pool: &PgPool) -> AppResult<Vec<(String, i64, i64)>> {
+    Ok(sqlx::query_as::<_, (String, i64, i64)>(
+        "SELECT r.name,
+                COUNT(o.id) AS total,
+                COUNT(o.id) FILTER (WHERE o.alarm_active) AS in_alarm
+         FROM regions r
+         LEFT JOIN objects o ON o.region_id = r.id AND o.is_active
+         WHERE r.is_active
+         GROUP BY r.name
+         ORDER BY r.name")
+        .fetch_all(pool).await?)
+}
+
+/// Trenutno aktivni alarmi: (objekt, regija, najgori nivo, sažetak).
+pub async fn bot_active_alarms(pool: &PgPool)
+    -> AppResult<Vec<(String, String, Option<i16>, Option<String>)>>
+{
+    Ok(sqlx::query_as::<_, (String, String, Option<i16>, Option<String>)>(
+        "SELECT o.name, r.name, o.alarm_worst_level, o.alarm_summary
+         FROM objects o
+         JOIN regions r ON r.id = o.region_id
+         WHERE o.alarm_active = TRUE
+         ORDER BY o.alarm_worst_level DESC NULLS LAST, o.name
+         LIMIT 50")
+        .fetch_all(pool).await?)
+}
+
+/// Stanje pojedinog objekta po (djelomičnom) imenu.
+/// Vraća: (ime, regija, alarm_active, najgori_nivo, sažetak, broj_alarma,
+///         napon_baterije, svjetlo_aktivno, vrijeme_zadnjeg_mjerenja).
+#[allow(clippy::type_complexity)]
+pub async fn bot_find_object(pool: &PgPool, query: &str)
+    -> AppResult<Option<(String, String, bool, Option<i16>, Option<String>, i16,
+                         Option<f32>, Option<f32>, Option<DateTime<Utc>>)>>
+{
+    Ok(sqlx::query_as::<_, (String, String, bool, Option<i16>, Option<String>, i16,
+                            Option<f32>, Option<f32>, Option<DateTime<Utc>>)>(
+        "SELECT o.name, r.name, o.alarm_active, o.alarm_worst_level, o.alarm_summary,
+                o.alarm_count, lm.battery_voltage_avg, lm.lantern_light_active_avg, lm.recorded_at
+         FROM objects o
+         JOIN regions r ON r.id = o.region_id
+         LEFT JOIN v_latest_measurements lm ON lm.object_id = o.id
+         WHERE o.name ILIKE '%' || $1 || '%' OR o.short_name ILIKE '%' || $1 || '%'
+         ORDER BY (o.name ILIKE $1) DESC, o.name
+         LIMIT 1")
+        .bind(query)
+        .fetch_optional(pool).await?)
+}
+
