@@ -22,7 +22,7 @@ use crate::notify::severity_label;
 
 pub fn start_bot(pool: PgPool) {
     let token = match std::env::var("TELEGRAM_BOT_TOKEN") {
-        Ok(t) if !t.trim().is_empty() => t,
+        Ok(t) if !t.trim().is_empty() => t.trim().to_string(),
         _ => {
             tracing::info!("TELEGRAM_BOT_TOKEN nije postavljen — Telegram bot (upiti) onemogućen");
             return;
@@ -37,19 +37,43 @@ async fn run(pool: PgPool, token: String) {
         Err(e) => { tracing::error!(error = %e, "Telegram bot: ne mogu kreirati HTTP klijent"); return; }
     };
 
+    // Provjeri token
+    match get_me(&client, &token).await {
+        Ok(name) => tracing::info!(bot = %name, "Telegram bot: token ispravan"),
+        Err(e) => {
+            tracing::error!(error = %e, "Telegram bot: neispravan TELEGRAM_BOT_TOKEN — bot se gasi");
+            return;
+        }
+    }
+
+    // Obriši eventualni webhook (webhook blokira getUpdates → tišina)
+    match delete_webhook(&client, &token).await {
+        Ok(true)  => tracing::info!("Telegram bot: postojeći webhook obrisan (sad koristim long-polling)"),
+        Ok(false) => {}
+        Err(e)    => tracing::warn!(error = %e, "Telegram bot: deleteWebhook nije uspio"),
+    }
+
     tracing::info!("Telegram bot (dvosmjerna komunikacija) pokrenut");
 
-    // Ignoriraj poruke poslane prije pokretanja (backlog nakon restarta)
-    let start_ts = chrono::Utc::now().timestamp();
+    // Preskoči backlog (poruke poslane prije pokretanja) preko offseta —
+    // bez oslanjanja na server-uru. offset=-1 vraća samo zadnji update.
     let mut offset: i64 = 0;
+    if let Ok(updates) = get_updates(&client, &token, -1, 0).await {
+        if let Some(last) = updates.last()
+            .and_then(|u| u.get("update_id")).and_then(|v| v.as_i64())
+        {
+            offset = last + 1;
+            tracing::info!(skipped_to = offset, "Telegram bot: preskočen backlog poruka");
+        }
+    }
 
     loop {
-        match get_updates(&client, &token, offset).await {
+        match get_updates(&client, &token, offset, 30).await {
             Ok(updates) => {
                 for upd in updates {
                     let update_id = upd.get("update_id").and_then(|v| v.as_i64()).unwrap_or(0);
                     if update_id >= offset { offset = update_id + 1; }
-                    if let Err(e) = handle_update(&pool, &client, &token, &upd, start_ts).await {
+                    if let Err(e) = handle_update(&pool, &client, &token, &upd).await {
                         tracing::warn!(error = %e, "Telegram bot: greška pri obradi poruke");
                     }
                 }
@@ -62,10 +86,34 @@ async fn run(pool: PgPool, token: String) {
     }
 }
 
-async fn get_updates(client: &reqwest::Client, token: &str, offset: i64) -> anyhow::Result<Vec<Value>> {
+async fn get_me(client: &reqwest::Client, token: &str) -> anyhow::Result<String> {
+    let url = format!("https://api.telegram.org/bot{}/getMe", token);
+    let body: Value = client.get(&url).send().await?.json().await?;
+    if body.get("ok").and_then(|v| v.as_bool()) != Some(true) {
+        anyhow::bail!("getMe odgovor: {}", body);
+    }
+    Ok(body.pointer("/result/username").and_then(|v| v.as_str()).unwrap_or("?").to_string())
+}
+
+async fn delete_webhook(client: &reqwest::Client, token: &str) -> anyhow::Result<bool> {
+    // Prvo provjeri je li webhook uopće postavljen
+    let info_url = format!("https://api.telegram.org/bot{}/getWebhookInfo", token);
+    let info: Value = client.get(&info_url).send().await?.json().await?;
+    let has_webhook = info.pointer("/result/url")
+        .and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false);
+    if !has_webhook { return Ok(false); }
+
+    let url = format!("https://api.telegram.org/bot{}/deleteWebhook", token);
+    client.get(&url).send().await?;
+    Ok(true)
+}
+
+async fn get_updates(client: &reqwest::Client, token: &str, offset: i64, timeout: i64)
+    -> anyhow::Result<Vec<Value>>
+{
     let url = format!("https://api.telegram.org/bot{}/getUpdates", token);
     let resp = client.get(&url)
-        .query(&[("offset", offset.to_string()), ("timeout", "30".to_string())])
+        .query(&[("offset", offset.to_string()), ("timeout", timeout.to_string())])
         .send().await?;
     let body: Value = resp.json().await?;
     if body.get("ok").and_then(|v| v.as_bool()) != Some(true) {
@@ -75,13 +123,9 @@ async fn get_updates(client: &reqwest::Client, token: &str, offset: i64) -> anyh
 }
 
 async fn handle_update(
-    pool: &PgPool, client: &reqwest::Client, token: &str, upd: &Value, start_ts: i64,
+    pool: &PgPool, client: &reqwest::Client, token: &str, upd: &Value,
 ) -> anyhow::Result<()> {
     let msg = match upd.get("message") { Some(m) => m, None => return Ok(()) };
-
-    // Preskoči stare poruke (otprije pokretanja servisa)
-    let date = msg.get("date").and_then(|v| v.as_i64()).unwrap_or(0);
-    if date < start_ts { return Ok(()); }
 
     let text = msg.get("text").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
     if text.is_empty() { return Ok(()); }
@@ -91,9 +135,12 @@ async fn handle_update(
         None => return Ok(()),
     };
 
+    tracing::info!(chat_id = %chat_id, cmd = %text, "Telegram bot: primljena komanda");
+
     // Autorizacija — samo registrirani Telegram kanali
     let authorized = ndb::bot_authorized_chat_ids(pool).await.unwrap_or_default();
     if !authorized.iter().any(|c| c == &chat_id) {
+        tracing::info!(chat_id = %chat_id, "Telegram bot: neovlašten chat — odbijeno");
         let reply = format!(
             "⛔ Nemate pristup ovom botu.\nVaš chat ID: {}\nZatražite od administratora da vas doda kao Telegram kanal za obavijesti.",
             chat_id
