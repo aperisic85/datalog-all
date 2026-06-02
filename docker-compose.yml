@@ -39,6 +39,10 @@ services:
       DATABASE_URL: postgres://datalogger:datalogger@postgres:5432/datalogger
       PORT: 8095
       RUST_LOG: datalogger_backend=info,tower_http=info,sqlx=warn
+      # Telegram bot za upite (dvosmjerna komunikacija).
+      # Postavi TELEGRAM_BOT_TOKEN u .env datoteci pored docker-compose.yml.
+      # Ako je prazno, bot za upite je onemogućen (obavijesti i dalje rade).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     ports:
       # Port 8095 matches the URL in config.CR300:
       # http://sdn.plovput.hr:8095/api/v1/datalogger/...
