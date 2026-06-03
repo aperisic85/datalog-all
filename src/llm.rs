@@ -27,6 +27,9 @@ pub struct BotIntent {
     pub action: String,
     /// Ime (ili dio imena) objekta — relevantno samo za action = "objekt".
     pub object: Option<String>,
+    /// O čemu se konkretno pita kod action = "objekt":
+    /// "svjetlo" | "baterija" | "alarm" | "mjerenje" | "sve".
+    pub focus: String,
 }
 
 /// Je li NL sloj omogućen (postoji li API ključ).
@@ -53,22 +56,31 @@ njegovo ime. NE izmišljaj i NE navodi nikakve mjerne vrijednosti — podatke
 dohvaća sustav iz baze.
 
 Odgovori ISKLJUČIVO jednim JSON objektom (bez markdowna, bez objašnjenja):
-{\"action\": \"<akcija>\", \"object\": \"<ime objekta ili null>\"}
+{\"action\": \"<akcija>\", \"object\": \"<ime objekta ili null>\", \"focus\": \"<fokus>\"}
 
 Dozvoljene akcije:
 - \"status\"   — opći pregled stanja, koliko je objekata u alarmu, sažetak po regijama.
 - \"alarmi\"   — popis trenutno aktivnih alarma.
-- \"objekt\"   — pitanje o JEDNOM objektu (napon baterije, je li u alarmu,
-                svjetlo, zadnje mjerenje itd.). U \"object\" stavi ime objekta.
+- \"objekt\"   — pitanje o JEDNOM objektu. U \"object\" stavi ime objekta.
 - \"pomoc\"    — korisnik traži pomoć ili popis mogućnosti.
 - \"nepoznato\"— ne možeš razaznati namjeru.
 
+Polje \"focus\" (na što se pitanje odnosi kod action=objekt; inače \"sve\"):
+- \"svjetlo\"  — radi li/je li upaljeno svjetlo, lanterna.
+- \"baterija\" — napon/stanje baterije.
+- \"alarm\"    — je li objekt u alarmu, kakav alarm.
+- \"mjerenje\" — kad je zadnje mjerenje, općenito stanje.
+- \"sve\"      — opće pitanje o objektu ili nije jasno.
+
 Primjeri:
-\"koliki je sad napon baterije na objektu Barbarinac?\" -> {\"action\":\"objekt\",\"object\":\"Barbarinac\"}
-\"je li Galija u alarmu\" -> {\"action\":\"objekt\",\"object\":\"Galija\"}
-\"daj mi stanje sustava\" -> {\"action\":\"status\",\"object\":null}
-\"koji su aktivni alarmi\" -> {\"action\":\"alarmi\",\"object\":null}
-\"što sve znaš\" -> {\"action\":\"pomoc\",\"object\":null}";
+\"koliki je sad napon baterije na objektu Barbarinac?\" -> {\"action\":\"objekt\",\"object\":\"Barbarinac\",\"focus\":\"baterija\"}
+\"radi li svjetlo na objektu Umag\" -> {\"action\":\"objekt\",\"object\":\"Umag\",\"focus\":\"svjetlo\"}
+\"je li Galija u alarmu\" -> {\"action\":\"objekt\",\"object\":\"Galija\",\"focus\":\"alarm\"}
+\"kad je zadnje mjerenje na Drveniku\" -> {\"action\":\"objekt\",\"object\":\"Drvenik\",\"focus\":\"mjerenje\"}
+\"reci mi sve o objektu Galija\" -> {\"action\":\"objekt\",\"object\":\"Galija\",\"focus\":\"sve\"}
+\"daj mi stanje sustava\" -> {\"action\":\"status\",\"object\":null,\"focus\":\"sve\"}
+\"koji su aktivni alarmi\" -> {\"action\":\"alarmi\",\"object\":null,\"focus\":\"sve\"}
+\"što sve znaš\" -> {\"action\":\"pomoc\",\"object\":null,\"focus\":\"sve\"}";
 
 /// Pretvori slobodan tekst u `BotIntent`. Vraća Err kod mrežne/API greške.
 pub async fn interpret(client: &reqwest::Client, text: &str) -> anyhow::Result<BotIntent> {
@@ -133,7 +145,70 @@ fn parse_intent(content: &str) -> anyhow::Result<BotIntent> {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("null"));
 
-    Ok(BotIntent { action, object })
+    let focus = v.get("focus").and_then(|f| f.as_str()).unwrap_or("sve")
+        .trim().to_lowercase();
+    let focus = match focus.as_str() {
+        "svjetlo" | "baterija" | "alarm" | "mjerenje" | "sve" => focus,
+        "light" => "svjetlo".to_string(),
+        "battery" => "baterija".to_string(),
+        "measurement" => "mjerenje".to_string(),
+        _ => "sve".to_string(),
+    };
+
+    Ok(BotIntent { action, object, focus })
+}
+
+const PHRASE_SYSTEM: &str = "\
+Ti si asistent nadzornog sustava beacona. Na temelju zadanih ČINJENICA sastavi
+JEDAN kratak, prirodan odgovor na hrvatskom jeziku na korisnikovo pitanje.
+
+Stroga pravila:
+- Koristi ISKLJUČIVO vrijednosti iz danih činjenica.
+- NE izmišljaj i NE mijenjaj brojeve; prepiši ih točno onako kako su zadani.
+- Ne dodaji informacije kojih nema u činjenicama.
+- Odgovori izravno na pitanje (npr. na „radi li…\" počni s „Radi…\" ili „Ne radi…\").
+- Bez markdowna, bez uvoda i bez objašnjenja — samo jedna rečenica.";
+
+/// Drugi (opcionalni) LLM poziv: od gotovih, autoritativnih činjenica iz baze
+/// sastavi prirodnu rečenicu kao odgovor na korisnikovo pitanje. Model NE dobiva
+/// pristup ničemu osim već-složenih činjenica, pa ne može izmisliti vrijednosti.
+pub async fn phrase_answer(client: &reqwest::Client, question: &str, facts: &str)
+    -> anyhow::Result<String>
+{
+    let (key, url, model) = config();
+    if key.is_empty() {
+        anyhow::bail!("LLM_API_KEY nije postavljen");
+    }
+
+    let payload = json!({
+        "model": model,
+        "temperature": 0.2,
+        "messages": [
+            { "role": "system", "content": PHRASE_SYSTEM },
+            { "role": "user",
+              "content": format!("Pitanje korisnika:\n{}\n\nČinjenice:\n{}", question, facts) }
+        ]
+    });
+
+    let resp = client.post(&url)
+        .header("Authorization", format!("Bearer {}", key))
+        .json(&payload)
+        .send().await?;
+
+    let status = resp.status();
+    let body: Value = resp.json().await?;
+    if !status.is_success() {
+        anyhow::bail!("LLM API greška ({}): {}", status, body);
+    }
+
+    let content = body
+        .pointer("/choices/0/message/content")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("LLM odgovor bez sadržaja: {}", body))?;
+
+    Ok(content)
 }
 
 /// Vrati prvi izbalansirani `{ ... }` blok iz teksta.
@@ -193,6 +268,20 @@ mod tests {
     fn maps_synonyms() {
         let i = parse_intent(r#"{"action":"object","object":"Galija"}"#).unwrap();
         assert_eq!(i.action, "objekt");
+    }
+
+    #[test]
+    fn parses_focus() {
+        let i = parse_intent(r#"{"action":"objekt","object":"Umag","focus":"svjetlo"}"#).unwrap();
+        assert_eq!(i.focus, "svjetlo");
+    }
+
+    #[test]
+    fn focus_defaults_to_sve() {
+        let i = parse_intent(r#"{"action":"objekt","object":"Umag"}"#).unwrap();
+        assert_eq!(i.focus, "sve");
+        let i2 = parse_intent(r#"{"action":"objekt","object":"Umag","focus":"bla"}"#).unwrap();
+        assert_eq!(i2.focus, "sve");
     }
 
     #[test]
