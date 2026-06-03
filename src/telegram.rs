@@ -19,11 +19,17 @@
 
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 
 use crate::db::notify as ndb;
 use crate::notify::severity_label;
+
+/// Red koji vrati `bot_find_object`: (ime, regija, alarm_active, najgori_nivo,
+/// sažetak, broj_alarma, napon_baterije, svjetlo_aktivno, vrijeme_zadnjeg).
+type ObjectRow = (String, String, bool, Option<i16>, Option<String>, i16,
+                  Option<f32>, Option<f32>, Option<DateTime<Utc>>);
 
 pub fn start_bot(pool: PgPool) {
     let token = match std::env::var("TELEGRAM_BOT_TOKEN") {
@@ -217,14 +223,17 @@ async fn handle_natural_language(pool: &PgPool, client: &reqwest::Client, text: 
         }
     };
 
-    tracing::info!(action = %intent.action, object = ?intent.object, "Telegram bot: LLM namjera");
+    tracing::info!(
+        action = %intent.action, object = ?intent.object, focus = %intent.focus,
+        "Telegram bot: LLM namjera"
+    );
 
     match intent.action.as_str() {
         "status" => cmd_status(pool).await,
         "alarmi" => cmd_alarms(pool).await,
         "pomoc"  => help_text(),
         "objekt" => match intent.object.as_deref() {
-            Some(name) => cmd_object(pool, name).await,
+            Some(name) => answer_object_nl(pool, client, text, name, &intent.focus).await,
             None => "Na koji objekt mislite? Npr. „napon baterije na objektu Galija“.".to_string(),
         },
         _ => format!(
@@ -288,22 +297,99 @@ async fn cmd_alarms(pool: &PgPool) -> String {
 
 async fn cmd_object(pool: &PgPool, query: &str) -> String {
     match ndb::bot_find_object(pool, query).await {
-        Ok(Some((name, region, active, lvl, summary, count, volt, light, ts))) => {
-            let mut out = format!("📍 {} ({})\n\n", name, region);
-            out.push_str(&format!("Stanje: {}\n", if active { "🔴 ALARM" } else { "🟢 OK" }));
-            if active {
-                let l = match lvl { Some(v) => severity_label(v), None => "Alarm" };
-                out.push_str(&format!("Nivo: {} ({} aktivnih)\n", l, count));
-                if let Some(sm) = summary { out.push_str(&format!("Opis: {}\n", sm)); }
-            }
-            if let Some(v) = volt { out.push_str(&format!("Baterija: {:.2} V\n", v)); }
-            if let Some(la) = light { out.push_str(&format!("Svjetlo aktivno: {:.0} %\n", la * 100.0)); }
-            if let Some(t) = ts { out.push_str(&format!("Zadnje mjerenje: {}\n", t.format("%d.%m.%Y %H:%M UTC"))); }
-            out
-        }
+        Ok(Some(row)) => format_object_card(&row),
         Ok(None) => format!("Objekt \"{}\" nije pronađen.", query),
         Err(e) => { tracing::warn!(error = %e, "bot /objekt"); "Greška pri dohvaćanju objekta.".to_string() }
     }
+}
+
+/// Puna kartica objekta (deterministički format, koristi se za /objekt i za
+/// opća NL pitanja gdje korisnik traži „sve“).
+fn format_object_card(row: &ObjectRow) -> String {
+    let (name, region, active, lvl, summary, count, volt, light, ts) = row;
+    let mut out = format!("📍 {} ({})\n\n", name, region);
+    out.push_str(&format!("Stanje: {}\n", if *active { "🔴 ALARM" } else { "🟢 OK" }));
+    if *active {
+        let l = match lvl { Some(v) => severity_label(*v), None => "Alarm" };
+        out.push_str(&format!("Nivo: {} ({} aktivnih)\n", l, count));
+        if let Some(sm) = summary { out.push_str(&format!("Opis: {}\n", sm)); }
+    }
+    if let Some(v) = volt { out.push_str(&format!("Baterija: {:.2} V\n", v)); }
+    if let Some(la) = light { out.push_str(&format!("Svjetlo aktivno: {:.0} %\n", la * 100.0)); }
+    if let Some(t) = ts { out.push_str(&format!("Zadnje mjerenje: {}\n", t.format("%d.%m.%Y %H:%M UTC"))); }
+    out
+}
+
+/// NL odgovor o pojedinom objektu (hibrid): podatke uvijek vučemo iz baze,
+/// složimo točne činjenice prema fokusu, a LLM ih samo „uglača“ u prirodnu
+/// rečenicu. Ako 2. LLM poziv padne, vraćamo same (točne) činjenice.
+async fn answer_object_nl(
+    pool: &PgPool, client: &reqwest::Client, question: &str, query: &str, focus: &str,
+) -> String {
+    let row = match ndb::bot_find_object(pool, query).await {
+        Ok(Some(r)) => r,
+        Ok(None) => return format!("Objekt \"{}\" nije pronađen.", query),
+        Err(e) => {
+            tracing::warn!(error = %e, "bot nl objekt");
+            return "Greška pri dohvaćanju objekta.".to_string();
+        }
+    };
+
+    // Opće pitanje → puna kartica, bez dodatnog LLM poziva.
+    if focus == "sve" {
+        return format_object_card(&row);
+    }
+
+    let facts = build_object_facts(&row, focus);
+
+    match crate::llm::phrase_answer(client, question, &facts).await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(error = %e, "Telegram bot: phrase_answer pao — vraćam činjenice");
+            facts
+        }
+    }
+}
+
+/// Iz reda baze složi precizne, ljudski čitljive činjenice za zadani fokus.
+/// Ovo je „izvor istine“ koji LLM smije samo preformulirati, ne mijenjati.
+fn build_object_facts(row: &ObjectRow, focus: &str) -> String {
+    let (name, region, active, lvl, summary, count, volt, light, ts) = row;
+    let mut f = format!("objekt: {}\nregija: {}\n", name, region);
+    match focus {
+        "svjetlo" => match light {
+            Some(la) => {
+                let radi = *la > 0.0;
+                f.push_str(&format!(
+                    "svjetlo (lanterna): {} — aktivno {:.0}% vremena u zadnjem mjerenju\n",
+                    if radi { "radi/upaljeno" } else { "ne radi/ugašeno" }, la * 100.0));
+            }
+            None => f.push_str("svjetlo: nema podatka\n"),
+        },
+        "baterija" => match volt {
+            Some(v) => f.push_str(&format!("napon baterije: {:.2} V\n", v)),
+            None => f.push_str("napon baterije: nema podatka\n"),
+        },
+        "alarm" => {
+            if *active {
+                let l = match lvl { Some(v) => severity_label(*v), None => "Alarm" };
+                f.push_str(&format!("alarm: DA — nivo {}, broj aktivnih: {}\n", l, count));
+                if let Some(sm) = summary { f.push_str(&format!("opis alarma: {}\n", sm)); }
+            } else {
+                f.push_str("alarm: NE (objekt nije u alarmu)\n");
+            }
+        }
+        "mjerenje" => {
+            match ts {
+                Some(t) => f.push_str(&format!("zadnje mjerenje: {}\n", t.format("%d.%m.%Y %H:%M UTC"))),
+                None => f.push_str("zadnje mjerenje: nema podatka\n"),
+            }
+            if let Some(v) = volt { f.push_str(&format!("napon baterije: {:.2} V\n", v)); }
+            f.push_str(&format!("alarm: {}\n", if *active { "DA" } else { "NE" }));
+        }
+        _ => {}
+    }
+    f
 }
 
 // ── Slanje ────────────────────────────────────────────────────────────────────

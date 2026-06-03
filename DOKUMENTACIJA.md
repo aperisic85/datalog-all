@@ -295,9 +295,20 @@ tekst** te ga preko besplatnog LLM-a pretvori u odgovarajuću naredbu. Primjeri:
 - „daj mi pregled stanja“ → `/status`
 - „koji su aktivni alarmi?“ → `/alarmi`
 
-**Važno:** LLM služi isključivo za *prepoznavanje namjere* (koju naredbu pokrenuti
-i o kojem se objektu radi). Sve stvarne vrijednosti (napon baterije, alarmi,
-mjerenja) dohvaćaju se iz baze podataka, pa nema rizika od izmišljenih podataka.
+**Prirodni odgovori (hibrid):** za pitanja o pojedinom objektu bot vraća kratku,
+prirodnu rečenicu umjesto fiksne kartice. Npr. „radi li svjetlo na objektu Umag?“
+→ „Ne radi svjetlo na objektu Umag (0%).“ Radi u dva koraka:
+1. LLM prepozna namjeru, objekt i *fokus* pitanja (`svjetlo` / `baterija` /
+   `alarm` / `mjerenje` / `sve`);
+2. backend iz baze složi **točne činjenice** za taj fokus, a LLM ih samo
+   preformulira u rečenicu — ne smije mijenjati brojeve.
+
+Za opća pitanja („reci mi sve o objektu X“) i dalje se vraća puna kartica.
+Ako drugi LLM poziv padne, bot vraća točne činjenice u jednostavnom obliku.
+
+**Važno:** LLM služi isključivo za *prepoznavanje namjere* i *formulaciju*. Sve
+stvarne vrijednosti (napon baterije, alarmi, mjerenja) dohvaćaju se iz baze
+podataka, pa nema rizika od izmišljenih podataka.
 
 Radi s bilo kojim OpenAI-kompatibilnim endpointom koji ima besplatni tier
 (default: **Groq**, `llama-3.3-70b-versatile`). Konfiguracija preko
