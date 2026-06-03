@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons.svg', 'pwa-192.svg', 'pwa-512.svg'],
+      includeAssets: ['favicon.svg', 'icons.svg', 'pwa-192.png', 'pwa-512.png'],
       manifest: {
         name: 'Beacon — Nadzor Stanica',
         short_name: 'Beacon',
@@ -21,15 +21,15 @@ export default defineConfig({
         lang: 'bs',
         icons: [
           {
-            src: '/pwa-192.svg',
+            src: '/pwa-192.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/pwa-512.svg',
+            src: '/pwa-512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any maskable',
           },
         ],
@@ -39,14 +39,14 @@ export default defineConfig({
             short_name: 'Alarmi',
             description: 'Pregled aktivnih alarma',
             url: '/alarms?status=active',
-            icons: [{ src: '/pwa-192.svg', sizes: '192x192' }],
+            icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
           },
           {
             name: 'Karta',
             short_name: 'Karta',
             description: 'Karta svih stanica',
             url: '/map',
-            icons: [{ src: '/pwa-192.svg', sizes: '192x192' }],
+            icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
           },
         ],
       },
