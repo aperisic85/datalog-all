@@ -280,11 +280,11 @@ pub async fn predict_battery(
 ) -> AppResult<Json<BatteryPrediction>> {
     check_object_access(&pool, &claims, id).await?;
 
-    // Dohvati zadnjih 72 satna mjerenja (= do 3 dana podataka)
-    let history = db::get_battery_voltage_history(&pool, id, 72).await?;
+    // Dnevni minimum napona (noćni low) zadnjih 30 dana — uklanja dnevni ciklus
+    let history = db::get_daily_min_voltage(&pool, id, 30).await?;
 
-    // Zadnji izmjereni napon (najnoviji uzorak)
-    let current_voltage = history.last().map(|(_, v)| *v);
+    // Trenutni napon = najnoviji stvarni izmjereni napon (za prikaz)
+    let current_voltage = db::get_latest_battery_voltage(&pool, id).await?.map(|(_, v)| v);
 
     // Pretvori u VoltagePoint za regresijski modul
     let points: Vec<crate::battery_prediction::VoltagePoint> = history
