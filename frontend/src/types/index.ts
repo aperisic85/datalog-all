@@ -370,6 +370,29 @@ export interface BatteryCapacityEstimate {
   status_label: string;
 }
 
+/**
+ * Procjena zdravlja baterije iz ponašanja napona (danju vs noću).
+ * Vraćen od GET /api/v1/objects/:id/battery/health
+ */
+export interface BatteryHealthAssessment {
+  object_id: string;
+  computed_at: string;
+  /** "good" | "degraded" | "replace" | "insufficient_data" */
+  status: string;
+  status_label: string;
+  sample_days: number;
+  /** Broj napunjenih (sunčanih) dana korištenih za zaključak */
+  charged_days: number;
+  /** Medijan noćnog minimuma na napunjenim danima (V) */
+  median_charged_night_min?: number;
+  /** Medijan dnevnog raspona napona na napunjenim danima (V) */
+  median_daily_swing?: number;
+  /** Najniži noćni minimum na napunjenim danima (V) */
+  worst_charged_night_min?: number;
+  /** Detektirani napon sustava (12 ili 24) */
+  system_voltage: number;
+}
+
 // ── Audit log ─────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {
