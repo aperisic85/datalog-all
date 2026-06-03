@@ -1862,6 +1862,7 @@ export default function ObjectDetailPage() {
               try {
                 await acknowledgeAlarm(id);
                 qc.invalidateQueries({ queryKey: ['alarms-active', id] });
+                qc.invalidateQueries({ queryKey: ['alarms-history'] });
                 qc.invalidateQueries({ queryKey: ['object', id] });
                 qc.invalidateQueries({ queryKey: ['region-summary'] });
               } catch {
