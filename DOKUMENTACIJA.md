@@ -282,7 +282,27 @@ Bot ne zahtijeva javni URL — koristi long-polling prema Telegram serverima. Od
 | `/status` | Sažetak po regijama: broj objekata, broj alarma |
 | `/alarmi` | Lista trenutno aktivnih alarma |
 | `/objekt <naziv>` | Detalji o pojedinoj stanici |
+| `/ai <pitanje>` | Eksplicitan upit prirodnim jezikom (vidi niže) |
 | `/pomoc` | Prikaz dostupnih naredbi |
+
+### Upiti prirodnim jezikom (AI)
+
+Ako je postavljena env varijabla `LLM_API_KEY`, bot uz naredbe prima i **slobodan
+tekst** te ga preko besplatnog LLM-a pretvori u odgovarajuću naredbu. Primjeri:
+
+- „koliki je sad napon baterije na objektu Barbarinac?“ → `/objekt Barbarinac`
+- „je li Galija u alarmu?“ → `/objekt Galija`
+- „daj mi pregled stanja“ → `/status`
+- „koji su aktivni alarmi?“ → `/alarmi`
+
+**Važno:** LLM služi isključivo za *prepoznavanje namjere* (koju naredbu pokrenuti
+i o kojem se objektu radi). Sve stvarne vrijednosti (napon baterije, alarmi,
+mjerenja) dohvaćaju se iz baze podataka, pa nema rizika od izmišljenih podataka.
+
+Radi s bilo kojim OpenAI-kompatibilnim endpointom koji ima besplatni tier
+(default: **Groq**, `llama-3.3-70b-versatile`). Konfiguracija preko
+`LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` (vidi `.env.example`). Ako ključ nije
+postavljen, bot radi kao i prije — samo s `/` naredbama.
 
 ---
 
