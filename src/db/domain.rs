@@ -545,7 +545,7 @@ pub async fn get_alarms(
 
 pub async fn get_active_alarms(pool: &PgPool, object_id: Uuid) -> AppResult<Vec<AlarmRecord>> {
     Ok(sqlx::query_as(
-        "SELECT * FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE
+        "SELECT * FROM alarms WHERE object_id = $1 AND any_alarm_active = TRUE AND acknowledged_at IS NULL
          ORDER BY recorded_at DESC LIMIT 50")
         .bind(object_id)
         .fetch_all(pool).await?)
