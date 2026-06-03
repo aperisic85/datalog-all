@@ -5,6 +5,7 @@ mod battery_prediction;
 mod db;
 mod errors;
 mod handlers;
+mod llm;
 mod middleware;
 mod models;
 mod notify;

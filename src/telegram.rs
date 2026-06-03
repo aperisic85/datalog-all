@@ -10,7 +10,12 @@
 //!   /status        — sažetak po regijama
 //!   /alarmi        — trenutno aktivni alarmi
 //!   /objekt <ime>  — stanje pojedinog objekta
+//!   /ai <pitanje>  — eksplicitan upit prirodnim jezikom
 //!   /pomoc         — popis komandi
+//!
+//! Uz to, ako je postavljen `LLM_API_KEY`, bot prima i slobodan tekst (bez "/")
+//! te ga preko besplatnog LLM-a (vidi `llm.rs`) pretvori u odgovarajuću komandu.
+//! Npr. „koliki je napon baterije na objektu Barbarinac?“ → /objekt Barbarinac.
 
 use std::time::Duration;
 
@@ -149,14 +154,19 @@ async fn handle_update(
         return Ok(());
     }
 
-    let reply = handle_command(pool, &text).await;
+    let reply = handle_command(pool, client, &text).await;
     send_message(client, token, &chat_id, &reply).await?;
     Ok(())
 }
 
 // ── Komande ───────────────────────────────────────────────────────────────────
 
-async fn handle_command(pool: &PgPool, text: &str) -> String {
+async fn handle_command(pool: &PgPool, client: &reqwest::Client, text: &str) -> String {
+    // Slobodan tekst (ne počinje s "/") → natural-language upit preko LLM-a.
+    if !text.starts_with('/') {
+        return handle_natural_language(pool, client, text).await;
+    }
+
     let mut parts = text.splitn(2, char::is_whitespace);
     let cmd_raw = parts.next().unwrap_or("");
     let arg = parts.next().unwrap_or("").trim();
@@ -174,16 +184,71 @@ async fn handle_command(pool: &PgPool, text: &str) -> String {
                 cmd_object(pool, arg).await
             }
         }
+        // Eksplicitni AI upit: /ai <pitanje> ili /pitaj <pitanje>
+        "/ai" | "/pitaj" | "/ask" => {
+            if arg.is_empty() {
+                "Koristite: /ai <pitanje>\nNpr. /ai koliki je napon baterije na objektu Barbarinac".to_string()
+            } else {
+                handle_natural_language(pool, client, arg).await
+            }
+        }
         _ => format!("Nepoznata komanda: {}\n\n{}", cmd_raw, help_text()),
     }
 }
 
+/// Obradi slobodan tekst: LLM-om ga pretvori u namjeru pa izvrši odgovarajuću
+/// komandu. Podaci se uvijek dohvaćaju iz baze — LLM samo usmjerava upit.
+async fn handle_natural_language(pool: &PgPool, client: &reqwest::Client, text: &str) -> String {
+    if !crate::llm::is_enabled() {
+        return format!(
+            "🤔 Razumijem samo komande (AI tumačenje upita nije uključeno).\n\n{}",
+            help_text()
+        );
+    }
+
+    let intent = match crate::llm::interpret(client, text).await {
+        Ok(i) => i,
+        Err(e) => {
+            tracing::warn!(error = %e, "Telegram bot: LLM tumačenje nije uspjelo");
+            return format!(
+                "⚠️ Trenutno ne mogu protumačiti upit. Pokušajte komandom.\n\n{}",
+                help_text()
+            );
+        }
+    };
+
+    tracing::info!(action = %intent.action, object = ?intent.object, "Telegram bot: LLM namjera");
+
+    match intent.action.as_str() {
+        "status" => cmd_status(pool).await,
+        "alarmi" => cmd_alarms(pool).await,
+        "pomoc"  => help_text(),
+        "objekt" => match intent.object.as_deref() {
+            Some(name) => cmd_object(pool, name).await,
+            None => "Na koji objekt mislite? Npr. „napon baterije na objektu Galija“.".to_string(),
+        },
+        _ => format!(
+            "🤔 Nisam siguran što tražite.\n\n{}",
+            help_text()
+        ),
+    }
+}
+
 fn help_text() -> String {
-    "🤖 Beacon nadzor — dostupne komande:\n\n\
-     /status — sažetak po regijama\n\
-     /alarmi — trenutno aktivni alarmi\n\
-     /objekt <ime> — stanje objekta (npr. /objekt Galija)\n\
-     /pomoc — ova poruka".to_string()
+    let mut t = String::from(
+        "🤖 Beacon nadzor — dostupne komande:\n\n\
+         /status — sažetak po regijama\n\
+         /alarmi — trenutno aktivni alarmi\n\
+         /objekt <ime> — stanje objekta (npr. /objekt Galija)\n\
+         /pomoc — ova poruka");
+    if crate::llm::is_enabled() {
+        t.push_str(
+            "\n\n💬 Možete pitati i običnim jezikom, npr.:\n\
+             • „koliki je napon baterije na objektu Barbarinac?“\n\
+             • „je li Galija u alarmu?“\n\
+             • „daj mi pregled stanja“");
+    }
+    t
 }
 
 async fn cmd_status(pool: &PgPool) -> String {
