@@ -46,6 +46,7 @@ function LighthouseIcon({ size = 24 }: { size?: number }) {
   );
 }
 import './Layout.css';
+import OfflineBanner from './OfflineBanner';
 
 // ── Change Password Modal ─────────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
@@ -250,6 +251,7 @@ export default function Layout() {
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
 
       <main className="content">
+        <OfflineBanner />
         <div className="mobile-topbar">
           <div className="mobile-logo">
             <LighthouseIcon size={18} />
