@@ -43,6 +43,12 @@ services:
       # Postavi TELEGRAM_BOT_TOKEN u .env datoteci pored docker-compose.yml.
       # Ako je prazno, bot za upite je onemogućen (obavijesti i dalje rade).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # AI tumačenje upita prirodnim jezikom (natural language → komanda).
+      # Postavi LLM_API_KEY u .env. Ako je prazno, bot razumije samo /naredbe.
+      # LLM_API_URL i LLM_MODEL imaju default (Groq); override po želji u .env.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
     ports:
       # Port 8095 matches the URL in config.CR300:
       # http://sdn.plovput.hr:8095/api/v1/datalogger/...
