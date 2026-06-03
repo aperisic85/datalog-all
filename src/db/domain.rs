@@ -435,6 +435,46 @@ pub async fn get_battery_voltage_history(
     Ok(rows)
 }
 
+/// Dnevni minimum napona baterije (noćni low) zadnjih `days` dana — uzlazno.
+/// Agregira iz measurements_10min i uklanja dnevni ciklus punjenja/pražnjenja,
+/// pa je trend smisleniji za procjenu zdravlja nego sirovi satni napon.
+pub async fn get_daily_min_voltage(
+    pool: &PgPool,
+    object_id: Uuid,
+    days: i64,
+) -> AppResult<Vec<(chrono::DateTime<chrono::Utc>, f32)>> {
+    let rows: Vec<(chrono::DateTime<chrono::Utc>, f32)> = sqlx::query_as(
+        "SELECT date_trunc('day', recorded_at) AS d,
+                MIN(battery_voltage_avg)::real AS v_min
+         FROM measurements_10min
+         WHERE object_id = $1
+           AND battery_voltage_avg IS NOT NULL
+           AND recorded_at >= NOW() - ($2::bigint * INTERVAL '1 day')
+         GROUP BY d
+         ORDER BY d ASC")
+        .bind(object_id)
+        .bind(days)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows)
+}
+
+/// Najnoviji stvarni izmjereni napon baterije i njegovo vrijeme.
+pub async fn get_latest_battery_voltage(
+    pool: &PgPool,
+    object_id: Uuid,
+) -> AppResult<Option<(chrono::DateTime<chrono::Utc>, f32)>> {
+    Ok(sqlx::query_as::<_, (chrono::DateTime<chrono::Utc>, f32)>(
+        "SELECT recorded_at, battery_voltage_avg
+         FROM measurements_10min
+         WHERE object_id = $1 AND battery_voltage_avg IS NOT NULL
+         ORDER BY recorded_at DESC
+         LIMIT 1")
+        .bind(object_id)
+        .fetch_optional(pool)
+        .await?)
+}
+
 // ================================================================
 // ALARMS
 // ================================================================

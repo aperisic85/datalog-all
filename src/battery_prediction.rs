@@ -1,9 +1,14 @@
-//! Predikcija kvara baterije na temelju linearne regresije nad vremenskim serijama napona.
+//! Predikcija kvara baterije na temelju linearne regresije nad trendom napona.
 //!
 //! Algoritam:
-//!  1. Uzimamo zadnjih N satnih mjerenja napona (measurements_1h).
+//!  1. Uzimamo DNEVNI MINIMUM napona (noćni low) zadnjih N dana. Dnevni
+//!     minimum uklanja dnevni ciklus punjenja/pražnjenja (solar danju diže
+//!     napon na 14 V, noću pada na ~12 V), pa je trend stvarni pokazatelj
+//!     zdravlja/SoC — za razliku od sirovog satnog napona čiji nagib ovisi
+//!     o fazi dana na rubovima prozora.
 //!  2. OLS linearna regresija: napon = slope * t + intercept  (t u satima)
-//!  3. Ekstrapoliramo kada će napon pasti ispod pragova:
+//!  3. Procjenjujemo kada će trend pasti ispod pragova (mjereno od zadnjeg
+//!     mjerenja, ne od now() — vidi t_ref):
 //!       - UPOZORENJE : < 11.5 V
 //!       - KRITIČNO   : < 10.5 V
 //!  4. Vraćamo strukturiranu predikciju s trendom, satima/danima do praga i R².
@@ -27,7 +32,7 @@ pub struct VoltagePoint {
 pub struct BatteryTrend {
     /// Nagib trenda u V/h (negativan = pražnjenje)
     pub slope_v_per_hour: f64,
-    /// Linearno ekstrapoliran napon u trenutku izračuna
+    /// Linearno procijenjen napon u trenutku zadnjeg mjerenja
     pub trend_voltage: f64,
     /// Za koliko sati se očekuje pad ispod praga upozorenja (None = nema pada)
     pub hours_to_warning: Option<f64>,
@@ -76,9 +81,11 @@ pub fn compute_trend(points: &[VoltagePoint]) -> Option<BatteryTrend> {
     let slope = cov_xy / var_x;
     let intercept = y_mean - slope * x_mean;
 
-    // Ekstrapoliramo napon na trenutni trenutak
-    let t_now = (Utc::now().timestamp() as f64 - t0_sec) / 3600.0;
-    let trend_voltage = slope * t_now + intercept;
+    // Referentno vrijeme = ZADNJI uzorak (ne Utc::now()). Time izbjegavamo
+    // ekstrapolaciju u budućnost za tihe stanice (zadnji podatak star više dana)
+    // koja bi lažno proglasila pad napona ispod praga.
+    let t_ref = *xs.last().unwrap();
+    let trend_voltage = slope * t_ref + intercept;
 
     // R² — mjera dobrote regresije
     let ss_res: f64 = xs
@@ -91,8 +98,8 @@ pub fn compute_trend(points: &[VoltagePoint]) -> Option<BatteryTrend> {
 
     // Predviđamo kada će trend prijeći pragove (samo ako napon pada)
     let (hours_to_warning, hours_to_critical) = if slope < 0.0 {
-        let h_warn = threshold_hours(trend_voltage, VOLTAGE_WARNING, slope, intercept, t_now);
-        let h_crit = threshold_hours(trend_voltage, VOLTAGE_CRITICAL, slope, intercept, t_now);
+        let h_warn = threshold_hours(trend_voltage, VOLTAGE_WARNING, slope, intercept, t_ref);
+        let h_crit = threshold_hours(trend_voltage, VOLTAGE_CRITICAL, slope, intercept, t_ref);
         (h_warn, h_crit)
     } else {
         (None, None)
@@ -123,24 +130,73 @@ pub fn compute_trend(points: &[VoltagePoint]) -> Option<BatteryTrend> {
     })
 }
 
-/// Vraća za koliko sati (od sada) trend prelazi `threshold`.
+/// Vraća za koliko sati (od zadnjeg mjerenja) trend prelazi `threshold`.
 /// Vraća `None` ako je napon već ispod praga ili je prijelaz u prošlosti.
 fn threshold_hours(
     current_v: f64,
     threshold: f64,
     slope: f64,
     intercept: f64,
-    t_now: f64,
+    t_ref: f64,
 ) -> Option<f64> {
     if current_v <= threshold {
         return None; // Već ispod praga
     }
     // threshold = slope * t_cross + intercept  →  t_cross = (threshold - intercept) / slope
     let t_cross = (threshold - intercept) / slope;
-    let hours_remaining = t_cross - t_now;
+    let hours_remaining = t_cross - t_ref;
     if hours_remaining > 0.0 {
         Some(hours_remaining)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, TimeZone};
+
+    fn pt(day: i64, v: f64) -> VoltagePoint {
+        VoltagePoint {
+            recorded_at: Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap() + Duration::days(day),
+            voltage: v,
+        }
+    }
+
+    #[test]
+    fn too_few_samples_returns_none() {
+        let pts: Vec<_> = (0..3).map(|i| pt(i, 12.0)).collect();
+        assert!(compute_trend(&pts).is_none());
+    }
+
+    #[test]
+    fn declining_series_predicts_warning() {
+        // 10 dana, pad 0.1 V/dan: 12.6 → 11.7 (iznad praga upozorenja 11.5)
+        let pts: Vec<_> = (0..10).map(|i| pt(i, 12.6 - 0.1 * i as f64)).collect();
+        let t = compute_trend(&pts).unwrap();
+        assert!(t.slope_v_per_hour < 0.0);
+        assert!(t.r_squared > 0.99);
+        assert!(t.hours_to_warning.is_some());
+    }
+
+    #[test]
+    fn stable_series_has_no_eta() {
+        let pts: Vec<_> = (0..10).map(|i| pt(i, 12.8)).collect();
+        let t = compute_trend(&pts).unwrap();
+        assert!(t.hours_to_warning.is_none());
+        assert!(t.hours_to_critical.is_none());
+    }
+
+    /// Ključni regresijski test za popravak tihih stanica (#3): podaci su iz
+    /// 2024., a danas je puno kasnije. trend_voltage mora odgovarati fitu na
+    /// ZADNJEM uzorku (~12.65 V), a NE ekstrapolaciji na danas (koja bi dala
+    /// besmisleno nizak/negativan napon i lažni alarm).
+    #[test]
+    fn stale_station_reference_is_last_sample_not_now() {
+        let pts: Vec<_> = (0..8).map(|i| pt(i, 13.0 - 0.05 * i as f64)).collect();
+        let last_v = 13.0 - 0.05 * 7.0; // 12.65
+        let t = compute_trend(&pts).unwrap();
+        assert!((t.trend_voltage - last_v).abs() < 0.05, "trend_voltage = {}", t.trend_voltage);
     }
 }
