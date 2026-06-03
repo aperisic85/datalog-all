@@ -459,6 +459,30 @@ pub async fn get_daily_min_voltage(
     Ok(rows)
 }
 
+/// Dnevni min i max napona baterije zadnjih `days` dana — uzlazno.
+/// Za detekciju degradirane baterije (ponašanje napona danju vs noću).
+pub async fn get_daily_voltage_stats(
+    pool: &PgPool,
+    object_id: Uuid,
+    days: i64,
+) -> AppResult<Vec<(chrono::DateTime<chrono::Utc>, f32, f32)>> {
+    let rows: Vec<(chrono::DateTime<chrono::Utc>, f32, f32)> = sqlx::query_as(
+        "SELECT date_trunc('day', recorded_at) AS d,
+                MIN(battery_voltage_avg)::real AS v_min,
+                MAX(battery_voltage_avg)::real AS v_max
+         FROM measurements_10min
+         WHERE object_id = $1
+           AND battery_voltage_avg IS NOT NULL
+           AND recorded_at >= NOW() - ($2::bigint * INTERVAL '1 day')
+         GROUP BY d
+         ORDER BY d ASC")
+        .bind(object_id)
+        .bind(days)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows)
+}
+
 /// Najnoviji stvarni izmjereni napon baterije i njegovo vrijeme.
 pub async fn get_latest_battery_voltage(
     pool: &PgPool,

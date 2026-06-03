@@ -371,6 +371,43 @@ pub async fn estimate_battery_capacity(
     }))
 }
 
+/// GET /api/v1/objects/:id/battery/health
+///
+/// Detekcija degradirane baterije iz ponašanja napona (noćni minimum na
+/// danima kad je baterija dokazano bila napunjena).
+pub async fn battery_health(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<BatteryHealthAssessment>> {
+    check_object_access(&pool, &claims, id).await?;
+
+    // Dnevni min/max napona zadnjih 30 dana
+    let stats = db::get_daily_voltage_stats(&pool, id, 30).await?;
+    let days: Vec<crate::battery_health::DailyVoltage> = stats
+        .into_iter()
+        .map(|(_, vmin, vmax)| crate::battery_health::DailyVoltage {
+            v_min: vmin as f64,
+            v_max: vmax as f64,
+        })
+        .collect();
+
+    let a = crate::battery_health::assess_health(&days);
+
+    Ok(Json(BatteryHealthAssessment {
+        object_id:                id,
+        computed_at:              chrono::Utc::now(),
+        status:                   a.status.to_string(),
+        status_label:             a.status_label.to_string(),
+        sample_days:              a.sample_days as i32,
+        charged_days:             a.charged_days as i32,
+        median_charged_night_min: a.median_charged_night_min,
+        median_daily_swing:       a.median_daily_swing,
+        worst_charged_night_min:  a.worst_charged_night_min,
+        system_voltage:           a.system_voltage,
+    }))
+}
+
 /// GET /api/v1/objects/:id/measurements/latest
 pub async fn get_latest_measurement(
     State(pool): State<PgPool>,

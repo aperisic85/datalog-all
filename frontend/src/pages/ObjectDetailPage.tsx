@@ -11,6 +11,7 @@ import {
   getEventLogs,
   getBatteryPrediction,
   getBatteryCapacity,
+  getBatteryHealth,
   getSolarEfficiency,
   getWeather,
   pollObject,
@@ -420,6 +421,90 @@ function BatteryCapacitySection({ objectId }: { objectId: string }) {
             borderRadius: 6, fontSize: 12, color: 'var(--warning)',
           }}>
             ⚠ Efektivni kapacitet između 60–80% nominalnog — pratite trend
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Battery Health Section (detekcija degradacije iz napona) ─────────────────
+
+const HEALTH_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  good:              { label: 'Baterija drži napon',  color: 'var(--success)' },
+  degraded:          { label: 'Znakovi slabljenja',   color: 'var(--warning)' },
+  replace:           { label: 'Preporučena zamjena',  color: 'var(--danger)'  },
+  insufficient_data: { label: 'Nedovoljno podataka',  color: 'var(--text2)'   },
+};
+
+function BatteryHealthSection({ objectId }: { objectId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['battery-health', objectId],
+    queryFn: () => getBatteryHealth(objectId),
+    refetchInterval: 60 * 60_000,
+    retry: 1,
+  });
+
+  if (isLoading) return null;
+  if (!data) return null;
+
+  const cfg = HEALTH_STATUS_CONFIG[data.status] ?? HEALTH_STATUS_CONFIG.insufficient_data;
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 10 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+      }}>
+        <Battery size={14} style={{ color: cfg.color }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Zdravlje baterije — napon
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text3)' }}>
+          {data.charged_days} napunjenih / {data.sample_days} dana
+        </span>
+      </div>
+
+      <div style={{ padding: '10px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>{data.system_voltage} V sustav</span>
+        </div>
+
+        {data.status === 'insufficient_data' && (
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>{data.status_label}</div>
+        )}
+
+        {data.median_charged_night_min != null && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px', fontSize: 12, color: 'var(--text2)' }}>
+            <span>Noćni min (napunjeni dani):{' '}
+              <strong style={{ color: cfg.color }}>{data.median_charged_night_min.toFixed(2)} V</strong>
+            </span>
+            {data.median_daily_swing != null && (
+              <span>Dnevni raspon: <strong style={{ color: 'var(--text)' }}>{data.median_daily_swing.toFixed(2)} V</strong></span>
+            )}
+            {data.worst_charged_night_min != null && (
+              <span>Najgori noćni min: <strong style={{ color: 'var(--text)' }}>{data.worst_charged_night_min.toFixed(2)} V</strong></span>
+            )}
+          </div>
+        )}
+
+        {data.status === 'replace' && (
+          <div style={{
+            marginTop: 8, padding: '6px 10px',
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: 6, fontSize: 12, color: 'var(--danger)',
+          }}>
+            ⚠ Baterija ne drži napon ni nakon punog punjenja — kandidat za zamjenu
+          </div>
+        )}
+        {data.status === 'degraded' && (
+          <div style={{
+            marginTop: 8, padding: '6px 10px',
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+            borderRadius: 6, fontSize: 12, color: 'var(--warning)',
+          }}>
+            ⚠ Napon pada više nego što bi zdrava baterija — pratite trend
           </div>
         )}
       </div>
@@ -1380,6 +1465,7 @@ export default function ObjectDetailPage() {
           {/* ── Analitika ── */}
           <div className="overview-section-label">Analitika</div>
           <BatteryCapacitySection objectId={id!} />
+          <BatteryHealthSection objectId={id!} />
           {hasCoords && <SolarEfficiencySection objectId={id!} />}
 
           {obj.latitude && obj.longitude && (() => {

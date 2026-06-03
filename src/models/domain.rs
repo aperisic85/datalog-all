@@ -751,6 +751,34 @@ pub struct BatteryCapacityEstimate {
 }
 
 // ================================================================
+// BATTERY HEALTH (detekcija degradirane baterije iz napona)
+// ================================================================
+
+/// Procjena zdravlja baterije iz ponašanja napona (danju vs noću).
+/// Vraćen od GET /api/v1/objects/:id/battery/health
+#[derive(Debug, Serialize)]
+pub struct BatteryHealthAssessment {
+    pub object_id:                Uuid,
+    pub computed_at:              DateTime<Utc>,
+    /// "good" | "degraded" | "replace" | "insufficient_data"
+    pub status:                   String,
+    /// Opis statusa na hrvatskom
+    pub status_label:             String,
+    /// Ukupno dana u analizi
+    pub sample_days:              i32,
+    /// Broj napunjenih (sunčanih) dana korištenih za zaključak
+    pub charged_days:             i32,
+    /// Medijan noćnog minimuma na napunjenim danima (V)
+    pub median_charged_night_min: Option<f64>,
+    /// Medijan dnevnog raspona napona na napunjenim danima (V)
+    pub median_daily_swing:       Option<f64>,
+    /// Najniži noćni minimum na napunjenim danima (V)
+    pub worst_charged_night_min:  Option<f64>,
+    /// Detektirani napon sustava (12 ili 24)
+    pub system_voltage:           f64,
+}
+
+// ================================================================
 // ALARM HEATMAP
 // ================================================================
 

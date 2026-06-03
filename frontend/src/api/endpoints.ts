@@ -16,6 +16,7 @@ import type {
   UserRegionAccessView,
   BatteryPrediction,
   BatteryCapacityEstimate,
+  BatteryHealthAssessment,
   AlarmHeatmapData,
   WeatherResponse,
   SolarEfficiency,
@@ -137,6 +138,10 @@ export const getBatteryPrediction = (id: string) =>
 // Battery capacity estimate
 export const getBatteryCapacity = (id: string) =>
   api.get<BatteryCapacityEstimate>(`/api/v1/objects/${id}/battery/capacity`).then((r) => r.data);
+
+// Battery health (detekcija degradacije iz napona)
+export const getBatteryHealth = (id: string) =>
+  api.get<BatteryHealthAssessment>(`/api/v1/objects/${id}/battery/health`).then((r) => r.data);
 
 // Weather (Open-Meteo)
 export const getWeather = (id: string, days?: number) =>
