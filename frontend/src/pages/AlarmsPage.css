@@ -315,14 +315,40 @@
   .alarms-filters { flex-direction: column; align-items: stretch; }
   .alarms-filters select { width: 100%; min-width: 0; }
 
-  .alarm-status-tab { font-size: 12px; padding: 9px 4px; gap: 4px; }
+  .alarm-status-tab { font-size: 12px; padding: 11px 4px; gap: 4px; min-height: 44px; }
   .alarm-status-tab svg { display: none; }
 
-  .alarm-card-actions { gap: 6px; }
-  .alarm-action-btn { flex: 1; justify-content: center; }
+  /* Veće alarm kartice za lakši touch */
+  .alarm-card { padding: 14px 14px; }
+
+  .alarm-card-actions {
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .alarm-action-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  /* Kritični "Potvrdi" gumb — naglašeniji na mobitelu */
+  .alarm-card-critical .alarm-card-actions .btn-secondary:not(:first-child) {
+    background: rgba(59,130,246,0.15);
+    border-color: rgba(59,130,246,0.35);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Pagination gumbi — veći touch target */
+  .alarm-pagination .btn-secondary {
+    min-width: 48px;
+    min-height: 48px;
+  }
 
   .modal-overlay { padding: 12px; }
   .modal-box { padding: 20px 16px; }
-  .modal-actions { flex-direction: column-reverse; }
-  .modal-actions button { width: 100%; justify-content: center; display: flex; }
+  .modal-actions { flex-direction: column-reverse; gap: 10px; }
+  .modal-actions button { width: 100%; justify-content: center; display: flex; min-height: 48px; }
 }
