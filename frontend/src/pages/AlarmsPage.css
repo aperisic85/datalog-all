@@ -352,3 +352,55 @@
   .modal-actions { flex-direction: column-reverse; gap: 10px; }
   .modal-actions button { width: 100%; justify-content: center; display: flex; min-height: 48px; }
 }
+
+/* ── Bulk odabir ───────────────────────────────────────────────────────────── */
+.alarm-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.alarm-bulk-selectall {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary, var(--text2));
+  cursor: pointer;
+  user-select: none;
+}
+
+.alarm-bulk-selectall input,
+.alarm-select-cb {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.alarm-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.alarm-select-cb {
+  margin-right: 4px;
+}
+
+.alarm-card-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+@media (max-width: 640px) {
+  .alarm-bulk-bar { flex-direction: column; align-items: stretch; }
+  .alarm-bulk-actions { flex-direction: column; }
+  .alarm-bulk-actions .alarm-action-btn { width: 100%; justify-content: center; min-height: 44px; }
+}
