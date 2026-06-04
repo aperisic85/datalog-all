@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listRegions, createRegion, updateRegion } from '../api/endpoints';
-import { Plus, Pencil, X, Check } from 'lucide-react';
+import { listRegions, createRegion, updateRegion, deleteRegion } from '../api/endpoints';
+import { Plus, Pencil, X, Check, Trash2 } from 'lucide-react';
 import type { Region } from '../types';
 import './AdminPage.css';
 
@@ -83,6 +83,7 @@ export default function AdminRegionsPage() {
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const { data: regions, isLoading } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
 
@@ -97,7 +98,14 @@ export default function AdminRegionsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['regions'] }); setEditing(null); },
   });
 
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteRegion(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['regions'] }); setConfirmDelete(null); },
+  });
+
   if (isLoading) return <div className="page-spinner"><div className="spinner" /></div>;
+
+  const regionToDelete = confirmDelete ? regions?.find((r) => r.id === confirmDelete) : null;
 
   return (
     <div className="admin-page">
@@ -117,6 +125,24 @@ export default function AdminRegionsPage() {
 
       {create.isError && <div className="error-msg">Greška pri kreiranju regije</div>}
       {update.isError && <div className="error-msg">Greška pri ažuriranju regije</div>}
+      {remove.isError && <div className="error-msg">Greška pri brisanju regije</div>}
+
+      {confirmDelete && regionToDelete && (
+        <div className="confirm-dialog-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>Obriši regiju <strong>{regionToDelete.name}</strong>?</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)' }}>Ova akcija je nepovratna.</p>
+            <div className="form-actions">
+              <button className="btn-danger" onClick={() => remove.mutate(confirmDelete)} disabled={remove.isPending}>
+                <Trash2 size={14} /> Obriši
+              </button>
+              <button className="btn-secondary" onClick={() => setConfirmDelete(null)}>
+                Odustani
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="table-scroll">
@@ -133,7 +159,7 @@ export default function AdminRegionsPage() {
           <tbody>
             {regions?.map((r) => (
               <>
-                <tr key={r.id}>
+                <tr key={r.id} style={!r.is_active ? { opacity: 0.55 } : undefined}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="region-dot" style={{ background: r.color, display: 'inline-block', width: 10, height: 10, borderRadius: '50%', flexShrink: 0 }} />
@@ -149,12 +175,23 @@ export default function AdminRegionsPage() {
                     }
                   </td>
                   <td>
-                    <button
-                      className="btn-secondary icon-btn"
-                      onClick={() => setEditing(editing === r.id ? null : r.id)}
-                    >
-                      <Pencil size={14} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        className="btn-secondary icon-btn"
+                        title="Uredi"
+                        onClick={() => setEditing(editing === r.id ? null : r.id)}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="btn-secondary icon-btn"
+                        title="Obriši"
+                        style={{ color: 'var(--danger)' }}
+                        onClick={() => setConfirmDelete(r.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 {editing === r.id && (

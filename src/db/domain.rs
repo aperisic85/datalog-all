@@ -11,7 +11,7 @@ use crate::models::domain::*;
 
 pub async fn list_regions(pool: &PgPool) -> AppResult<Vec<Region>> {
     Ok(sqlx::query_as!(Region,
-        "SELECT * FROM regions WHERE is_active = TRUE ORDER BY name")
+        "SELECT * FROM regions ORDER BY name")
         .fetch_all(pool).await?)
 }
 
@@ -47,6 +47,12 @@ pub async fn update_region(pool: &PgPool, id: Uuid, req: &UpdateRegionRequest) -
            WHERE id = $1 RETURNING *"#,
         id, req.name, req.description, req.color, req.is_active)
         .fetch_one(pool).await?)
+}
+
+pub async fn delete_region(pool: &PgPool, id: Uuid) -> AppResult<bool> {
+    let res: sqlx::postgres::PgQueryResult = sqlx::query!("DELETE FROM regions WHERE id = $1", id)
+        .execute(pool).await?;
+    Ok(res.rows_affected() > 0)
 }
 
 pub async fn list_region_summary(pool: &PgPool, user_id: Uuid, role: &str) -> AppResult<Vec<RegionSummary>> {

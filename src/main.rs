@@ -117,6 +117,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/regions",                get(handlers::domain::list_regions))
         .route("/api/v1/regions",                post(handlers::domain::create_region))
         .route("/api/v1/regions/:id",            put(handlers::domain::update_region))
+        .route("/api/v1/regions/:id",            delete(handlers::domain::delete_region))
         .route("/api/v1/regions/summary",        get(handlers::domain::region_summary))
         // Station types
         .route("/api/v1/station-types",          get(handlers::domain::list_station_types))

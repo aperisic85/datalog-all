@@ -141,6 +141,25 @@ pub async fn update_region(
     Ok(Json(region))
 }
 
+/// DELETE /api/v1/regions/:id  [admin only]
+pub async fn delete_region(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    require_admin(&claims)?;
+    let deleted = db::delete_region(&pool, id).await?;
+    if deleted {
+        let uid = parse_uid(&claims.sub).ok();
+        let _ = db::write_audit(&pool, uid, Some(&claims.username),
+            "DELETE_REGION", Some("region"), Some(&id.to_string()),
+            None, None).await;
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Ok(StatusCode::NOT_FOUND)
+    }
+}
+
 /// GET /api/v1/station-types
 pub async fn list_station_types(State(pool): State<PgPool>) -> AppResult<Json<Vec<StationType>>> {
     Ok(Json(db::list_station_types(&pool).await?))

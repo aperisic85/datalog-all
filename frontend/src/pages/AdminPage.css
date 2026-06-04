@@ -114,6 +114,28 @@
 
 .icon-btn-sm:hover { background: rgba(239,68,68,0.15); color: var(--danger); }
 
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.confirm-dialog {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.confirm-dialog p { margin: 0 0 8px; }
+
 .grant-form {
   display: flex;
   align-items: center;
