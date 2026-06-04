@@ -27,6 +27,24 @@
   color: var(--text-muted);
 }
 
+.map-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.map-region-select {
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  min-height: 34px;
+  cursor: pointer;
+}
+
 .map-filters {
   display: flex;
   gap: 0.5rem;
@@ -92,6 +110,47 @@
 .legend-dot.active { background: #22c55e; }
 .legend-dot.alarm  { background: #ef4444; }
 .legend-dot.inactive { background: #6b7280; }
+
+.map-legend-hint {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Cluster ikone ── */
+.map-cluster {
+  background: transparent;
+}
+
+.map-cluster > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.map-cluster-md > div { background: #16a34a; }
+.map-cluster-lg > div {
+  background: #15803d;
+  font-size: 0.9rem;
+}
+
+/* Bilo koja skupina s alarmom postaje crvena — vizualna gustoća alarma */
+.map-cluster-alarm > div {
+  background: #ef4444;
+}
+.map-cluster-alarm.map-cluster-lg > div {
+  background: #dc2626;
+}
 
 .map-loading {
   flex: 1;

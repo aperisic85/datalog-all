@@ -109,20 +109,29 @@ const STATUS_TABS: { value: Status; label: string; icon: React.ReactNode }[] = [
 ];
 
 // ── Alarm kartica ──────────────────────────────────────────────────────────
-function AlarmCard({ item, onAcknowledge, onDelete, isAcking }: {
+function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggleSelect }: {
   item: AlarmListItem;
   onAcknowledge: () => void;
   onDelete: () => void;
   isAcking: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const isAcknowledged = !!item.acknowledged_at;
   const critical = isCriticalAlarm(item);
 
   return (
-    <div className={`alarm-card card ${isAcknowledged ? 'alarm-card-ack' : critical ? 'alarm-card-critical' : 'alarm-card-warning'}`}>
+    <div className={`alarm-card card ${selected ? 'alarm-card-selected' : ''} ${isAcknowledged ? 'alarm-card-ack' : critical ? 'alarm-card-critical' : 'alarm-card-warning'}`}>
       {/* Header: naziv + status badge */}
       <div className="alarm-card-header">
         <div className="alarm-card-title">
+          <input
+            type="checkbox"
+            className="alarm-select-cb"
+            checked={selected}
+            onChange={onToggleSelect}
+            aria-label={`Označi alarm za ${item.object_name}`}
+          />
           <span className={`status-dot ${isAcknowledged ? 'status-dot-inactive' : 'status-dot-alarm'}`} />
           <div className="alarm-card-title-text">
             <span className="alarm-obj-name">{item.object_name}</span>
@@ -203,6 +212,11 @@ export default function AlarmsPage() {
   const [ackTarget, setAckTarget]       = useState<AlarmListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AlarmListItem | null>(null);
 
+  // Bulk odabir + potvrde
+  const [selected, setSelected]         = useState<Set<number>>(new Set());
+  const [bulkConfirm, setBulkConfirm]   = useState<null | 'ack' | 'delete'>(null);
+  const [bulkBusy, setBulkBusy]         = useState(false);
+
   // Loading stanja po kartici
   const [pendingAck, setPendingAck]     = useState<Set<string>>(new Set());
   const [actionError, setActionError]   = useState('');
@@ -229,8 +243,9 @@ export default function AlarmsPage() {
     setSearchParams(p);
   };
 
-  const handleStatus = (s: Status) => { setStatus(s); setPage(1); syncParams(s, regionFilter); };
-  const handleRegion = (r: string) => { setRegionFilter(r); setPage(1); syncParams(status, r); };
+  const clearSelection = () => setSelected(new Set());
+  const handleStatus = (s: Status) => { setStatus(s); setPage(1); clearSelection(); syncParams(s, regionFilter); };
+  const handleRegion = (r: string) => { setRegionFilter(r); setPage(1); clearSelection(); syncParams(status, r); };
 
   // Potvrdi alarm
   const doAcknowledge = async () => {
@@ -267,6 +282,52 @@ export default function AlarmsPage() {
   const totalPages = data?.total_pages ?? 1;
   const total = data?.total ?? 0;
 
+  // ── Bulk odabir ────────────────────────────────────────────────────────────
+  const toggleSelect = (id: number) =>
+    setSelected(prev => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
+
+  const allSelected = items.length > 0 && items.every(i => selected.has(i.id));
+  const toggleSelectAll = () =>
+    setSelected(allSelected ? new Set() : new Set(items.map(i => i.id)));
+
+  const selectedItems = items.filter(i => selected.has(i.id));
+  // Za potvrdu su relevantni samo još nepotvrđeni alarmi (ack ide po objektu)
+  const selectedUnacked = selectedItems.filter(i => !i.acknowledged_at);
+
+  // Masovna potvrda — dedupe po objektu jer ack potvrđuje sve alarme objekta
+  const doBulkAcknowledge = async () => {
+    setBulkConfirm(null);
+    setActionError('');
+    setBulkBusy(true);
+    const objectIds = [...new Set(selectedUnacked.map(i => i.object_id))];
+    const results = await Promise.allSettled(objectIds.map(id => acknowledgeAlarm(id)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    await qc.invalidateQueries({ queryKey: ['alarms-history'] });
+    await qc.invalidateQueries({ queryKey: ['region-summary'] });
+    setBulkBusy(false);
+    clearSelection();
+    if (failed > 0) setActionError(`${failed} od ${objectIds.length} potvrda nije uspjelo. Pokušaj ponovo.`);
+  };
+
+  // Masovno brisanje — po pojedinom zapisu alarma
+  const doBulkDelete = async () => {
+    setBulkConfirm(null);
+    setActionError('');
+    setBulkBusy(true);
+    const ids = selectedItems.map(i => i.id);
+    const results = await Promise.allSettled(ids.map(id => deleteAlarm(id)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    await qc.invalidateQueries({ queryKey: ['alarms-history'] });
+    await qc.invalidateQueries({ queryKey: ['region-summary'] });
+    setBulkBusy(false);
+    clearSelection();
+    if (failed > 0) setActionError(`${failed} od ${ids.length} brisanja nije uspjelo. Pokušaj ponovo.`);
+  };
+
   return (
     <div className="alarms-page">
       {/* Confirm acknowledge */}
@@ -296,6 +357,35 @@ export default function AlarmsPage() {
           confirmLabel="Briši ovaj alarm"
           onConfirm={doDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* Bulk potvrda */}
+      {bulkConfirm === 'ack' && (
+        <ConfirmModal
+          title="Masovna potvrda alarma"
+          message={<>Potvrđuješ <strong>{selectedUnacked.length}</strong>{' '}
+            {selectedUnacked.length === 1 ? 'nepotvrđeni alarm' : 'nepotvrđenih alarma'}.
+            <br /><span style={{ color: 'var(--text2)', fontSize: 13 }}>
+              Potvrda se primjenjuje po objektu i označava sve njegove aktivne alarme.
+            </span></>}
+          confirmLabel="Potvrdi označene"
+          onConfirm={doBulkAcknowledge}
+          onCancel={() => setBulkConfirm(null)}
+        />
+      )}
+      {bulkConfirm === 'delete' && (
+        <ConfirmModal
+          title="Masovno brisanje alarma"
+          danger
+          message={<>Brišeš <strong>{selected.size}</strong>{' '}
+            {selected.size === 1 ? 'označeni zapis' : 'označenih zapisa'} alarma.
+            <br /><span style={{ color: 'var(--text2)', fontSize: 13 }}>
+              Brišu se samo odabrani zapisi. Ovu akciju nije moguće poništiti.
+            </span></>}
+          confirmLabel="Briši označene"
+          onConfirm={doBulkDelete}
+          onCancel={() => setBulkConfirm(null)}
         />
       )}
 
@@ -367,6 +457,46 @@ export default function AlarmsPage() {
         </div>
       )}
 
+      {/* Bulk akcijska traka */}
+      {items.length > 0 && (
+        <div className="alarm-bulk-bar card">
+          <label className="alarm-bulk-selectall">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = selected.size > 0 && !allSelected; }}
+              onChange={toggleSelectAll}
+            />
+            {selected.size > 0
+              ? `${selected.size} ${selected.size === 1 ? 'odabran' : 'odabranih'}`
+              : 'Označi sve'}
+          </label>
+          <div className="alarm-bulk-actions">
+            <button
+              className="btn-secondary alarm-action-btn"
+              disabled={bulkBusy || selectedUnacked.length === 0}
+              onClick={() => setBulkConfirm('ack')}
+            >
+              {bulkBusy
+                ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Obrada...</>
+                : <><Check size={13} /> Potvrdi označene{selectedUnacked.length > 0 ? ` (${selectedUnacked.length})` : ''}</>}
+            </button>
+            <button
+              className="btn-danger alarm-action-btn"
+              disabled={bulkBusy || selected.size === 0}
+              onClick={() => setBulkConfirm('delete')}
+            >
+              <Trash2 size={13} /> Briši označene{selected.size > 0 ? ` (${selected.size})` : ''}
+            </button>
+            {selected.size > 0 && (
+              <button className="clear-filter-btn" onClick={clearSelection}>
+                <X size={14} /> Poništi odabir
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Lista */}
       {items.length > 0 && (
         <div className="alarm-list">
@@ -374,6 +504,8 @@ export default function AlarmsPage() {
             <AlarmCard
               key={item.id}
               item={item}
+              selected={selected.has(item.id)}
+              onToggleSelect={() => toggleSelect(item.id)}
               isAcking={pendingAck.has(item.object_id)}
               onAcknowledge={() => setAckTarget(item)}
               onDelete={() => setDeleteTarget(item)}
