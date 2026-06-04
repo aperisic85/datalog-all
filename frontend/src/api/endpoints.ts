@@ -57,6 +57,9 @@ export const updateRegion = (id: string, data: {
   is_active?: boolean;
 }) => api.put<Region>(`/api/v1/regions/${id}`, data).then((r) => r.data);
 
+export const deleteRegion = (id: string) =>
+  api.delete(`/api/v1/regions/${id}`);
+
 // Station types
 export const listStationTypes = () =>
   api.get<StationType[]>('/api/v1/station-types').then((r) => r.data);
