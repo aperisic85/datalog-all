@@ -24,6 +24,7 @@ import type {
   NotificationChannel,
   NotificationRule,
   NotificationLogEntry,
+  SetValueResponse,
 } from '../types';
 
 // Auth
@@ -257,6 +258,15 @@ export const updateNotificationRule = (id: string, data: {
 
 export const deleteNotificationRule = (id: string) =>
   api.delete(`/api/v1/notifications/rules/${id}`);
+
+// ── Kontrola uređaja ─────────────────────────────────────────────────────────
+
+export const setDataloggerValue = (data: {
+  object_id: string;
+  table: string;
+  field: string;
+  value: string;
+}) => api.post<SetValueResponse>('/api/v1/control/setvalue', data).then((r) => r.data);
 
 // Log
 export const listNotificationLog = (params?: { page?: number; page_size?: number }) =>

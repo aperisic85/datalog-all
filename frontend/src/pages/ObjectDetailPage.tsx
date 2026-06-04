@@ -20,6 +20,7 @@ import {
   listRegions,
   listStationTypes,
   acknowledgeAlarm,
+  setDataloggerValue,
 } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
@@ -68,7 +69,7 @@ import './ObjectDetailPage.css';
 import './ObjectsPage.css';
 import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
 
-type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap';
+type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap' | 'control';
 type Range = '6h' | '24h' | '7d';
 type DriftRange = '1h' | '6h' | '24h' | '7d';
 
@@ -1012,6 +1013,215 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
   );
 }
 
+// ─── Unaprijed definirane komande ────────────────────────────────────────────
+
+interface PresetCommand {
+  label: string;
+  description: string;
+  table: string;
+  field: string;
+  value: string;
+  confirmLabel?: string;
+  danger?: boolean;
+}
+
+const PRESET_COMMANDS: PresetCommand[] = [
+  {
+    label: 'Uključi fenjer (ručno)',
+    description: 'Forsira paljenje fenjera bez obzira na detektor dana/noći.',
+    table: 'Public',
+    field: 'Lan_set_always_on',
+    value: '1',
+    confirmLabel: 'Potvrdi uključivanje',
+  },
+  {
+    label: 'Isključi forsiranje fenjera',
+    description: 'Vraća fenjer u automatski način rada (detektor dan/noć).',
+    table: 'Public',
+    field: 'Lan_set_always_on',
+    value: '0',
+  },
+];
+
+function ControlTab({ objectId }: { objectId: string }) {
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [confirmCmd, setConfirmCmd] = useState<PresetCommand | null>(null);
+  const [customTable, setCustomTable] = useState('Public');
+  const [customField, setCustomField] = useState('');
+  const [customValue, setCustomValue] = useState('');
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: (cmd: { table: string; field: string; value: string }) =>
+      setDataloggerValue({ object_id: objectId, ...cmd }),
+    onSuccess: (data) => setResult(data),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setResult({ success: false, message: msg ?? 'Greška pri slanju komande' });
+    },
+  });
+
+  const sendPreset = (cmd: PresetCommand) => {
+    if (cmd.confirmLabel && !confirmCmd) {
+      setConfirmCmd(cmd);
+      return;
+    }
+    setConfirmCmd(null);
+    setResult(null);
+    mutate({ table: cmd.table, field: cmd.field, value: cmd.value });
+  };
+
+  const sendCustom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customField.trim()) return;
+    setResult(null);
+    mutate({ table: customTable, field: customField, value: customValue });
+  };
+
+  return (
+    <div className="control-tab" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Rezultat */}
+      {result && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px',
+            borderLeft: `3px solid ${result.success ? 'var(--success)' : 'var(--danger)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 13, color: result.success ? 'var(--success)' : 'var(--danger)' }}>
+            {result.success ? '✓ ' : '✗ '}{result.message}
+          </span>
+          <button
+            className="btn-secondary"
+            style={{ padding: '2px 10px', fontSize: 12 }}
+            onClick={() => setResult(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Unaprijed definirane komande */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '8px 14px', borderBottom: '1px solid var(--border)',
+        }}>
+          <Radio size={14} style={{ color: 'var(--accent)' }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Brze komande
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {PRESET_COMMANDS.map((cmd, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderBottom: i < PRESET_COMMANDS.length - 1 ? '1px solid var(--border)' : undefined,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{cmd.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{cmd.description}</div>
+                <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3, fontFamily: 'monospace' }}>
+                  {cmd.table}.{cmd.field} = {cmd.value}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, marginLeft: 16 }}>
+                {confirmCmd === cmd ? (
+                  <>
+                    <button
+                      className="btn-primary"
+                      style={{ fontSize: 12 }}
+                      disabled={isPending}
+                      onClick={() => sendPreset(cmd)}
+                    >
+                      {isPending ? 'Šalje...' : (cmd.confirmLabel ?? 'Potvrdi')}
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      style={{ fontSize: 12 }}
+                      onClick={() => setConfirmCmd(null)}
+                    >
+                      Odustani
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className={cmd.danger ? 'btn-danger' : 'btn-primary'}
+                    style={{ fontSize: 12 }}
+                    disabled={isPending}
+                    onClick={() => sendPreset(cmd)}
+                  >
+                    Pošalji
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Napredna / ručna komanda */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '8px 14px', borderBottom: '1px solid var(--border)',
+        }}>
+          <Cpu size={14} style={{ color: 'var(--text2)' }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Ručna komanda
+          </span>
+        </div>
+        <form onSubmit={sendCustom} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Tabela</label>
+              <input
+                className="form-input"
+                value={customTable}
+                onChange={(e) => setCustomTable(e.target.value)}
+                placeholder="Public"
+                required
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Polje</label>
+              <input
+                className="form-input"
+                value={customField}
+                onChange={(e) => setCustomField(e.target.value)}
+                placeholder="Lan_set_always_on"
+                required
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Vrijednost</label>
+              <input
+                className="form-input"
+                value={customValue}
+                onChange={(e) => setCustomValue(e.target.value)}
+                placeholder="1"
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" className="btn-primary" disabled={isPending || !customField.trim()}>
+              {isPending ? 'Šalje...' : 'Pošalji komandu'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -1277,9 +1487,18 @@ export default function ObjectDetailPage() {
               alarms: 'Alarmi',
               heatmap: 'Heatmap',
               events: 'Log',
+              control: 'Kontrola',
             }[t]}
           </button>
         ))}
+        {authUser?.role !== 'viewer' && (
+          <button
+            className={`tab-btn ${tab === 'control' ? 'active' : ''}`}
+            onClick={() => setTab('control')}
+          >
+            Kontrola
+          </button>
+        )}
       </div>
 
       {tab === 'overview' && (
@@ -1949,6 +2168,10 @@ export default function ObjectDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {tab === 'control' && authUser?.role !== 'viewer' && (
+        <ControlTab objectId={id!} />
       )}
     </div>
   );
