@@ -447,14 +447,22 @@ impl Cr300Client {
         }
 
         let resp = req.send().await?;
+        let status = resp.status();
         let text = resp.text().await?;
+
+        if text.trim().is_empty() {
+            // Neke verzije CR300 firmwarea vraćaju prazan body na SetValueEx.
+            // HTTP 200 tretiramo kao uspjeh.
+            return Ok(status.is_success());
+        }
 
         #[derive(Deserialize)]
         struct SetValueResponse {
             outcome: Option<u32>,
         }
 
-        let result: SetValueResponse = serde_json::from_str(&text)?;
+        let result: SetValueResponse = serde_json::from_str(&text)
+            .with_context(|| format!("SetValueEx: neočekivani odgovor datalogera: {}", &text[..text.len().min(200)]))?;
         // outcome=1 means success
         Ok(result.outcome == Some(1))
     }
