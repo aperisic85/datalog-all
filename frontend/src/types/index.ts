@@ -437,6 +437,13 @@ export interface NotificationRule {
   updated_at: string;
 }
 
+// ── Kontrola uređaja ──────────────────────────────────────────────────────────
+
+export interface SetValueResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface NotificationLogEntry {
   id: number;
   channel_id?: string;
