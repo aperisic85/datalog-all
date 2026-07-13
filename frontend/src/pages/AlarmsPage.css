@@ -1,5 +1,5 @@
 .alarms-page {
-  max-width: 900px;
+  max-width: 1240px;
   animation: fadeInUp 0.25s ease both;
 }
 
@@ -11,6 +11,281 @@
 }
 
 .page-header h2 { margin: 0; }
+
+/* ══════════════════════════════════════════════════════
+   SCADA annunciator traka — brojači po prioritetu,
+   vrijeme osvježavanja, sirena
+   ══════════════════════════════════════════════════════ */
+.scada-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.scada-tiles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scada-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+}
+
+.scada-tile-count {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.scada-tile-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Upaljene pločice — ISA boje prioriteta */
+.scada-tile-critical.lit {
+  background: rgba(239,68,68,0.14);
+  border-color: rgba(239,68,68,0.5);
+  color: var(--danger);
+  animation: scadaBlink 1s step-end infinite;
+}
+
+.scada-tile-warning.lit {
+  background: rgba(245,158,11,0.12);
+  border-color: rgba(245,158,11,0.45);
+  color: var(--warning);
+}
+
+.scada-tile-total.ok {
+  background: rgba(34,197,94,0.1);
+  border-color: rgba(34,197,94,0.35);
+  color: var(--success);
+}
+
+@keyframes scadaBlink {
+  50% { border-color: var(--danger); background: rgba(239,68,68,0.28); }
+}
+
+.scada-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scada-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+  font-variant-numeric: tabular-nums;
+}
+
+.scada-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scada-btn-on {
+  color: var(--accent);
+  border-color: rgba(59,130,246,0.4);
+  background: rgba(59,130,246,0.1);
+}
+
+.scada-btn-silence { animation: scadaBlink 1s step-end infinite; }
+
+.scada-btn .spin { animation: scadaSpin 0.9s linear infinite; }
+@keyframes scadaSpin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════════
+   SCADA alarm tablica (desktop)
+   ══════════════════════════════════════════════════════ */
+.alarm-table-wrap {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.alarm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.alarm-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.alarm-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.alarm-table tbody tr:last-child td { border-bottom: none; }
+
+.alarm-table .col-cb { width: 32px; }
+.alarm-table .col-state { width: 60px; }
+.alarm-table .col-time { width: 155px; }
+.alarm-table .col-actions { width: 110px; }
+
+/* Redci obojeni po prioritetu — puna linija boje na lijevom rubu */
+.alarm-row td:first-child { border-left: 3px solid transparent; }
+.alarm-row-critical td:first-child { border-left-color: var(--danger); }
+.alarm-row-warning  td:first-child { border-left-color: var(--warning); }
+.alarm-row-ack      td:first-child { border-left-color: var(--text2); }
+
+.alarm-row-critical { background: rgba(239,68,68,0.055); }
+.alarm-row-warning  { background: rgba(245,158,11,0.045); }
+.alarm-row-ack      { opacity: 0.72; }
+
+.alarm-row:hover { background: var(--bg3); }
+.alarm-row-critical:hover { background: rgba(239,68,68,0.1); }
+.alarm-row-warning:hover  { background: rgba(245,158,11,0.09); }
+
+.alarm-row-selected td { background: rgba(59,130,246,0.08); }
+
+/* Stanje alarma — AKT treperi dok nije potvrđen (EEMUA 191) */
+.alarm-state {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.alarm-state-critical {
+  background: var(--danger);
+  color: #fff;
+  animation: alarmStateBlink 1s step-end infinite;
+}
+
+.alarm-state-warning {
+  background: var(--warning);
+  color: #1a1a0a;
+  animation: alarmStateBlink 2s step-end infinite;
+}
+
+.alarm-state-ack {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+
+@keyframes alarmStateBlink {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alarm-state-critical, .alarm-state-warning,
+  .scada-tile-critical.lit, .scada-btn-silence {
+    animation: none;
+  }
+}
+
+/* Vrijeme — monospace s tabularnim znamenkama za poravnanje */
+.alarm-table .col-time {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.alarm-obj-link {
+  font-weight: 600;
+  color: var(--text);
+  margin-right: 8px;
+}
+
+.alarm-obj-link:hover { color: var(--accent); }
+
+.alarm-row-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+.alarm-table .alarm-tag-list { margin-bottom: 0; }
+
+/* Regija i "potvrdio" ne smiju razgurati tablicu izvan kartice */
+.alarm-table td.col-region .region-tag {
+  max-width: 130px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.alarm-table .col-ackby { font-size: 12px; }
+.alarm-table td.col-ackby .alarm-ack-info { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+@media (max-width: 1200px) {
+  .alarm-row-loc { display: none; }
+}
+
+.alarm-ack-time {
+  margin-left: 6px;
+  color: var(--text2);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.alarm-row-actions {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.alarm-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.alarm-icon-btn:hover { text-decoration: none; }
+
+.alarm-icon-btn-ack {
+  color: var(--accent);
+  border-color: rgba(59,130,246,0.35);
+}
 
 /* ── Status tabs ── */
 .alarm-status-tabs {
@@ -403,4 +678,14 @@
   .alarm-bulk-bar { flex-direction: column; align-items: stretch; }
   .alarm-bulk-actions { flex-direction: column; }
   .alarm-bulk-actions .alarm-action-btn { width: 100%; justify-content: center; min-height: 44px; }
+}
+
+/* ── Tablica na desktopu, kartice na mobilnom ─────────────────────────────
+   Na kraju datoteke da nadjača ranija display pravila iste specifičnosti */
+@media (max-width: 899px) {
+  .alarm-table-wrap { display: none; }
+}
+
+@media (min-width: 900px) {
+  .alarm-list { display: none; }
 }
