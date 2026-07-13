@@ -355,7 +355,7 @@ Organizirana u tabove:
 | Tab | Sadržaj |
 |-----|---------|
 | **Pregled** | Trenutni napon, temperatura, koordinate, status |
-| **Grafovi** | Vremenski nizovi (6h / 24h / 7 dana): napon baterije, solarni napon, modem/GPS metrike |
+| **Grafovi** | Vremenski nizovi (6h / 24h / 7 dana / proizvoljni datum): napon baterije, solarni napon, modem/GPS metrike |
 | **Alarmi** | Povijesni alarmi stanice s opcijama upravljanja |
 | **Događaji** | Event log — promjene stanja i dijagnostički zapisi |
 | **Toplinska mapa** | Frekvencija alarma po satu × dan u tjednu |
@@ -363,6 +363,20 @@ Organizirana u tabove:
 - Karta s prikazom lokacije i geofence polumjera
 - Editabilna polja: konfiguracija, koordinate, napomene
 - Kontrole: ručni poll, brisanje, potvrda alarma
+
+### Povijesni pregled podataka (proizvoljni datum)
+Uz brze raspone (6h / 24h / 7d), tab **Grafovi** ima i opciju **Datum** — odabir
+proizvoljnog datuma ili raspona datuma (od–do):
+- Rezolucija podataka bira se automatski prema širini raspona: do 3 dana →
+  10-minutni podaci, do 42 dana → satni prosjeci, dulje → dnevni sažeci
+- Strelice ◀ ▶ pomiču odabrani raspon naprijed/natrag za njegovu širinu —
+  praktično za listanje dan po dan
+- Vremenski podaci (Open-Meteo) prikazuju se za povijesne raspone unutar
+  zadnjih 30 dana
+- **Tablica mjerenja** — prikaz točnih izmjerenih vrijednosti (napon, struja,
+  solar, temperatura, svjetlo…) s vremenskim oznakama, dostupna za bilo koji raspon
+- **CSV izvoz** — preuzimanje svih mjerenja odabranog raspona (svi stupci,
+  format kompatibilan s Excelom)
 
 ### Stranica usporedbe stanica
 - Izbor do 4 stanice za usporedbu

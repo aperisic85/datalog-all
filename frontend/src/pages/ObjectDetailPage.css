@@ -219,6 +219,96 @@
 .filter-tab:hover { background: var(--bg3); color: var(--text); }
 .filter-tab.active { background: rgba(59,130,246,0.15); color: var(--accent); }
 
+.charts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.charts-toolbar .range-selector { margin-bottom: 0; }
+
+.charts-toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.btn-sm:disabled { opacity: 0.5; cursor: default; }
+
+.btn-secondary.toggled {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Povijesni pregled — odabir datumskog raspona */
+.custom-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.custom-range-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.custom-range-field input[type="date"] {
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.day-nav { padding: 6px 8px; }
+
+.resolution-note {
+  font-size: 12px;
+  color: var(--text2);
+  margin-left: 4px;
+}
+
+/* Tablica mjerenja */
+.measurements-table-card {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.measurements-table-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.measurements-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg2);
+  z-index: 1;
+}
+
+.measurements-table-count {
+  font-size: 12px;
+  color: var(--text2);
+  padding: 8px 13px;
+  border-top: 1px solid var(--border);
+}
+
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
