@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
 import { listAlarmHistory, listRegions, acknowledgeAlarm, deleteAlarm } from '../api/endpoints';
 import type { AlarmListItem } from '../types';
@@ -8,9 +8,10 @@ import {
   MapPin, Thermometer, Zap, Check, Trash2,
   ExternalLink, Filter, ChevronLeft, ChevronRight,
   Clock, CheckCircle, X, Wind, Eye,
+  Volume2, VolumeX, BellOff, RefreshCw,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
-import { bs } from 'date-fns/locale';
+import { hr } from 'date-fns/locale';
 import './AlarmsPage.css';
 
 // ── Alarm tip definicije ────────────────────────────────────────────────────
@@ -48,8 +49,22 @@ const ALARM_DEFS: { key: AlarmKey; label: string; icon: React.ReactNode; severit
   { key: 'alarm_fog_signal_on_while_no_fog',   label: 'Sirena: aktivna bez magle',  icon: <Wind size={12} />,          severity: 'warning' },
 ];
 
+// Kritičnost se izvodi iz ALARM_DEFS — jedan izvor istine za severity
+const CRITICAL_KEYS = ALARM_DEFS.filter(d => d.severity === 'danger').map(d => d.key);
+
+function isCriticalAlarm(item: AlarmListItem) {
+  return CRITICAL_KEYS.some(k => item[k] > 0);
+}
+
+type Severity = 'critical' | 'warning' | 'ack';
+
+function severityOf(item: AlarmListItem): Severity {
+  if (item.acknowledged_at) return 'ack';
+  return isCriticalAlarm(item) ? 'critical' : 'warning';
+}
+
 function AlarmTags({ item }: { item: AlarmListItem }) {
-  const active = ALARM_DEFS.filter(d => (item[d.key] as number) > 0);
+  const active = ALARM_DEFS.filter(d => item[d.key] > 0);
   if (!active.length) return null;
   return (
     <div className="alarm-tag-list">
@@ -62,14 +77,48 @@ function AlarmTags({ item }: { item: AlarmListItem }) {
   );
 }
 
-function isCriticalAlarm(item: AlarmListItem) {
-  return item.alarm_battery_voltage_flat > 0 ||
-    item.alarm_garmin_comm_failed > 0 ||
-    item.alarm_lantern_night_light_off > 0 ||
-    item.alarm_lantern_comm_failed > 0 ||
-    item.alarm_station_out_of_radius > 0 ||
-    item.alarm_fog_signal_off_during_fog > 0 ||
-    item.alarm_visibility_comm_failed > 0;
+// ── Zvučna signalizacija (annunciator horn) ────────────────────────────────
+// Klasična SCADA sirena: svira dok postoji nepotvrđeni kritični alarm,
+// "Utišaj" je gasi do pojave NOVOG kritičnog alarma (re-annunciation).
+function useAlarmHorn(criticalCount: number) {
+  const [enabled, setEnabled] = useState(() => localStorage.getItem('alarm-horn') === '1');
+  const [silenced, setSilenced] = useState(false);
+  const [prevCount, setPrevCount] = useState(criticalCount);
+
+  // Porast broja kritičnih alarma poništava utišanje (re-annunciation)
+  if (criticalCount !== prevCount) {
+    setPrevCount(criticalCount);
+    if (criticalCount > prevCount) setSilenced(false);
+  }
+
+  const sounding = enabled && !silenced && criticalCount > 0;
+
+  useEffect(() => {
+    if (!sounding) return;
+    const ctx = new AudioContext();
+    const beep = () => {
+      if (ctx.state !== 'running') { ctx.resume(); return; }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    };
+    beep();
+    const timer = setInterval(beep, 2500);
+    return () => { clearInterval(timer); ctx.close(); };
+  }, [sounding]);
+
+  const toggle = () => setEnabled(e => {
+    localStorage.setItem('alarm-horn', e ? '0' : '1');
+    return !e;
+  });
+
+  return { enabled, toggle, sounding, silence: () => setSilenced(true) };
 }
 
 // ── Modalna forma za potvrdu ────────────────────────────────────────────────
@@ -108,7 +157,130 @@ const STATUS_TABS: { value: Status; label: string; icon: React.ReactNode }[] = [
   { value: 'all',          label: 'Svi',       icon: <Clock size={14} /> },
 ];
 
-// ── Alarm kartica ──────────────────────────────────────────────────────────
+// ── SCADA statusna traka (annunciator panel) ───────────────────────────────
+function ScadaBanner({ critical, warning, activeTotal, updatedAt, onRefresh, isFetching, horn }: {
+  critical: number;
+  warning: number;
+  activeTotal: number;
+  updatedAt: number;
+  onRefresh: () => void;
+  isFetching: boolean;
+  horn: ReturnType<typeof useAlarmHorn>;
+}) {
+  return (
+    <div className="scada-banner card">
+      <div className="scada-tiles">
+        <div className={`scada-tile scada-tile-critical${critical > 0 ? ' lit' : ''}`}>
+          <span className="scada-tile-count">{critical}</span>
+          <span className="scada-tile-label">Kritično</span>
+        </div>
+        <div className={`scada-tile scada-tile-warning${warning > 0 ? ' lit' : ''}`}>
+          <span className="scada-tile-count">{warning}</span>
+          <span className="scada-tile-label">Upozorenje</span>
+        </div>
+        <div className={`scada-tile scada-tile-total${activeTotal === 0 ? ' ok' : ''}`}>
+          <span className="scada-tile-count">{activeTotal}</span>
+          <span className="scada-tile-label">Aktivnih</span>
+        </div>
+      </div>
+      <div className="scada-banner-right">
+        {updatedAt > 0 && (
+          <span className="scada-updated" title="Vrijeme zadnjeg osvježavanja podataka">
+            <Clock size={12} /> {format(updatedAt, 'HH:mm:ss')}
+          </span>
+        )}
+        <button className="btn-secondary scada-btn" onClick={onRefresh} disabled={isFetching}
+          title="Osvježi podatke">
+          <RefreshCw size={13} className={isFetching ? 'spin' : undefined} /> Osvježi
+        </button>
+        <button
+          className={`btn-secondary scada-btn${horn.enabled ? ' scada-btn-on' : ''}`}
+          onClick={horn.toggle}
+          title={horn.enabled ? 'Isključi zvučnu signalizaciju' : 'Uključi zvučnu signalizaciju za kritične alarme'}
+        >
+          {horn.enabled ? <Volume2 size={13} /> : <VolumeX size={13} />} Sirena
+        </button>
+        {horn.sounding && (
+          <button className="btn-danger scada-btn scada-btn-silence" onClick={horn.silence}
+            title="Utišaj sirenu do pojave novog kritičnog alarma">
+            <BellOff size={13} /> Utišaj
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Redak SCADA tablice ────────────────────────────────────────────────────
+function AlarmRow({ item, onAcknowledge, onDelete, isAcking, selected, onToggleSelect }: {
+  item: AlarmListItem;
+  onAcknowledge: () => void;
+  onDelete: () => void;
+  isAcking: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
+}) {
+  const sev = severityOf(item);
+  return (
+    <tr className={`alarm-row alarm-row-${sev}${selected ? ' alarm-row-selected' : ''}`}>
+      <td className="col-cb">
+        <input
+          type="checkbox"
+          className="alarm-select-cb"
+          checked={selected}
+          onChange={onToggleSelect}
+          aria-label={`Označi alarm za ${item.object_name}`}
+        />
+      </td>
+      <td className="col-state">
+        {sev === 'ack'
+          ? <span className="alarm-state alarm-state-ack">POTV</span>
+          : <span className={`alarm-state alarm-state-${sev}`}>AKT</span>}
+      </td>
+      <td className="col-time" title={formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}>
+        {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
+      </td>
+      <td className="col-object">
+        <Link to={`/objects/${item.object_id}`} className="alarm-obj-link">{item.object_name}</Link>
+        <code className="station-id">{item.station_id}</code>
+        {item.location_name && <span className="alarm-row-loc"><MapPin size={11} />{item.location_name}</span>}
+      </td>
+      <td className="col-region">
+        <span className="region-tag">
+          <span className="region-dot" style={{ background: item.region_color }} />
+          {item.region_name}
+        </span>
+      </td>
+      <td className="col-alarms"><AlarmTags item={item} /></td>
+      <td className="col-ackby">
+        {item.acknowledged_at
+          ? <span className="alarm-ack-info" title={format(new Date(item.acknowledged_at), 'dd.MM.yyyy HH:mm:ss')}>
+              <CheckCircle size={11} /> {item.acknowledged_by || '—'}
+              <span className="alarm-ack-time">{format(new Date(item.acknowledged_at), 'dd.MM. HH:mm')}</span>
+            </span>
+          : <span className="text-muted">—</span>}
+      </td>
+      <td className="col-actions">
+        <div className="alarm-row-actions">
+          <Link to={`/objects/${item.object_id}`} className="btn-secondary alarm-icon-btn" title="Pregledaj objekt">
+            <ExternalLink size={13} />
+          </Link>
+          {!item.acknowledged_at && (
+            <button className="btn-secondary alarm-icon-btn alarm-icon-btn-ack" onClick={onAcknowledge}
+              disabled={isAcking} title="Potvrdi alarm">
+              {isAcking ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <Check size={13} />}
+            </button>
+          )}
+          <button className="btn-danger alarm-icon-btn" onClick={onDelete} title="Briši zapis">
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── Alarm kartica (mobilni prikaz) ─────────────────────────────────────────
 function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggleSelect }: {
   item: AlarmListItem;
   onAcknowledge: () => void;
@@ -165,9 +337,9 @@ function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggle
       {/* Vremena */}
       <div className="alarm-times">
         <span><Clock size={11} />
-          {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm')}
+          {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
           {' · '}
-          {formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: bs })}
+          {formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}
         </span>
         {isAcknowledged && item.acknowledged_at && (
           <span className="alarm-ack-info">
@@ -223,7 +395,7 @@ export default function AlarmsPage() {
 
   const qc = useQueryClient();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, isFetching, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['alarms-history', status, regionFilter, page],
     queryFn: () => listAlarmHistory({
       status,
@@ -231,10 +403,32 @@ export default function AlarmsPage() {
       page,
       page_size: 30,
     }),
-    refetchInterval: status === 'active' ? 60_000 : undefined,
+    // SCADA: prikaz se osvježava uvijek, aktivni alarmi češće
+    refetchInterval: status === 'active' ? 30_000 : 60_000,
+    placeholderData: keepPreviousData,
   });
 
+  // Zaseban upit za annunciator brojače — neovisan o filterima i paginaciji
+  const { data: activeSummary } = useQuery({
+    queryKey: ['alarms-active-summary'],
+    queryFn: () => listAlarmHistory({ status: 'active', page: 1, page_size: 200 }),
+    refetchInterval: 30_000,
+  });
+
+  const activeAlarms = activeSummary?.data ?? [];
+  const criticalCount = activeAlarms.filter(isCriticalAlarm).length;
+  const warningCount = activeAlarms.length - criticalCount;
+  const activeTotal = activeSummary?.total ?? 0;
+
+  const horn = useAlarmHorn(criticalCount);
+
   const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
+
+  const invalidateAlarmQueries = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ['alarms-history'] }),
+    qc.invalidateQueries({ queryKey: ['alarms-active-summary'] }),
+    qc.invalidateQueries({ queryKey: ['region-summary'] }),
+  ]);
 
   const syncParams = (s: Status, r: string) => {
     const p: Record<string, string> = {};
@@ -255,8 +449,7 @@ export default function AlarmsPage() {
     setPendingAck(prev => new Set(prev).add(ackTarget.object_id));
     try {
       await acknowledgeAlarm(ackTarget.object_id);
-      await qc.invalidateQueries({ queryKey: ['alarms-history'] });
-      await qc.invalidateQueries({ queryKey: ['region-summary'] });
+      await invalidateAlarmQueries();
     } catch {
       setActionError(`Greška pri potvrdi alarma za "${ackTarget.object_name}". Pokušaj ponovo.`);
     } finally {
@@ -271,16 +464,31 @@ export default function AlarmsPage() {
     setActionError('');
     try {
       await deleteAlarm(deleteTarget.id);
-      await qc.invalidateQueries({ queryKey: ['alarms-history'] });
-      await qc.invalidateQueries({ queryKey: ['region-summary'] });
+      await invalidateAlarmQueries();
     } catch {
       setActionError(`Greška pri brisanju alarma. Pokušaj ponovo.`);
     }
   };
 
-  const items = data?.data ?? [];
+  const items = useMemo(() => data?.data ?? [], [data]);
   const totalPages = data?.total_pages ?? 1;
   const total = data?.total ?? 0;
+
+  // Ako nakon brisanja/promjene filtera stranica ispadne iz raspona, vrati je u raspon
+  useEffect(() => {
+    if (data && page > Math.max(1, data.total_pages)) {
+      setPage(Math.max(1, data.total_pages));
+    }
+  }, [data, page]);
+
+  // Odabir ne smije preživjeti zapise koji više nisu na ekranu (refetch, paginacija)
+  useEffect(() => {
+    setSelected(prev => {
+      const visible = new Set(items.map(i => i.id));
+      const next = new Set([...prev].filter(id => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [items]);
 
   // ── Bulk odabir ────────────────────────────────────────────────────────────
   const toggleSelect = (id: number) =>
@@ -306,8 +514,7 @@ export default function AlarmsPage() {
     const objectIds = [...new Set(selectedUnacked.map(i => i.object_id))];
     const results = await Promise.allSettled(objectIds.map(id => acknowledgeAlarm(id)));
     const failed = results.filter(r => r.status === 'rejected').length;
-    await qc.invalidateQueries({ queryKey: ['alarms-history'] });
-    await qc.invalidateQueries({ queryKey: ['region-summary'] });
+    await invalidateAlarmQueries();
     setBulkBusy(false);
     clearSelection();
     if (failed > 0) setActionError(`${failed} od ${objectIds.length} potvrda nije uspjelo. Pokušaj ponovo.`);
@@ -321,8 +528,7 @@ export default function AlarmsPage() {
     const ids = selectedItems.map(i => i.id);
     const results = await Promise.allSettled(ids.map(id => deleteAlarm(id)));
     const failed = results.filter(r => r.status === 'rejected').length;
-    await qc.invalidateQueries({ queryKey: ['alarms-history'] });
-    await qc.invalidateQueries({ queryKey: ['region-summary'] });
+    await invalidateAlarmQueries();
     setBulkBusy(false);
     clearSelection();
     if (failed > 0) setActionError(`${failed} od ${ids.length} brisanja nije uspjelo. Pokušaj ponovo.`);
@@ -398,6 +604,17 @@ export default function AlarmsPage() {
           </span>
         </div>
       </div>
+
+      {/* SCADA annunciator traka */}
+      <ScadaBanner
+        critical={criticalCount}
+        warning={warningCount}
+        activeTotal={activeTotal}
+        updatedAt={dataUpdatedAt}
+        onRefresh={() => { refetch(); qc.invalidateQueries({ queryKey: ['alarms-active-summary'] }); }}
+        isFetching={isFetching}
+        horn={horn}
+      />
 
       {/* Greška akcije */}
       {actionError && (
@@ -497,7 +714,49 @@ export default function AlarmsPage() {
         </div>
       )}
 
-      {/* Lista */}
+      {/* SCADA tablica (desktop) */}
+      {items.length > 0 && (
+        <div className="alarm-table-wrap card">
+          <table className="alarm-table">
+            <thead>
+              <tr>
+                <th className="col-cb">
+                  <input
+                    type="checkbox"
+                    className="alarm-select-cb"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && !allSelected; }}
+                    onChange={toggleSelectAll}
+                    aria-label="Označi sve alarme"
+                  />
+                </th>
+                <th className="col-state">Stanje</th>
+                <th className="col-time">Vrijeme</th>
+                <th className="col-object">Objekt</th>
+                <th className="col-region">Regija</th>
+                <th className="col-alarms">Alarmi</th>
+                <th className="col-ackby">Potvrdio</th>
+                <th className="col-actions">Akcije</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(item => (
+                <AlarmRow
+                  key={item.id}
+                  item={item}
+                  selected={selected.has(item.id)}
+                  onToggleSelect={() => toggleSelect(item.id)}
+                  isAcking={pendingAck.has(item.object_id)}
+                  onAcknowledge={() => setAckTarget(item)}
+                  onDelete={() => setDeleteTarget(item)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Kartice (mobilni) */}
       {items.length > 0 && (
         <div className="alarm-list">
           {items.map(item => (

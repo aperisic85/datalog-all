@@ -4,7 +4,7 @@ import {
   startOfWeek, subDays, format, parseISO,
   eachDayOfInterval, getMonth,
 } from 'date-fns';
-import { bs } from 'date-fns/locale';
+import { hr } from 'date-fns/locale';
 import { getAlarmHeatmap } from '../api/endpoints';
 import type { AlarmHeatmapDay } from '../types';
 import './AlarmHeatmapTab.css';
@@ -158,7 +158,7 @@ function YearlyHeatmap({ daily }: { daily: AlarmHeatmapDay[] }) {
                         x: r.left - wrap.left + CELL / 2,
                         y: r.top - wrap.top - 8,
                         text: cell.inRange
-                          ? `${format(cell.date, 'dd. MMMM yyyy.', { locale: bs })} — ${cell.count === 0 ? 'nema alarma' : `${cell.count} perioda s alarmom`}`
+                          ? `${format(cell.date, 'dd. MMMM yyyy.', { locale: hr })} — ${cell.count === 0 ? 'nema alarma' : `${cell.count} perioda s alarmom`}`
                           : '',
                       });
                     }}
@@ -308,7 +308,7 @@ function HeatmapStats({ daily }: { daily: AlarmHeatmapDay[] }) {
         <div className="hm-stat">
           <span className="hm-stat-val">{stats.maxDay.count}</span>
           <span className="hm-stat-lbl">
-            maks. perioda — {format(parseISO(stats.maxDay.date), 'dd. MMM yyyy.', { locale: bs })}
+            maks. perioda — {format(parseISO(stats.maxDay.date), 'dd. MMM yyyy.', { locale: hr })}
           </span>
         </div>
       )}
