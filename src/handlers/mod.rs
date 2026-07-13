@@ -37,17 +37,22 @@ pub async fn ingest_alarms(
     let station_id = detect_station_name(&payload).unwrap_or_else(|| "unknown".into());
     info!(station = %station_id, rows = payload.data.len(), "← alarms");
 
-    let records = parse_alarms(&payload, &station_id)?;
-    let count   = records.len();
+    let mut records = parse_alarms(&payload, &station_id)?;
+    // Kronološki: prijelazi stanja alarma moraju se obraditi redom nastanka
+    records.sort_by_key(|r| r.recorded_at);
+    let count = records.len();
 
     for rec in &records {
-        db::insert_alarm(&pool, rec).await?;
+        let inserted = db::insert_alarm(&pool, rec).await?;
         // Logiraj kritične alarme na server
         if rec.alarm_battery_voltage_flat    > 0 { warn!(station=%station_id, "ALARM: Baterija prazna!"); }
         if rec.alarm_lantern_night_light_off > 0 { warn!(station=%station_id, "ALARM: Fenjer ugašen noću!"); }
         if rec.alarm_station_out_of_radius   > 0 { warn!(station=%station_id, "ALARM: Stanica van radijusa!"); }
-        // Pošalji obavijesti (Telegram/Slack/webhook) za prijelaze stanja alarma
-        crate::notify::dispatch_for_alarm(&pool, rec).await;
+        // Obavijesti (Telegram/Slack/webhook) SAMO za nove zapise — duplikati
+        // koje stanica ponovo pošalje ne smiju iznova okidati obavijesti.
+        if inserted {
+            crate::notify::dispatch_for_alarm(&pool, rec).await;
+        }
     }
 
     Ok((StatusCode::CREATED, Json(IngestResponse { status: "ok", records_inserted: count, table: "alarms".into() })))

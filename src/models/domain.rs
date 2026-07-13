@@ -451,6 +451,36 @@ pub struct AlarmInsert {
 }
 
 // ================================================================
+// ALARM SHELVING (privremeno odlaganje alarma)
+// ================================================================
+
+/// Aktivni shelf s podacima o objektu — za prikaz u sučelju.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AlarmShelfView {
+    pub id:          Uuid,
+    pub object_id:   Uuid,
+    pub object_name: String,
+    pub station_id:  String,
+    pub region_name: String,
+    /// NULL = shelvani svi alarmi objekta
+    pub alarm_type:  Option<String>,
+    pub reason:      Option<String>,
+    pub shelved_by:  String,
+    pub shelved_at:  DateTime<Utc>,
+    pub expires_at:  DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ShelveAlarmRequest {
+    /// Ključ tipa alarma iz kataloga (npr. "battery_voltage_low");
+    /// izostavljeno/null = svi alarmi objekta
+    pub alarm_type:       Option<String>,
+    /// Trajanje shelfa u minutama
+    pub duration_minutes: i64,
+    pub reason:           Option<String>,
+}
+
+// ================================================================
 // EVENT LOG
 // ================================================================
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]

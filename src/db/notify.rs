@@ -132,12 +132,12 @@ pub async fn matching_rules(pool: &PgPool, region_id: Uuid, severity: i16)
     Ok(out)
 }
 
-/// Vraća (active, last_notified_at) za (objekt, tip alarma), ako zapis postoji.
+/// Vraća (active, last_notified_at, since) za (objekt, tip alarma), ako zapis postoji.
 pub async fn get_state(pool: &PgPool, object_id: Uuid, alarm_type: &str)
-    -> AppResult<Option<(bool, Option<DateTime<Utc>>)>>
+    -> AppResult<Option<(bool, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>>
 {
-    let row = sqlx::query_as::<_, (bool, Option<DateTime<Utc>>)>(
-        "SELECT active, last_notified_at FROM notification_state
+    let row = sqlx::query_as::<_, (bool, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>(
+        "SELECT active, last_notified_at, since FROM notification_state
          WHERE object_id = $1 AND alarm_type = $2")
         .bind(object_id).bind(alarm_type)
         .fetch_optional(pool).await?;

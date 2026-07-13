@@ -10,6 +10,7 @@ import type {
   Measurement1h,
   AlarmRecord,
   AlarmListItem,
+  AlarmShelf,
   EventLogRecord,
   LatestMeasurement,
   UserPublic,
@@ -130,6 +131,19 @@ export const listAlarmHistory = (params?: AlarmHistoryParams) =>
 
 export const deleteAlarm = (alarmId: number) =>
   api.delete(`/api/v1/alarms/${alarmId}`);
+
+// Alarm shelving (privremeno odlaganje alarma)
+export const listAlarmShelves = () =>
+  api.get<AlarmShelf[]>('/api/v1/alarms/shelves').then((r) => r.data);
+
+export const shelveAlarm = (objectId: string, data: {
+  alarm_type?: string | null;
+  duration_minutes: number;
+  reason?: string;
+}) => api.post<{ id: string }>(`/api/v1/objects/${objectId}/alarms/shelve`, data).then((r) => r.data);
+
+export const unshelveAlarm = (shelfId: string) =>
+  api.delete(`/api/v1/alarms/shelves/${shelfId}`);
 
 // Alarm heatmap
 export const getAlarmHeatmap = (id: string) =>

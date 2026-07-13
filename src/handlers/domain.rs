@@ -483,6 +483,68 @@ pub async fn acknowledge_alarm(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ── Alarm shelving ──────────────────────────────────────────────────────────
+
+/// POST /api/v1/objects/:id/alarms/shelve — privremeno odloži alarm(e) objekta
+pub async fn shelve_alarm(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<ShelveAlarmRequest>,
+) -> AppResult<(StatusCode, Json<serde_json::Value>)> {
+    if claims.role == "viewer" { return Err(AppError::Forbidden); }
+    check_object_access(&pool, &claims, id).await?;
+
+    if !(5..=43_200).contains(&req.duration_minutes) {
+        return Err(AppError::Validation(
+            "Trajanje mora biti između 5 minuta i 30 dana".into()));
+    }
+    if let Some(t) = req.alarm_type.as_deref() {
+        if !crate::notify::CATALOG.iter().any(|d| d.key == t) {
+            return Err(AppError::Validation(format!("Nepoznat tip alarma: {}", t)));
+        }
+    }
+
+    let shelf_id = db::create_alarm_shelf(
+        &pool, id, req.alarm_type.as_deref(),
+        req.duration_minutes, req.reason.as_deref(), &claims.username,
+    ).await?;
+
+    let uid = parse_uid(&claims.sub).ok();
+    let details = serde_json::json!({
+        "alarm_type": req.alarm_type.as_deref().unwrap_or("svi"),
+        "duration_minutes": req.duration_minutes,
+        "reason": req.reason,
+    });
+    let _ = db::write_audit(&pool, uid, Some(&claims.username),
+        "SHELVE_ALARM", Some("object"), Some(&id.to_string()), Some(details), None).await;
+
+    Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": shelf_id }))))
+}
+
+/// GET /api/v1/alarms/shelves — trenutno aktivni shelfovi
+pub async fn list_alarm_shelves(
+    State(pool): State<PgPool>,
+    Extension(_claims): Extension<JwtClaims>,
+) -> AppResult<Json<Vec<AlarmShelfView>>> {
+    Ok(Json(db::list_active_shelves(&pool).await?))
+}
+
+/// DELETE /api/v1/alarms/shelves/:shelf_id — ručno ukini shelf
+pub async fn unshelve_alarm(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(shelf_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    if claims.role == "viewer" { return Err(AppError::Forbidden); }
+    let object_id = db::unshelve_alarm(&pool, shelf_id, &claims.username).await?
+        .ok_or_else(|| AppError::NotFound(format!("Shelf {}", shelf_id)))?;
+    let uid = parse_uid(&claims.sub).ok();
+    let _ = db::write_audit(&pool, uid, Some(&claims.username),
+        "UNSHELVE_ALARM", Some("object"), Some(&object_id.to_string()), None, None).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// GET /api/v1/alarms  — globalni pregled alarma s filterima
 pub async fn list_alarms(
     State(pool): State<PgPool>,

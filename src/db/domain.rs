@@ -509,8 +509,11 @@ pub async fn get_latest_battery_voltage(
 // ALARMS
 // ================================================================
 
-pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<()> {
-    sqlx::query(
+/// Vraća `true` ako je zapis stvarno umetnut (nije duplikat).
+/// Poller pri restartu / bez broja zapisa ponovo dohvaća iste retke —
+/// pozivatelj smije slati obavijesti SAMO za nove zapise.
+pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<bool> {
+    let result = sqlx::query(
         "INSERT INTO alarms (object_id, station_id, recorded_at,
              alarm_datalogger_high_temp, alarm_datalogger_high_voltage, alarm_datalogger_other_error,
              alarm_battery_voltage_low, alarm_battery_voltage_flat, alarm_battery_other_error,
@@ -532,7 +535,7 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<()> {
         .bind(r.alarm_visibility_comm_failed).bind(r.alarm_visibility_error)
         .bind(r.alarm_fog_signal_off_during_fog).bind(r.alarm_fog_signal_on_while_no_fog)
         .execute(pool).await?;
-    Ok(())
+    Ok(result.rows_affected() > 0)
 }
 
 pub async fn get_alarms(
@@ -669,6 +672,63 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
         .fetch_one(pool).await?;
 
     Ok(Page::new(rows, total, page, page_size))
+}
+
+// ── Alarm shelving ────────────────────────────────────────────────────────
+
+/// Kreiraj shelf za (objekt, tip alarma). `alarm_type = None` = svi alarmi objekta.
+pub async fn create_alarm_shelf(
+    pool: &PgPool, object_id: Uuid, alarm_type: Option<&str>,
+    duration_minutes: i64, reason: Option<&str>, by: &str,
+) -> AppResult<Uuid> {
+    let id: Uuid = sqlx::query_scalar(
+        "INSERT INTO alarm_shelves (object_id, alarm_type, reason, shelved_by, expires_at)
+         VALUES ($1, $2, $3, $4, NOW() + make_interval(mins => $5::int))
+         RETURNING id")
+        .bind(object_id).bind(alarm_type).bind(reason).bind(by)
+        .bind(duration_minutes)
+        .fetch_one(pool).await?;
+    Ok(id)
+}
+
+/// Svi trenutno aktivni shelfovi (neistekli, neukinuti) s podacima o objektu.
+pub async fn list_active_shelves(pool: &PgPool) -> AppResult<Vec<AlarmShelfView>> {
+    Ok(sqlx::query_as::<_, AlarmShelfView>(
+        "SELECT s.id, s.object_id, o.name AS object_name, o.station_id,
+                r.name AS region_name, s.alarm_type, s.reason,
+                s.shelved_by, s.shelved_at, s.expires_at
+         FROM alarm_shelves s
+         JOIN objects o ON o.id = s.object_id
+         JOIN regions r ON r.id = o.region_id
+         WHERE s.unshelved_at IS NULL AND s.expires_at > NOW()
+         ORDER BY s.expires_at")
+        .fetch_all(pool).await?)
+}
+
+/// Ručno ukini shelf. Vraća object_id shelfa ako je postojao i bio aktivan.
+pub async fn unshelve_alarm(pool: &PgPool, shelf_id: Uuid, by: &str) -> AppResult<Option<Uuid>> {
+    Ok(sqlx::query_scalar(
+        "UPDATE alarm_shelves
+         SET unshelved_at = NOW(), unshelved_by = $2
+         WHERE id = $1 AND unshelved_at IS NULL
+         RETURNING object_id")
+        .bind(shelf_id).bind(by)
+        .fetch_optional(pool).await?)
+}
+
+/// Tipovi alarma trenutno shelvani za objekt.
+/// Vraća (svi_shelvani, skup_pojedinačnih_tipova).
+pub async fn shelved_alarm_types(pool: &PgPool, object_id: Uuid)
+    -> AppResult<(bool, std::collections::HashSet<String>)>
+{
+    let rows: Vec<Option<String>> = sqlx::query_scalar(
+        "SELECT alarm_type FROM alarm_shelves
+         WHERE object_id = $1 AND unshelved_at IS NULL AND expires_at > NOW()")
+        .bind(object_id)
+        .fetch_all(pool).await?;
+    let all = rows.iter().any(|t| t.is_none());
+    let types = rows.into_iter().flatten().collect();
+    Ok((all, types))
 }
 
 /// Heatmap agregacija alarma — dnevni sažetak + hour-of-day × day-of-week matrica

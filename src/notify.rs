@@ -128,6 +128,12 @@ async fn dispatch_inner(pool: &PgPool, rec: &AlarmInsert) -> anyhow::Result<()> 
     let active_keys: HashSet<&str> = active.iter().map(|d| d.key).collect();
     let hour_utc = now.hour() as i16;
 
+    // Alarm shelving: shelvani tipovi ne šalju obavijesti (ni raised ni cleared).
+    // Stanje se svejedno ažurira, pa se nakon isteka shelfa alarm ponovo javi
+    // kroz cooldown ako je i dalje aktivan.
+    let (shelf_all, shelf_types) = crate::db::domain::shelved_alarm_types(pool, object_id).await?;
+    let is_shelved = |key: &str| shelf_all || shelf_types.contains(key);
+
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .build()?;
@@ -137,19 +143,33 @@ async fn dispatch_inner(pool: &PgPool, rec: &AlarmInsert) -> anyhow::Result<()> 
         let state         = ndb::get_state(pool, object_id, def.key).await?;
         let was_active    = state.as_ref().map(|s| s.0).unwrap_or(false);
         let last_notified = state.as_ref().and_then(|s| s.1);
+        let since         = state.as_ref().and_then(|s| s.2);
         let is_new        = !was_active;
 
         ndb::set_state_active(pool, object_id, def.key, now).await?;
 
+        if is_shelved(def.key) { continue; }
+
         let rules = ndb::matching_rules(pool, region_id, def.severity).await?;
         if rules.is_empty() { continue; }
 
-        let text = format!(
-            "🔴 ALARM • {object_name}\n{} ({})\nVrijeme: {}",
-            def.label,
-            severity_label(def.severity),
-            rec.recorded_at.format("%d.%m.%Y %H:%M UTC"),
-        );
+        // Nova obavijest nosi vrijeme nastanka; ponovljena (nakon cooldowna)
+        // je jasno označena i navodi otkad alarm traje.
+        let text = if is_new {
+            format!(
+                "🔴 ALARM • {object_name}\n{} ({})\nVrijeme: {}",
+                def.label,
+                severity_label(def.severity),
+                rec.recorded_at.format("%d.%m.%Y %H:%M UTC"),
+            )
+        } else {
+            format!(
+                "🔁 ALARM I DALJE AKTIVAN • {object_name}\n{} ({})\nTraje od: {}",
+                def.label,
+                severity_label(def.severity),
+                since.unwrap_or(rec.recorded_at).format("%d.%m.%Y %H:%M UTC"),
+            )
+        };
 
         let mut sent_any = false;
         for (rule, ch) in &rules {
@@ -183,6 +203,8 @@ async fn dispatch_inner(pool: &PgPool, rec: &AlarmInsert) -> anyhow::Result<()> 
         if !was_active { continue; }
 
         ndb::set_state_cleared(pool, object_id, def.key).await?;
+
+        if is_shelved(def.key) { continue; }
 
         let rules = ndb::matching_rules(pool, region_id, def.severity).await?;
         let text = format!(

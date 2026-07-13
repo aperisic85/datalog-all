@@ -680,6 +680,101 @@
   .alarm-bulk-actions .alarm-action-btn { width: 100%; justify-content: center; min-height: 44px; }
 }
 
+/* ── Alarm shelving (odloženi alarmi) ───────────────────────────────────── */
+.alarm-state-shelved {
+  background: var(--bg3);
+  border: 1px dashed var(--border);
+  color: var(--text2);
+}
+
+.alarm-row-shelved td { opacity: 0.55; }
+.alarm-row-shelved .alarm-state,
+.alarm-row-shelved .alarm-tag { animation: none; }
+
+.alarm-card-shelved { opacity: 0.6; }
+.alarm-card-shelved .badge { animation: none; }
+
+.shelf-panel {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+}
+
+.shelf-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+
+.shelf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shelf-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+
+.shelf-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.shelf-reason {
+  color: var(--text2);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.shelf-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text2);
+  flex-wrap: wrap;
+}
+
+.shelf-item-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shelf-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.shelf-form-label select,
+.shelf-form-label input {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .shelf-item { flex-direction: column; align-items: stretch; }
+  .shelf-item-meta { justify-content: space-between; }
+}
+
 /* ── Tablica na desktopu, kartice na mobilnom ─────────────────────────────
    Na kraju datoteke da nadjača ranija display pravila iste specifičnosti */
 @media (max-width: 899px) {
