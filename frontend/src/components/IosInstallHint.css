@@ -1,0 +1,43 @@
+.ios-install-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  z-index: 199;
+  background: rgba(26, 86, 219, 0.92);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  animation: slideDown 0.2s ease both;
+}
+
+.ios-install-hint-text {
+  flex: 1;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.ios-install-hint-icon {
+  vertical-align: -2px;
+}
+
+.ios-install-hint-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+}
+
+.ios-install-hint-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
