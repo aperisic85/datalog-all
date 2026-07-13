@@ -126,6 +126,30 @@ export interface Measurement1h {
   fog_signal_current_avg?: number;
 }
 
+export interface Measurement24h {
+  id: number;
+  object_id?: string;
+  station_id: string;
+  recorded_at: string;
+  received_at: string;
+  datalogger_temp_avg?: number;
+  battery_voltage_avg?: number;
+  battery_current_avg?: number;
+  battery_current_min?: number;
+  battery_current_max?: number;
+  battery_charge_tot?: number;
+  battery_discharge_tot?: number;
+  battery_status_avg?: number;
+  solar_daylight_avg?: number;
+  modem_power_avg?: number;
+  internet_ok_avg?: number;
+  lantern_light_active_avg?: number;
+  lantern_current_avg?: number;
+  // Novi senzori (modularni program)
+  visibility_value_avg?: number;
+  fog_signal_current_avg?: number;
+}
+
 export interface AlarmListItem {
   id: number;
   object_id: string;

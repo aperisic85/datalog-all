@@ -8,6 +8,7 @@ import type {
   Page,
   Measurement10min,
   Measurement1h,
+  Measurement24h,
   AlarmRecord,
   AlarmListItem,
   AlarmShelf,
@@ -102,6 +103,9 @@ export const getMeasurements10min = (id: string, params?: { from?: string; to?: 
 
 export const getMeasurements1h = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
   api.get<Measurement1h[]>(`/api/v1/objects/${id}/measurements/1h`, { params }).then((r) => r.data);
+
+export const getMeasurements24h = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
+  api.get<Measurement24h[]>(`/api/v1/objects/${id}/measurements/24h`, { params }).then((r) => r.data);
 
 export const getLatestMeasurement = (id: string) =>
   api.get<LatestMeasurement>(`/api/v1/objects/${id}/measurements/latest`).then((r) => r.data);

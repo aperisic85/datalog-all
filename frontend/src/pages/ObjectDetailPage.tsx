@@ -7,6 +7,7 @@ import {
   getLatestMeasurement,
   getMeasurements10min,
   getMeasurements1h,
+  getMeasurements24h,
   getActiveAlarms,
   getEventLogs,
   getBatteryPrediction,
@@ -39,7 +40,8 @@ import {
   ComposedChart,
   Area,
 } from 'recharts';
-import { format, parseISO, subHours, subDays } from 'date-fns';
+import { format, parseISO, subHours, subDays, addDays } from 'date-fns';
+import type { Measurement10min, Measurement1h, Measurement24h } from '../types';
 import {
   ArrowLeft,
   Battery,
@@ -62,6 +64,11 @@ import {
   Cpu,
   Cloud,
   Check,
+  Calendar,
+  Table as TableIcon,
+  Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { formatDistanceToNow, parseISO as parseDateISO } from 'date-fns';
 import { hr } from 'date-fns/locale';
@@ -70,7 +77,8 @@ import './ObjectsPage.css';
 import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
 
 type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap' | 'control';
-type Range = '6h' | '24h' | '7d';
+type Range = '6h' | '24h' | '7d' | 'custom';
+type Resolution = '10min' | '1h' | '24h';
 type DriftRange = '1h' | '6h' | '24h' | '7d';
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -640,24 +648,29 @@ function SolarEfficiencySection({ objectId }: { objectId: string }) {
 
 function WeatherChart({
   objectId,
-  range,
+  days,
+  fromMs,
+  toMs,
+  multiDay,
   hasCoords,
 }: {
   objectId: string;
-  range: Range;
+  /** Broj dana unatrag za dohvat (null = raspon izvan dostupne povijesti — ne prikazuj) */
+  days: number | null;
+  fromMs: number;
+  toMs: number;
+  multiDay: boolean;
   hasCoords: boolean;
 }) {
-  const days = range === '7d' ? 7 : range === '24h' ? 2 : 1;
-
   const { data, isLoading } = useQuery({
     queryKey: ['weather', objectId, days],
-    queryFn:  () => getWeather(objectId, days),
-    enabled:  hasCoords,
+    queryFn:  () => getWeather(objectId, days!),
+    enabled:  hasCoords && days != null,
     staleTime: 30 * 60_000,
     retry: 1,
   });
 
-  if (!hasCoords) return null;
+  if (!hasCoords || days == null) return null;
 
   if (isLoading) return (
     <div className="chart-card card chart-wide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160 }}>
@@ -667,13 +680,13 @@ function WeatherChart({
 
   if (!data?.hours.length) return null;
 
-  const now = new Date();
-  const fromMs = now.getTime() - days * 24 * 60 * 60 * 1000;
-
   const weatherChartData = data.hours
-    .filter((h) => new Date(h.time).getTime() >= fromMs)
+    .filter((h) => {
+      const t = new Date(h.time).getTime();
+      return t >= fromMs && t <= toMs;
+    })
     .map((h) => ({
-      time: format(parseISO(h.time), range === '7d' ? 'dd.MM HH:mm' : 'HH:mm'),
+      time: format(parseISO(h.time), multiDay ? 'dd.MM HH:mm' : 'HH:mm'),
       cloud_cover:        h.cloud_cover,
       wind_speed_10m:     h.wind_speed_10m,
       precipitation:      h.precipitation,
@@ -1222,6 +1235,91 @@ function ControlTab({ objectId }: { objectId: string }) {
   );
 }
 
+// ─── Povijesna tablica mjerenja + CSV export ─────────────────────────────────
+
+type MeasurementRow = Measurement10min | Measurement1h | Measurement24h;
+
+function measurementColumns(resolution: Resolution, navlite: boolean) {
+  const lightKey = navlite && resolution === '10min' ? 'lantern_current_active_avg' : 'lantern_light_active_avg';
+  const cols: { key: string; label: string; digits: number }[] = [
+    { key: 'battery_voltage_avg',  label: 'Baterija (V)',       digits: 2 },
+    { key: 'battery_current_avg',  label: 'Struja bat. (A)',    digits: 2 },
+  ];
+  if (resolution !== '24h') cols.push({ key: 'solar_voltage_avg', label: 'Solar (V)', digits: 2 });
+  cols.push(
+    { key: 'datalogger_temp_avg',  label: 'Temp. (°C)',         digits: 1 },
+    { key: lightKey,               label: 'Svjetlo',            digits: 2 },
+    { key: 'lantern_current_avg',  label: 'Struja svj. (A)',    digits: 2 },
+  );
+  if (resolution !== '10min') {
+    cols.push(
+      { key: 'battery_charge_tot',    label: 'Punjenje (Ah)',   digits: 2 },
+      { key: 'battery_discharge_tot', label: 'Pražnjenje (Ah)', digits: 2 },
+    );
+  }
+  return cols;
+}
+
+function exportMeasurementsCsv(measurements: MeasurementRow[], stationId: string, rangeKey: string) {
+  if (measurements.length === 0) return;
+  // Sve kolone iz prvog zapisa (bez internih ID-ova) — potpuni izvoz
+  const skip = new Set(['id', 'object_id']);
+  const keys = Object.keys(measurements[0]).filter((k) => !skip.has(k));
+  const header = keys.join(';');
+  const rows = measurements
+    .slice()
+    .reverse() // kronološki
+    .map((m) => keys.map((k) => (m as unknown as Record<string, unknown>)[k] ?? '').join(';'));
+  // BOM za ispravan prikaz u Excelu
+  const blob = new Blob(['\uFEFF' + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${stationId}_mjerenja_${rangeKey.replace(/:/g, '_')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function MeasurementsTable({
+  measurements,
+  resolution,
+  navlite,
+}: {
+  measurements: MeasurementRow[];
+  resolution: Resolution;
+  navlite: boolean;
+}) {
+  const cols = measurementColumns(resolution, navlite);
+  return (
+    <div className="card measurements-table-card">
+      <div className="table-scroll measurements-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Vrijeme</th>
+              {cols.map((c) => <th key={c.key}>{c.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {measurements.map((m) => (
+              <tr key={m.id}>
+                <td style={{ fontSize: 12 }}>
+                  {format(parseISO(m.recorded_at), resolution === '24h' ? 'dd.MM.yyyy' : 'dd.MM.yyyy HH:mm')}
+                </td>
+                {cols.map((c) => {
+                  const v = (m as unknown as Record<string, unknown>)[c.key];
+                  return <td key={c.key}>{typeof v === 'number' ? v.toFixed(c.digits) : '—'}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="measurements-table-count">{measurements.length} zapisa (najnoviji prvi)</div>
+    </div>
+  );
+}
+
 export default function ObjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -1229,6 +1327,10 @@ export default function ObjectDetailPage() {
   const { isAdmin, user: authUser } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [range, setRange] = useState<Range>('24h');
+  // Povijesni pregled — proizvoljni datumski raspon (default: jučer, cijeli dan)
+  const [customFrom, setCustomFrom] = useState(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'));
+  const [customTo, setCustomTo] = useState(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'));
+  const [showTable, setShowTable] = useState(false);
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -1286,23 +1388,50 @@ export default function ObjectDetailPage() {
     refetchInterval: 60_000,
   });
 
-  const rangeParam = {
-    '6h': { from: subHours(new Date(), 6).toISOString(), limit: 500 },
-    '24h': { from: subHours(new Date(), 24).toISOString(), limit: 500 },
-    '7d': { from: subDays(new Date(), 7).toISOString(), limit: 500 },
-  }[range];
+  const customValid = customFrom <= customTo;
+  const customFromDate = new Date(`${customFrom}T00:00:00`);
+  const customToDate = new Date(`${customTo}T23:59:59.999`);
+  const customSpanDays = customValid
+    ? Math.max(1, Math.round((customToDate.getTime() - customFromDate.getTime()) / 86_400_000))
+    : 1;
 
-  const { data: measurements10min, isLoading: loadingM } = useQuery({
-    queryKey: ['measurements-10min', id, range],
+  // Rezolucija podataka ovisno o širini raspona: 10-min ≤ 3 dana (max 432 zapisa),
+  // satni prosjeci ≤ 42 dana (max 1008 → backend limit 1000), inače dnevni sažeci
+  const resolution: Resolution =
+    range === '7d' ? '1h'
+    : range === 'custom' ? (customSpanDays <= 3 ? '10min' : customSpanDays <= 42 ? '1h' : '24h')
+    : '10min';
+
+  const rangeParam = range === 'custom'
+    ? { from: customFromDate.toISOString(), to: customToDate.toISOString(), limit: 1000 }
+    : {
+        '6h': { from: subHours(new Date(), 6).toISOString(), limit: 500 },
+        '24h': { from: subHours(new Date(), 24).toISOString(), limit: 500 },
+        '7d': { from: subDays(new Date(), 7).toISOString(), limit: 500 },
+      }[range];
+
+  const rangeKey = range === 'custom' ? `custom:${customFrom}:${customTo}` : range;
+  const chartsEnabled = !!id && tab === 'charts' && (range !== 'custom' || customValid);
+
+  const { data: measurements10min, isLoading: loadingM10 } = useQuery({
+    queryKey: ['measurements-10min', id, rangeKey],
     queryFn: () => getMeasurements10min(id!, rangeParam),
-    enabled: !!id && tab === 'charts',
+    enabled: chartsEnabled && resolution === '10min',
   });
 
-  const { data: measurements1h } = useQuery({
-    queryKey: ['measurements-1h', id, range],
+  const { data: measurements1h, isLoading: loadingM1h } = useQuery({
+    queryKey: ['measurements-1h', id, rangeKey],
     queryFn: () => getMeasurements1h(id!, rangeParam),
-    enabled: !!id && tab === 'charts' && range === '7d',
+    enabled: chartsEnabled && resolution === '1h',
   });
+
+  const { data: measurements24h, isLoading: loadingM24h } = useQuery({
+    queryKey: ['measurements-24h', id, rangeKey],
+    queryFn: () => getMeasurements24h(id!, rangeParam),
+    enabled: chartsEnabled && resolution === '24h',
+  });
+
+  const loadingM = resolution === '10min' ? loadingM10 : resolution === '1h' ? loadingM1h : loadingM24h;
 
   const { data: activeAlarms, isLoading: loadingAlarms } = useQuery({
     queryKey: ['alarms-active', id],
@@ -1322,11 +1451,16 @@ export default function ObjectDetailPage() {
   const hasCoords = !!(obj?.latitude && obj?.longitude);
 
   // Weather data for chart overlay — mora biti PRIJE early return-ova (Rules of Hooks)
-  const chartWeatherDays = range === '7d' ? 7 : range === '24h' ? 2 : 1;
+  // Za custom raspon: broj dana unatrag od danas do početka raspona (Open-Meteo podržava max 30)
+  const customDaysBack = Math.ceil((Date.now() - customFromDate.getTime()) / 86_400_000);
+  const chartWeatherDays: number | null =
+    range === 'custom'
+      ? (customValid && customDaysBack >= 1 && customDaysBack <= 30 ? customDaysBack : null)
+      : range === '7d' ? 7 : range === '24h' ? 2 : 1;
   const { data: chartWeatherData } = useQuery({
     queryKey: ['weather', id, chartWeatherDays],
-    queryFn: () => getWeather(id!, chartWeatherDays),
-    enabled: !!id && tab === 'charts' && hasCoords,
+    queryFn: () => getWeather(id!, chartWeatherDays!),
+    enabled: !!id && tab === 'charts' && hasCoords && chartWeatherDays != null,
     staleTime: 30 * 60_000,
     retry: 1,
   });
@@ -1367,16 +1501,28 @@ export default function ObjectDetailPage() {
       })
   );
 
-  const chartData = (range === '7d' ? measurements1h : measurements10min)?.map((m) => {
-    const d = new Date(m.recorded_at);
-    d.setMinutes(0, 0, 0);
-    const irr = irrByHour.get(d.getTime()) ?? irrByHour.get(d.getTime() - 3_600_000);
-    return {
-      ...m,
-      irr,
-      time: format(parseISO(m.recorded_at), range === '7d' ? 'dd.MM HH:mm' : 'HH:mm'),
-    };
-  }) ?? [];
+  const rawMeasurements: (Measurement10min | Measurement1h | Measurement24h)[] =
+    (resolution === '10min' ? measurements10min : resolution === '1h' ? measurements1h : measurements24h) ?? [];
+
+  const timeFormat =
+    resolution === '24h' ? 'dd.MM.yyyy'
+    : range === '7d' || (range === 'custom' && customSpanDays > 1) ? 'dd.MM HH:mm'
+    : 'HH:mm';
+
+  // API vraća DESC (najnovije prvo) → za grafove okreni u kronološki redoslijed
+  const chartData = rawMeasurements
+    .slice()
+    .reverse()
+    .map((m) => {
+      const d = new Date(m.recorded_at);
+      d.setMinutes(0, 0, 0);
+      const irr = irrByHour.get(d.getTime()) ?? irrByHour.get(d.getTime() - 3_600_000);
+      return {
+        ...m,
+        irr,
+        time: format(parseISO(m.recorded_at), timeFormat),
+      };
+    });
 
   return (
     <div className="object-detail">
@@ -1903,17 +2049,102 @@ export default function ObjectDetailPage() {
 
       {tab === 'charts' && (
         <div className="charts-tab">
-          <div className="range-selector">
-            {(['6h', '24h', '7d'] as Range[]).map((r) => (
+          <div className="charts-toolbar">
+            <div className="range-selector">
+              {(['6h', '24h', '7d'] as Range[]).map((r) => (
+                <button
+                  key={r}
+                  className={`filter-tab ${range === r ? 'active' : ''}`}
+                  onClick={() => setRange(r)}
+                >
+                  {r}
+                </button>
+              ))}
               <button
-                key={r}
-                className={`filter-tab ${range === r ? 'active' : ''}`}
-                onClick={() => setRange(r)}
+                className={`filter-tab ${range === 'custom' ? 'active' : ''}`}
+                onClick={() => setRange('custom')}
               >
-                {r}
+                <Calendar size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
+                Datum
               </button>
-            ))}
+            </div>
+            <div className="charts-toolbar-actions">
+              <button
+                className={`btn-secondary btn-sm ${showTable ? 'toggled' : ''}`}
+                onClick={() => setShowTable((s) => !s)}
+              >
+                <TableIcon size={13} /> Tablica
+              </button>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => exportMeasurementsCsv(rawMeasurements, obj.station_id, rangeKey)}
+                disabled={rawMeasurements.length === 0}
+              >
+                <Download size={13} /> CSV
+              </button>
+            </div>
           </div>
+
+          {range === 'custom' && (
+            <div className="custom-range-row">
+              <button
+                className="btn-secondary btn-sm day-nav"
+                title="Dan ranije"
+                onClick={() => {
+                  setCustomFrom(format(addDays(customFromDate, -customSpanDays), 'yyyy-MM-dd'));
+                  setCustomTo(format(addDays(customToDate, -customSpanDays), 'yyyy-MM-dd'));
+                }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <label className="custom-range-field">
+                Od
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={format(new Date(), 'yyyy-MM-dd')}
+                  onChange={(e) => {
+                    setCustomFrom(e.target.value);
+                    if (e.target.value > customTo) setCustomTo(e.target.value);
+                  }}
+                />
+              </label>
+              <label className="custom-range-field">
+                Do
+                <input
+                  type="date"
+                  value={customTo}
+                  max={format(new Date(), 'yyyy-MM-dd')}
+                  onChange={(e) => {
+                    setCustomTo(e.target.value);
+                    if (e.target.value < customFrom) setCustomFrom(e.target.value);
+                  }}
+                />
+              </label>
+              <button
+                className="btn-secondary btn-sm day-nav"
+                title="Dan kasnije"
+                disabled={customTo >= format(new Date(), 'yyyy-MM-dd')}
+                onClick={() => {
+                  setCustomFrom(format(addDays(customFromDate, customSpanDays), 'yyyy-MM-dd'));
+                  setCustomTo(format(addDays(customToDate, customSpanDays), 'yyyy-MM-dd'));
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+              <span className="resolution-note">
+                Prikaz: {resolution === '10min' ? '10-minutni podaci' : resolution === '1h' ? 'satni prosjeci' : 'dnevni sažeci'}
+              </span>
+            </div>
+          )}
+
+          {showTable && rawMeasurements.length > 0 && (
+            <MeasurementsTable
+              measurements={rawMeasurements}
+              resolution={resolution}
+              navlite={!!obj.program_features?.navlite}
+            />
+          )}
 
           {loadingM ? (
             <div className="page-spinner"><div className="spinner" /></div>
@@ -2039,7 +2270,14 @@ export default function ObjectDetailPage() {
               )}
 
               {/* Weather correlation charts — samo ako objekt ima koordinate */}
-              <WeatherChart objectId={id!} range={range} hasCoords={hasCoords} />
+              <WeatherChart
+                objectId={id!}
+                days={chartWeatherDays}
+                fromMs={range === 'custom' ? customFromDate.getTime() : Date.now() - (chartWeatherDays ?? 1) * 86_400_000}
+                toMs={range === 'custom' ? customToDate.getTime() : Date.now()}
+                multiDay={timeFormat !== 'HH:mm'}
+                hasCoords={hasCoords}
+              />
             </div>
           )}
         </div>
