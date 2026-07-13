@@ -137,8 +137,19 @@ Za svaki objekt sustav održava predmemoriju s: statusom aktivnih alarma, brojem
 - Pregled svih aktivnih i povijesnih alarma
 - Filtriranje po regiji, statusu, vremenskom rasponu
 - Potvrda alarma (acknowledgment)
+- Odlaganje alarma (shelving)
 - Brisanje alarma
 - Pregled po stanici
+
+### Odlaganje alarma (shelving)
+Alarm se može privremeno odložiti — po tipu alarma ili za cijeli objekt — na
+odabrano vrijeme (5 minuta do 30 dana), uz opcijski razlog. Dok odlaganje traje:
+- ne šalju se obavijesti (Telegram / Slack / webhook) za taj alarm,
+- alarm se u sučelju prikazuje prigušeno s oznakom **ODL** i ne pokreće sirenu.
+
+Odlaganje automatski istječe, a može se i ručno ukinuti. Ako je alarm nakon
+isteka i dalje aktivan, obavijesti se ponovo šalju (re-annunciation). Sva
+odlaganja i ukidanja bilježe se u audit log.
 
 ### Vizualizacija — toplinska mapa alarma
 Za svaku stanicu generira se toplinska mapa koja prikazuje učestalost alarma po satu u danu i danu u tjednu. Ovo omogućuje lako uočavanje uzoraka (npr. alarmi koji se redovito javljaju noću ili vikendima).
@@ -265,6 +276,12 @@ Sustav prati tranzicije stanja per (objekt, tip alarma):
 - Prijelaz **aktivan → neaktivan**: šalje poruku "riješeno" (ako je uključeno)
 
 Ovo sprečava lažna ponavljanja i slanje notifikacija za alarmе koji su već poznati.
+
+Obavijesti se šalju **samo za nove zapise alarma**: duplikati koje poller ponovo
+dohvati (restart servera, tablica bez broja zapisa) odbijaju se na bazi i ne
+okidaju ponovno slanje. Ponovljena obavijest za i dalje aktivan alarm (nakon
+cooldowna) jasno je označena s "ALARM I DALJE AKTIVAN" i navodi otkad alarm traje.
+Odloženi (shelvani) alarmi ne šalju obavijesti dok odlaganje traje.
 
 ### Dnevnik notifikacija
 Sve poslane notifikacije se bilježe s: vremenom slanja, kanalom, statusom (uspjeh/greška), sadržajem poruke i eventualnom greškom.

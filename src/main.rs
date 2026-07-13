@@ -145,12 +145,16 @@ async fn main() -> anyhow::Result<()> {
         // Globalni alarmi
         .route("/api/v1/alarms",                          get(handlers::domain::list_alarms))
         .route("/api/v1/alarms/:id",                      delete(handlers::domain::delete_alarm))
+        // Alarm shelving (privremeno odlaganje)
+        .route("/api/v1/alarms/shelves",                  get(handlers::domain::list_alarm_shelves))
+        .route("/api/v1/alarms/shelves/:id",              delete(handlers::domain::unshelve_alarm))
         // Alarmi po objektu
         .route("/api/v1/objects/:id/alarms",              get(handlers::domain::get_alarms))
         .route("/api/v1/objects/:id/alarms",              delete(handlers::domain::delete_alarms))
         .route("/api/v1/objects/:id/alarms/heatmap",      get(handlers::domain::get_alarm_heatmap))
         .route("/api/v1/objects/:id/alarms/active",       get(handlers::domain::get_active_alarms))
         .route("/api/v1/objects/:id/alarms/acknowledge",  post(handlers::domain::acknowledge_alarm))
+        .route("/api/v1/objects/:id/alarms/shelve",       post(handlers::domain::shelve_alarm))
         // Event log po objektu
         .route("/api/v1/objects/:id/eventlogs",      get(handlers::domain::get_event_logs))
         // Users (admin only)

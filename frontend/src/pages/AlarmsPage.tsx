@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
-import { listAlarmHistory, listRegions, acknowledgeAlarm, deleteAlarm } from '../api/endpoints';
-import type { AlarmListItem } from '../types';
+import {
+  listAlarmHistory, listRegions, acknowledgeAlarm, deleteAlarm,
+  listAlarmShelves, shelveAlarm, unshelveAlarm,
+} from '../api/endpoints';
+import type { AlarmListItem, AlarmShelf } from '../types';
 import {
   AlertTriangle, Battery, Wifi, WifiOff,
   MapPin, Thermometer, Zap, Check, Trash2,
   ExternalLink, Filter, ChevronLeft, ChevronRight,
   Clock, CheckCircle, X, Wind, Eye,
-  Volume2, VolumeX, BellOff, RefreshCw,
+  Volume2, VolumeX, Bell, BellOff, RefreshCw, Timer,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { hr } from 'date-fns/locale';
@@ -62,6 +65,32 @@ function severityOf(item: AlarmListItem): Severity {
   if (item.acknowledged_at) return 'ack';
   return isCriticalAlarm(item) ? 'critical' : 'warning';
 }
+
+// ── Alarm shelving (privremeno odlaganje) ──────────────────────────────────
+// Ključ tipa u backendu = ključ iz ALARM_DEFS bez "alarm_" prefiksa
+const shelfKey = (k: AlarmKey) => k.replace(/^alarm_/, '');
+const shelfTypeLabel = (t: string | null) =>
+  t === null ? 'Svi alarmi' : (ALARM_DEFS.find(d => shelfKey(d.key) === t)?.label ?? t);
+
+// Zapis se smatra odloženim ako je odložen cijeli objekt ili su odloženi
+// svi tipovi alarma aktivni na tom zapisu.
+function isItemShelved(item: AlarmListItem, shelves: AlarmShelf[]): boolean {
+  const own = shelves.filter(s => s.object_id === item.object_id);
+  if (own.length === 0) return false;
+  if (own.some(s => s.alarm_type === null)) return true;
+  const activeKeys = ALARM_DEFS.filter(d => item[d.key] > 0).map(d => shelfKey(d.key));
+  return activeKeys.length > 0 && activeKeys.every(k => own.some(s => s.alarm_type === k));
+}
+
+const SHELF_DURATIONS: { minutes: number; label: string }[] = [
+  { minutes: 30,        label: '30 minuta' },
+  { minutes: 60,        label: '1 sat' },
+  { minutes: 4 * 60,    label: '4 sata' },
+  { minutes: 8 * 60,    label: '8 sati' },
+  { minutes: 24 * 60,   label: '24 sata' },
+  { minutes: 3 * 1440,  label: '3 dana' },
+  { minutes: 7 * 1440,  label: '7 dana' },
+];
 
 function AlarmTags({ item }: { item: AlarmListItem }) {
   const active = ALARM_DEFS.filter(d => item[d.key] > 0);
@@ -149,6 +178,137 @@ function ConfirmModal({ title, message, danger, confirmLabel, onConfirm, onCance
   );
 }
 
+// ── Modal za odlaganje alarma (shelving) ───────────────────────────────────
+function ShelveModal({ item, onDone, onCancel, onError }: {
+  item: AlarmListItem;
+  onDone: () => void;
+  onCancel: () => void;
+  onError: (msg: string) => void;
+}) {
+  const activeDefs = ALARM_DEFS.filter(d => item[d.key] > 0);
+  const [alarmType, setAlarmType] = useState<string>('');   // '' = svi alarmi objekta
+  const [duration, setDuration] = useState(8 * 60);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await shelveAlarm(item.object_id, {
+        alarm_type: alarmType || null,
+        duration_minutes: duration,
+        reason: reason.trim() || undefined,
+      });
+      onDone();
+    } catch {
+      onError(`Greška pri odlaganju alarma za "${item.object_name}". Pokušaj ponovo.`);
+      onCancel();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box card" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3><BellOff size={16} /> Odloži alarm</h3>
+          <button className="modal-close-btn" onClick={onCancel}><X size={18} /></button>
+        </div>
+        <div className="modal-body">
+          <p style={{ marginTop: 0 }}>
+            Objekt: <strong>{item.object_name}</strong>
+            <br /><span style={{ color: 'var(--text2)', fontSize: 13 }}>
+              Odloženi alarm ne šalje obavijesti (Telegram/webhook) dok odlaganje traje.
+              Nakon isteka alarm se ponovo javlja ako je i dalje aktivan.
+            </span>
+          </p>
+          <label className="shelf-form-label">
+            Tip alarma
+            <select value={alarmType} onChange={e => setAlarmType(e.target.value)}>
+              <option value="">Svi alarmi objekta</option>
+              {activeDefs.map(d => (
+                <option key={d.key} value={shelfKey(d.key)}>{d.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="shelf-form-label">
+            Trajanje
+            <select value={duration} onChange={e => setDuration(Number(e.target.value))}>
+              {SHELF_DURATIONS.map(d => (
+                <option key={d.minutes} value={d.minutes}>{d.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="shelf-form-label">
+            Razlog (opcionalno)
+            <input
+              type="text"
+              value={reason}
+              maxLength={200}
+              placeholder="npr. servis baterije u tijeku"
+              onChange={e => setReason(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={onCancel}>Odustani</button>
+          <button className="btn-primary" onClick={submit} disabled={busy}>
+            {busy
+              ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Odlažem...</>
+              : <><BellOff size={14} /> Odloži</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Panel odloženih alarma ─────────────────────────────────────────────────
+function ShelvedPanel({ shelves, onUnshelve, busyId }: {
+  shelves: AlarmShelf[];
+  onUnshelve: (shelf: AlarmShelf) => void;
+  busyId: string | null;
+}) {
+  if (shelves.length === 0) return null;
+  return (
+    <div className="shelf-panel card">
+      <div className="shelf-panel-title">
+        <BellOff size={14} /> Odloženi alarmi ({shelves.length})
+      </div>
+      <div className="shelf-list">
+        {shelves.map(s => (
+          <div key={s.id} className="shelf-item">
+            <div className="shelf-item-main">
+              <Link to={`/objects/${s.object_id}`} className="alarm-obj-link">{s.object_name}</Link>
+              <span className={`alarm-tag ${s.alarm_type === null ? 'alarm-tag-danger' : 'alarm-tag-warning'}`}>
+                {shelfTypeLabel(s.alarm_type)}
+              </span>
+              {s.reason && <span className="shelf-reason">„{s.reason}”</span>}
+            </div>
+            <div className="shelf-item-meta">
+              <span title={format(new Date(s.expires_at), 'dd.MM.yyyy HH:mm')}>
+                <Timer size={11} /> istječe {formatDistanceToNow(new Date(s.expires_at), { addSuffix: true, locale: hr })}
+              </span>
+              <span>odložio: {s.shelved_by}</span>
+              <button
+                className="btn-secondary alarm-icon-btn"
+                onClick={() => onUnshelve(s)}
+                disabled={busyId === s.id}
+                title="Vrati alarm u obavještavanje"
+              >
+                {busyId === s.id
+                  ? <span className="spinner" style={{ width: 13, height: 13 }} />
+                  : <Bell size={13} />}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Status tab definicije ──────────────────────────────────────────────────
 type Status = 'active' | 'acknowledged' | 'all';
 const STATUS_TABS: { value: Status; label: string; icon: React.ReactNode }[] = [
@@ -212,9 +372,11 @@ function ScadaBanner({ critical, warning, activeTotal, updatedAt, onRefresh, isF
 }
 
 // ── Redak SCADA tablice ────────────────────────────────────────────────────
-function AlarmRow({ item, onAcknowledge, onDelete, isAcking, selected, onToggleSelect }: {
+function AlarmRow({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking, selected, onToggleSelect }: {
   item: AlarmListItem;
+  shelved: boolean;
   onAcknowledge: () => void;
+  onShelve: () => void;
   onDelete: () => void;
   isAcking: boolean;
   selected: boolean;
@@ -222,7 +384,7 @@ function AlarmRow({ item, onAcknowledge, onDelete, isAcking, selected, onToggleS
 }) {
   const sev = severityOf(item);
   return (
-    <tr className={`alarm-row alarm-row-${sev}${selected ? ' alarm-row-selected' : ''}`}>
+    <tr className={`alarm-row alarm-row-${sev}${selected ? ' alarm-row-selected' : ''}${shelved ? ' alarm-row-shelved' : ''}`}>
       <td className="col-cb">
         <input
           type="checkbox"
@@ -233,9 +395,11 @@ function AlarmRow({ item, onAcknowledge, onDelete, isAcking, selected, onToggleS
         />
       </td>
       <td className="col-state">
-        {sev === 'ack'
-          ? <span className="alarm-state alarm-state-ack">POTV</span>
-          : <span className={`alarm-state alarm-state-${sev}`}>AKT</span>}
+        {shelved
+          ? <span className="alarm-state alarm-state-shelved">ODL</span>
+          : sev === 'ack'
+            ? <span className="alarm-state alarm-state-ack">POTV</span>
+            : <span className={`alarm-state alarm-state-${sev}`}>AKT</span>}
       </td>
       <td className="col-time" title={formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}>
         {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
@@ -271,6 +435,12 @@ function AlarmRow({ item, onAcknowledge, onDelete, isAcking, selected, onToggleS
               {isAcking ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <Check size={13} />}
             </button>
           )}
+          {!shelved && (
+            <button className="btn-secondary alarm-icon-btn" onClick={onShelve}
+              title="Odloži alarm (privremeno bez obavijesti)">
+              <BellOff size={13} />
+            </button>
+          )}
           <button className="btn-danger alarm-icon-btn" onClick={onDelete} title="Briši zapis">
             <Trash2 size={13} />
           </button>
@@ -281,9 +451,11 @@ function AlarmRow({ item, onAcknowledge, onDelete, isAcking, selected, onToggleS
 }
 
 // ── Alarm kartica (mobilni prikaz) ─────────────────────────────────────────
-function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggleSelect }: {
+function AlarmCard({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking, selected, onToggleSelect }: {
   item: AlarmListItem;
+  shelved: boolean;
   onAcknowledge: () => void;
+  onShelve: () => void;
   onDelete: () => void;
   isAcking: boolean;
   selected: boolean;
@@ -293,7 +465,7 @@ function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggle
   const critical = isCriticalAlarm(item);
 
   return (
-    <div className={`alarm-card card ${selected ? 'alarm-card-selected' : ''} ${isAcknowledged ? 'alarm-card-ack' : critical ? 'alarm-card-critical' : 'alarm-card-warning'}`}>
+    <div className={`alarm-card card ${selected ? 'alarm-card-selected' : ''} ${isAcknowledged ? 'alarm-card-ack' : critical ? 'alarm-card-critical' : 'alarm-card-warning'}${shelved ? ' alarm-card-shelved' : ''}`}>
       {/* Header: naziv + status badge */}
       <div className="alarm-card-header">
         <div className="alarm-card-title">
@@ -311,11 +483,13 @@ function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggle
           </div>
         </div>
         <div>
-          {isAcknowledged
-            ? <span className="badge badge-neutral"><CheckCircle size={11} /> Potvrđen</span>
-            : critical
-              ? <span className="badge badge-danger badge-pulse"><AlertTriangle size={11} /> Kritično</span>
-              : <span className="badge badge-warning"><AlertTriangle size={11} /> Upozorenje</span>
+          {shelved
+            ? <span className="badge badge-neutral"><BellOff size={11} /> Odložen</span>
+            : isAcknowledged
+              ? <span className="badge badge-neutral"><CheckCircle size={11} /> Potvrđen</span>
+              : critical
+                ? <span className="badge badge-danger badge-pulse"><AlertTriangle size={11} /> Kritično</span>
+                : <span className="badge badge-warning"><AlertTriangle size={11} /> Upozorenje</span>
           }
         </div>
       </div>
@@ -363,6 +537,11 @@ function AlarmCard({ item, onAcknowledge, onDelete, isAcking, selected, onToggle
             }
           </button>
         )}
+        {!shelved && (
+          <button className="btn-secondary alarm-action-btn" onClick={onShelve}>
+            <BellOff size={13} /> Odloži
+          </button>
+        )}
         <button className="btn-danger alarm-action-btn" onClick={onDelete}>
           <Trash2 size={13} /> Briši
         </button>
@@ -383,6 +562,8 @@ export default function AlarmsPage() {
   // Modalne potvrde
   const [ackTarget, setAckTarget]       = useState<AlarmListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AlarmListItem | null>(null);
+  const [shelveTarget, setShelveTarget] = useState<AlarmListItem | null>(null);
+  const [unshelveBusy, setUnshelveBusy] = useState<string | null>(null);
 
   // Bulk odabir + potvrde
   const [selected, setSelected]         = useState<Set<number>>(new Set());
@@ -415,9 +596,18 @@ export default function AlarmsPage() {
     refetchInterval: 30_000,
   });
 
+  // Aktivni shelfovi — odloženi alarmi ne zvone i ne broje se u annunciatoru
+  const { data: shelvesData } = useQuery({
+    queryKey: ['alarm-shelves'],
+    queryFn: listAlarmShelves,
+    refetchInterval: 30_000,
+  });
+  const shelves = useMemo(() => shelvesData ?? [], [shelvesData]);
+
   const activeAlarms = activeSummary?.data ?? [];
-  const criticalCount = activeAlarms.filter(isCriticalAlarm).length;
-  const warningCount = activeAlarms.length - criticalCount;
+  const unshelvedActive = activeAlarms.filter(i => !isItemShelved(i, shelves));
+  const criticalCount = unshelvedActive.filter(isCriticalAlarm).length;
+  const warningCount = unshelvedActive.length - criticalCount;
   const activeTotal = activeSummary?.total ?? 0;
 
   const horn = useAlarmHorn(criticalCount);
@@ -428,7 +618,22 @@ export default function AlarmsPage() {
     qc.invalidateQueries({ queryKey: ['alarms-history'] }),
     qc.invalidateQueries({ queryKey: ['alarms-active-summary'] }),
     qc.invalidateQueries({ queryKey: ['region-summary'] }),
+    qc.invalidateQueries({ queryKey: ['alarm-shelves'] }),
   ]);
+
+  // Vrati odloženi alarm u obavještavanje
+  const doUnshelve = async (shelf: AlarmShelf) => {
+    setActionError('');
+    setUnshelveBusy(shelf.id);
+    try {
+      await unshelveAlarm(shelf.id);
+      await invalidateAlarmQueries();
+    } catch {
+      setActionError(`Greška pri vraćanju alarma za "${shelf.object_name}". Pokušaj ponovo.`);
+    } finally {
+      setUnshelveBusy(null);
+    }
+  };
 
   const syncParams = (s: Status, r: string) => {
     const p: Record<string, string> = {};
@@ -566,6 +771,16 @@ export default function AlarmsPage() {
         />
       )}
 
+      {/* Odlaganje alarma (shelving) */}
+      {shelveTarget && (
+        <ShelveModal
+          item={shelveTarget}
+          onDone={async () => { setShelveTarget(null); await invalidateAlarmQueries(); }}
+          onCancel={() => setShelveTarget(null)}
+          onError={setActionError}
+        />
+      )}
+
       {/* Bulk potvrda */}
       {bulkConfirm === 'ack' && (
         <ConfirmModal
@@ -615,6 +830,9 @@ export default function AlarmsPage() {
         isFetching={isFetching}
         horn={horn}
       />
+
+      {/* Odloženi alarmi */}
+      <ShelvedPanel shelves={shelves} onUnshelve={doUnshelve} busyId={unshelveBusy} />
 
       {/* Greška akcije */}
       {actionError && (
@@ -744,10 +962,12 @@ export default function AlarmsPage() {
                 <AlarmRow
                   key={item.id}
                   item={item}
+                  shelved={isItemShelved(item, shelves)}
                   selected={selected.has(item.id)}
                   onToggleSelect={() => toggleSelect(item.id)}
                   isAcking={pendingAck.has(item.object_id)}
                   onAcknowledge={() => setAckTarget(item)}
+                  onShelve={() => setShelveTarget(item)}
                   onDelete={() => setDeleteTarget(item)}
                 />
               ))}
@@ -763,10 +983,12 @@ export default function AlarmsPage() {
             <AlarmCard
               key={item.id}
               item={item}
+              shelved={isItemShelved(item, shelves)}
               selected={selected.has(item.id)}
               onToggleSelect={() => toggleSelect(item.id)}
               isAcking={pendingAck.has(item.object_id)}
               onAcknowledge={() => setAckTarget(item)}
+              onShelve={() => setShelveTarget(item)}
               onDelete={() => setDeleteTarget(item)}
             />
           ))}

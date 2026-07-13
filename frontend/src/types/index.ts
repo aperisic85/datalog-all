@@ -163,6 +163,21 @@ export interface AlarmListItem {
   alarm_fog_signal_on_while_no_fog: number;
 }
 
+// Alarm shelving — privremeno odloženi alarmi
+export interface AlarmShelf {
+  id: string;
+  object_id: string;
+  object_name: string;
+  station_id: string;
+  region_name: string;
+  /** null = shelvani svi alarmi objekta */
+  alarm_type: string | null;
+  reason?: string;
+  shelved_by: string;
+  shelved_at: string;
+  expires_at: string;
+}
+
 export interface AlarmRecord {
   id: number;
   station_id: string;

@@ -95,10 +95,18 @@ pub async fn poll_one_table(
     let tl    = table_cfg.name.to_lowercase();
 
     if tl.contains("alarm") {
-        let recs = parse_alarms(&payload, station_id)?;
+        let mut recs = parse_alarms(&payload, station_id)?;
+        // Kronološki redoslijed — prijelazi stanja (raised/cleared) moraju se
+        // odigrati istim redom kojim su nastali na dataloggeru.
+        recs.sort_by_key(|r| r.recorded_at);
         for r in &recs {
-            db::insert_alarm(pool, r).await?;
-            crate::notify::dispatch_for_alarm(pool, r).await;
+            let inserted = db::insert_alarm(pool, r).await?;
+            // Obavijesti SAMO za nove zapise: poller ponovo dohvaća iste retke
+            // (restart, tablica bez broja zapisa) i duplikati bi inače slali
+            // beskrajne obavijesti s istim vremenom nastanka.
+            if inserted {
+                crate::notify::dispatch_for_alarm(pool, r).await;
+            }
         }
     } else if tl.contains("10min") {
         let recs = parse_measurements_10min(&payload, station_id)?;
