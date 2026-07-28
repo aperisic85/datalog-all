@@ -856,6 +856,47 @@ fn parse_uid(sub: &str) -> AppResult<Uuid> {
     Uuid::parse_str(sub).map_err(|_| AppError::Unauthorized)
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ENERGETSKA PROGNOZA
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// GET /api/v1/objects/:id/energy-forecast
+///
+/// Predviđanje stanja baterije 7 dana unaprijed iz prognoze iradijancije
+/// (Open-Meteo) i naučenih parametara stanice.
+///
+/// Poslužuje se iz cachea dok je svjež — Open-Meteo je besplatan servis s
+/// dnevnim ograničenjem, a scheduler prognozu ionako periodički osvježava.
+pub async fn get_energy_forecast(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<crate::energy_forecast::EnergyForecast>> {
+    check_object_access(&pool, &claims, id).await?;
+
+    if let Some(cached) = crate::energy_forecast::read_fresh_cache(&pool, id).await {
+        return Ok(Json(cached));
+    }
+
+    let f = crate::energy_forecast::forecast_for_object(&pool, id).await?;
+    if let Err(e) = crate::energy_forecast::store_cache(&pool, &f).await {
+        tracing::warn!(error = %e, "Energetska prognoza: spremanje u cache nije uspjelo");
+    }
+    Ok(Json(f))
+}
+
+/// GET /api/v1/energy-forecast/risks
+///
+/// Stanice pod energetskim rizikom (warning/critical) iz cachea, filtrirano
+/// po regijama kojima korisnik ima pristup — za karticu na dashboardu.
+pub async fn energy_forecast_risks(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+) -> AppResult<Json<Vec<crate::energy_forecast::EnergyRiskEntry>>> {
+    let uid = parse_uid(&claims.sub)?;
+    Ok(Json(crate::energy_forecast::list_risks(&pool, uid, &claims.role).await?))
+}
+
 async fn check_object_access(pool: &PgPool, claims: &JwtClaims, object_id: Uuid) -> AppResult<()> {
     let uid = parse_uid(&claims.sub)?;
     let obj = db::get_object_by_id(pool, object_id).await?

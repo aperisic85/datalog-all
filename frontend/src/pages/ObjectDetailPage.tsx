@@ -15,6 +15,7 @@ import {
   getBatteryHealth,
   getSolarEfficiency,
   getWeather,
+  getEnergyForecast,
   pollObject,
   updateObject,
   deleteObject,
@@ -39,6 +40,7 @@ import {
   Cell,
   ComposedChart,
   Area,
+  ReferenceLine,
 } from 'recharts';
 import { format, parseISO, subHours, subDays, addDays } from 'date-fns';
 import type { Measurement10min, Measurement1h, Measurement24h } from '../types';
@@ -65,6 +67,7 @@ import {
   Cloud,
   Check,
   Calendar,
+  CalendarClock,
   Table as TableIcon,
   Download,
   ChevronLeft,
@@ -637,6 +640,137 @@ function SolarEfficiencySection({ objectId }: { objectId: string }) {
         {data.baseline_ratio != null && (
           <span style={{ fontSize: 11, color: 'var(--text3)' }}>
             Ref. omjer: {(data.baseline_ratio * 1000).toFixed(2)} mV/(W/m²)
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Energetska prognoza (7 dana unaprijed) ──────────────────────────────────
+
+const FORECAST_STATUS_COLOR: Record<string, string> = {
+  ok:                'var(--success)',
+  warning:           'var(--warning)',
+  critical:          'var(--danger)',
+  insufficient_data: 'var(--text2)',
+};
+
+function EnergyForecastSection({ objectId }: { objectId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['energy-forecast', objectId],
+    queryFn:  () => getEnergyForecast(objectId),
+    staleTime: 60 * 60_000,
+    refetchInterval: 60 * 60_000,
+    retry: 1,
+  });
+
+  if (isLoading) return (
+    <div className="card" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <div className="spinner" style={{ width: 16, height: 16 }} />
+      <span style={{ fontSize: 13, color: 'var(--text2)' }}>Računam energetsku prognozu...</span>
+    </div>
+  );
+
+  if (error || !data) return null;
+
+  const color = FORECAST_STATUS_COLOR[data.status] ?? 'var(--text2)';
+  const warnV = 11.5 * (data.system_voltage / 12);
+  const critV = 10.5 * (data.system_voltage / 12);
+
+  const chartData = data.days.map((d) => ({
+    ...d,
+    label: format(parseISO(d.date), 'EEE dd.MM.', { locale: hr }),
+  }));
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderBottom: '1px solid var(--border)' }}>
+        <CalendarClock size={14} style={{ color }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Energetska prognoza — 7 dana
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text3)' }}>Open-Meteo prognoza</span>
+      </div>
+
+      {/* Status + poruka */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        {data.min_soc_pct != null && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 56 }}>
+            <span style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>
+              {Math.round(data.min_soc_pct)}%
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>min. SOC</span>
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color }}>{data.status_label}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{data.message}</div>
+        </div>
+      </div>
+
+      {/* Graf predviđenog napona + insolacije */}
+      {chartData.length > 0 && (
+        <div style={{ padding: '10px 14px 4px' }}>
+          <ResponsiveContainer width="100%" height={160}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
+              <YAxis yAxisId="v" domain={[
+                (min: number) => Math.min(min, critV) - 0.3,
+                (max: number) => Math.max(max, data.system_voltage) + 0.3,
+              ]} tick={{ fontSize: 10, fill: 'var(--text3)' }} />
+              <YAxis yAxisId="ins" orientation="right" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
+              <Tooltip
+                contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                formatter={(val: unknown, name: unknown) => {
+                  const n = Number(val);
+                  const label = String(name);
+                  if (label === 'Napon')       return [`${n.toFixed(2)} V`, label] as [string, string];
+                  if (label === 'Insolacija')  return [`${n.toFixed(2)} kWh/m²`, label] as [string, string];
+                  if (label === 'SOC')         return [`${n.toFixed(0)} %`, label] as [string, string];
+                  return [`${n}`, label] as [string, string];
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Area yAxisId="ins" type="monotone" dataKey="insolation_kwh" stroke="#f59e0b44" fill="#f59e0b22"
+                dot={false} name="Insolacija" />
+              <ReferenceLine yAxisId="v" y={warnV} stroke="var(--warning)" strokeDasharray="4 3"
+                label={{ value: `${warnV.toFixed(1)} V`, fontSize: 10, fill: 'var(--warning)', position: 'insideTopLeft' }} />
+              <ReferenceLine yAxisId="v" y={critV} stroke="var(--danger)" strokeDasharray="4 3"
+                label={{ value: `${critV.toFixed(1)} V`, fontSize: 10, fill: 'var(--danger)', position: 'insideBottomLeft' }} />
+              <Line yAxisId="v" type="monotone" dataKey="voltage_est" stroke={color} strokeWidth={2}
+                dot={{ r: 3 }} name="Napon" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Parametri modela — transparentnost procjene */}
+      <div style={{ padding: '6px 14px 10px', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        {data.capacity_ah != null && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Kapacitet: {data.capacity_ah.toFixed(0)} Ah
+          </span>
+        )}
+        {data.daily_discharge_ah != null && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Potrošnja: {data.daily_discharge_ah.toFixed(1)} Ah/dan
+          </span>
+        )}
+        {data.charge_ratio_ah_per_kwh != null && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Solarni omjer: {data.charge_ratio_ah_per_kwh.toFixed(1)} Ah po kWh/m²
+          </span>
+        )}
+        {data.start_soc_pct != null && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Početni SOC: {data.start_soc_pct.toFixed(0)} %
+          </span>
+        )}
+        {data.ratio_sample_days > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Naučeno iz {data.ratio_sample_days} dana
           </span>
         )}
       </div>
@@ -1829,6 +1963,7 @@ export default function ObjectDetailPage() {
 
           {/* ── Analitika ── */}
           <div className="overview-section-label">Analitika</div>
+          {hasCoords && <EnergyForecastSection objectId={id!} />}
           <BatteryCapacitySection objectId={id!} />
           <BatteryHealthSection objectId={id!} />
           {hasCoords && <SolarEfficiencySection objectId={id!} />}

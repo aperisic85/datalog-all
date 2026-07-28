@@ -106,13 +106,25 @@ pub async fn fetch_weather(
     lon: f64,
     past_days: u32,
 ) -> Result<WeatherResponse, String> {
+    fetch_weather_range(lat, lon, past_days, 1).await
+}
+
+/// Kao [`fetch_weather`], ali s konfiguririvim brojem dana prognoze unaprijed
+/// (max 16 za besplatni API). Koristi se za energetsku prognozu, gdje trebamo
+/// i povijest (za učenje omjera punjenja) i prognozu iradijancije.
+pub async fn fetch_weather_range(
+    lat: f64,
+    lon: f64,
+    past_days: u32,
+    forecast_days: u32,
+) -> Result<WeatherResponse, String> {
     let url = format!(
         "https://api.open-meteo.com/v1/forecast\
          ?latitude={lat:.5}&longitude={lon:.5}\
          &hourly=shortwave_radiation,cloud_cover,wind_speed_10m,precipitation,temperature_2m\
          &timezone=auto\
          &past_days={past_days}\
-         &forecast_days=1"
+         &forecast_days={forecast_days}"
     );
 
     let client = reqwest::Client::builder()

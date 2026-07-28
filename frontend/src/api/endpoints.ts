@@ -22,6 +22,8 @@ import type {
   AlarmHeatmapData,
   WeatherResponse,
   SolarEfficiency,
+  EnergyForecast,
+  EnergyRiskEntry,
   AuditLogEntry,
   NotificationChannel,
   NotificationRule,
@@ -173,6 +175,13 @@ export const getWeather = (id: string, days?: number) =>
 // Solar efficiency score
 export const getSolarEfficiency = (id: string) =>
   api.get<SolarEfficiency>(`/api/v1/objects/${id}/solar-efficiency`).then((r) => r.data);
+
+// Energetska prognoza (7 dana unaprijed)
+export const getEnergyForecast = (id: string) =>
+  api.get<EnergyForecast>(`/api/v1/objects/${id}/energy-forecast`).then((r) => r.data);
+
+export const getEnergyRisks = () =>
+  api.get<EnergyRiskEntry[]>('/api/v1/energy-forecast/risks').then((r) => r.data);
 
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>

@@ -384,6 +384,60 @@ export interface SolarEfficiency {
   daily_scores: SolarDayScore[];
 }
 
+/** Jedan dan energetske prognoze */
+export interface ForecastDay {
+  date: string;              // "YYYY-MM-DD"
+  insolation_kwh: number;    // prognozirana dnevna insolacija (kWh/m²)
+  charge_est_ah: number;     // procijenjeno punjenje (Ah)
+  discharge_est_ah: number;  // procijenjena potrošnja (Ah)
+  net_ah: number;            // neto bilanca (Ah)
+  soc_pct: number;           // predviđeni SOC na kraju dana (%)
+  voltage_est: number;       // predviđeni napon mirovanja (V)
+}
+
+/**
+ * Energetska prognoza — predviđanje stanja baterije 7 dana unaprijed.
+ * Vraćeno od GET /api/v1/objects/:id/energy-forecast
+ */
+export interface EnergyForecast {
+  object_id: string;
+  computed_at: string;
+  /** "ok" | "warning" | "critical" | "insufficient_data" */
+  status: string;
+  status_label: string;
+  message: string;
+  days: ForecastDay[];
+  /** Kapacitet korišten u simulaciji (Ah) */
+  capacity_ah?: number;
+  /** Naučeni omjer punjenja (Ah po kWh/m²) */
+  charge_ratio_ah_per_kwh?: number;
+  /** Medijan dnevne potrošnje (Ah) */
+  daily_discharge_ah?: number;
+  /** Početni SOC simulacije (%) */
+  start_soc_pct?: number;
+  /** 12 ili 24 */
+  system_voltage: number;
+  ratio_sample_days: number;
+  first_warning_date?: string;
+  first_critical_date?: string;
+  min_soc_pct?: number;
+}
+
+/** Stanica pod energetskim rizikom — GET /api/v1/energy-forecast/risks */
+export interface EnergyRiskEntry {
+  object_id: string;
+  object_name: string;
+  region_name: string;
+  region_color?: string;
+  status: string;
+  status_label: string;
+  message: string;
+  first_warning_date?: string;
+  first_critical_date?: string;
+  min_soc_pct?: number;
+  computed_at: string;
+}
+
 /**
  * Procjena efektivnog kapaciteta baterije iz dnevnih totalizatora.
  * Vraćen od GET /api/v1/objects/:id/battery/capacity

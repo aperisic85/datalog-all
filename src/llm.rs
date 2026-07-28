@@ -62,6 +62,7 @@ Dozvoljene akcije:
 - \"status\"   — opći pregled stanja, koliko je objekata u alarmu, sažetak po regijama.
 - \"alarmi\"   — popis trenutno aktivnih alarma.
 - \"objekt\"   — pitanje o JEDNOM objektu. U \"object\" stavi ime objekta.
+- \"brifing\"  — korisnik traži jutarnji brifing / dnevni izvještaj / pregled zadnja 24 sata.
 - \"pomoc\"    — korisnik traži pomoć ili popis mogućnosti.
 - \"nepoznato\"— ne možeš razaznati namjeru.
 
@@ -79,6 +80,8 @@ Primjeri:
 \"kad je zadnje mjerenje na Drveniku\" -> {\"action\":\"objekt\",\"object\":\"Drvenik\",\"focus\":\"mjerenje\"}
 \"reci mi sve o objektu Galija\" -> {\"action\":\"objekt\",\"object\":\"Galija\",\"focus\":\"sve\"}
 \"daj mi stanje sustava\" -> {\"action\":\"status\",\"object\":null,\"focus\":\"sve\"}
+\"daj mi jutarnji brifing\" -> {\"action\":\"brifing\",\"object\":null,\"focus\":\"sve\"}
+\"što se dogodilo preko noći\" -> {\"action\":\"brifing\",\"object\":null,\"focus\":\"sve\"}
 \"koji su aktivni alarmi\" -> {\"action\":\"alarmi\",\"object\":null,\"focus\":\"sve\"}
 \"što sve znaš\" -> {\"action\":\"pomoc\",\"object\":null,\"focus\":\"sve\"}";
 
@@ -132,11 +135,12 @@ fn parse_intent(content: &str) -> anyhow::Result<BotIntent> {
     let action = v.get("action").and_then(|a| a.as_str()).unwrap_or("nepoznato")
         .trim().to_lowercase();
     let action = match action.as_str() {
-        "status" | "alarmi" | "objekt" | "pomoc" => action,
+        "status" | "alarmi" | "objekt" | "pomoc" | "brifing" => action,
         // tolerancija na sinonime/varijante
         "object" => "objekt".to_string(),
         "alarms" | "alarm" => "alarmi".to_string(),
         "help" | "pomoć" => "pomoc".to_string(),
+        "briefing" => "brifing".to_string(),
         _ => "nepoznato".to_string(),
     };
 
@@ -209,6 +213,54 @@ pub async fn phrase_answer(client: &reqwest::Client, question: &str, facts: &str
         .ok_or_else(|| anyhow::anyhow!("LLM odgovor bez sadržaja: {}", body))?;
 
     Ok(content)
+}
+
+const BRIEFING_SYSTEM: &str = "\
+Ti si asistent nadzornog sustava pomorskih navigacijskih objekata. Na temelju
+zadanih ČINJENICA napiši kratak uvodni komentar (2-3 rečenice) za jutarnji
+brifing operaterima, na hrvatskom jeziku.
+
+Stroga pravila:
+- Koristi ISKLJUČIVO vrijednosti iz danih činjenica; NE izmišljaj i NE
+  mijenjaj brojeve ni imena objekata.
+- Istakni ono najvažnije: nove alarme, tihe stanice i energetske rizike.
+- Ako je sve u redu, reci to kratko i mirno.
+- Bez markdowna, bez naslova, bez nabrajanja — samo 2-3 tečne rečenice.";
+
+/// Treći (opcionalni) LLM poziv: iz složenih činjenica za jutarnji brifing
+/// napiši kratak uvodni komentar. Kao i drugdje, model ne može izmisliti
+/// vrijednosti — dobiva samo već-složene činjenice iz baze.
+pub async fn phrase_briefing(client: &reqwest::Client, facts: &str) -> anyhow::Result<String> {
+    let (key, url, model) = config();
+    if key.is_empty() {
+        anyhow::bail!("LLM_API_KEY nije postavljen");
+    }
+
+    let payload = json!({
+        "model": model,
+        "temperature": 0.3,
+        "messages": [
+            { "role": "system", "content": BRIEFING_SYSTEM },
+            { "role": "user",   "content": format!("Činjenice:\n{}", facts) }
+        ]
+    });
+
+    let resp = client.post(&url)
+        .header("Authorization", format!("Bearer {}", key))
+        .json(&payload)
+        .send().await?;
+
+    let status = resp.status();
+    let body: Value = resp.json().await?;
+    if !status.is_success() {
+        anyhow::bail!("LLM API greška ({}): {}", status, body);
+    }
+
+    body.pointer("/choices/0/message/content")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("LLM odgovor bez sadržaja: {}", body))
 }
 
 /// Vrati prvi izbalansirani `{ ... }` blok iz teksta.

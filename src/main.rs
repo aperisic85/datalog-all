@@ -2,7 +2,9 @@ mod auth;
 mod battery_capacity;
 mod battery_health;
 mod battery_prediction;
+mod briefing;
 mod db;
+mod energy_forecast;
 mod errors;
 mod handlers;
 mod llm;
@@ -88,6 +90,12 @@ async fn main() -> anyhow::Result<()> {
     // ── Telegram bot (dvosmjerna komunikacija — upiti) ──────────────────────
     telegram::start_bot(pool.clone());
 
+    // ── Energetska prognoza (periodički izračun za sve objekte) ────────────
+    energy_forecast::start_scheduler(pool.clone());
+
+    // ── AI jutarnji brifing (dnevni Telegram sažetak) ───────────────────────
+    briefing::start_scheduler(pool.clone());
+
     // ── CORS ──────────────────────────────────────────────────────────────
     let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
 
@@ -142,6 +150,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/weather",             get(handlers::domain::get_weather))
         // Solarni efikasnost score
         .route("/api/v1/objects/:id/solar-efficiency",    get(handlers::domain::get_solar_efficiency))
+        // Energetska prognoza (7 dana unaprijed)
+        .route("/api/v1/objects/:id/energy-forecast",     get(handlers::domain::get_energy_forecast))
+        .route("/api/v1/energy-forecast/risks",           get(handlers::domain::energy_forecast_risks))
         // Globalni alarmi
         .route("/api/v1/alarms",                          get(handlers::domain::list_alarms))
         .route("/api/v1/alarms/:id",                      delete(handlers::domain::delete_alarm))

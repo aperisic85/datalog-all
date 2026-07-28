@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { regionSummary } from '../api/endpoints';
-import { AlertTriangle, Battery, Zap, Radio, CheckCircle, ChevronRight } from 'lucide-react';
+import { regionSummary, getEnergyRisks } from '../api/endpoints';
+import { AlertTriangle, Battery, Zap, Radio, CheckCircle, ChevronRight, CalendarClock } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { hr } from 'date-fns/locale';
 import './DashboardPage.css';
 
 function AlarmLevel({ level }: { level?: number | null }) {
@@ -52,6 +54,70 @@ function LiveRing({ intervalMs, dataUpdatedAt }: { intervalMs: number; dataUpdat
           strokeDasharray={circ} strokeDashoffset={circ * (1 - progress)} strokeLinecap="round" />
       </svg>
       <span className="live-label">LIVE</span>
+    </div>
+  );
+}
+
+/**
+ * Stanice kojima energetska prognoza predviđa pad napona u sljedećih 7 dana.
+ * Prikazuje se samo kad ima rizika — inače kartica ne zauzima prostor.
+ */
+function EnergyRiskCard() {
+  const navigate = useNavigate();
+  const { data, isLoading } = useQuery({
+    queryKey: ['energy-risks'],
+    queryFn: getEnergyRisks,
+    refetchInterval: 15 * 60_000,
+    retry: 1,
+  });
+
+  if (isLoading || !data?.length) return null;
+
+  const fmtDate = (iso?: string) => {
+    if (!iso) return null;
+    try {
+      return format(parseISO(iso), 'EEEE dd.MM.', { locale: hr });
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <div className="energy-risk-card card">
+      <div className="energy-risk-header">
+        <CalendarClock size={15} style={{ color: 'var(--warning)' }} />
+        <h3>Energetski rizik — sljedećih 7 dana</h3>
+        <span className="energy-risk-count">{data.length}</span>
+      </div>
+      <div className="energy-risk-list">
+        {data.map((r) => {
+          const critical = r.status === 'critical';
+          const when = fmtDate(critical ? r.first_critical_date : r.first_warning_date);
+          return (
+            <button
+              key={r.object_id}
+              className={`energy-risk-row ${critical ? 'critical' : 'warning'}`}
+              onClick={() => navigate(`/objects/${r.object_id}`)}
+            >
+              <span className="energy-risk-dot" style={{ background: r.region_color || 'var(--text3)' }} />
+              <div className="energy-risk-body">
+                <div className="energy-risk-name">
+                  {r.object_name}
+                  <span className="energy-risk-region">{r.region_name}</span>
+                </div>
+                <div className="energy-risk-msg">{r.message}</div>
+              </div>
+              <div className="energy-risk-meta">
+                {when && <span className={critical ? 'energy-risk-when-crit' : 'energy-risk-when'}>{when}</span>}
+                {r.min_soc_pct != null && (
+                  <span className="energy-risk-soc">min. SOC {Math.round(r.min_soc_pct)}%</span>
+                )}
+              </div>
+              <ChevronRight size={14} style={{ color: 'var(--text3)', flexShrink: 0 }} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -117,6 +183,8 @@ export default function DashboardPage() {
           </div>
         </button>
       </div>
+
+      <EnergyRiskCard />
 
       <div className="regions-header">
         <h3>Regije</h3>

@@ -250,6 +250,70 @@ Sustav integrira **Open-Meteo API** (besplatni meteorološki servis) koji daje s
 
 ---
 
+## 8a. Energetska prognoza — predviđanje 7 dana unaprijed
+
+Dok predviđanje pražnjenja (poglavlje 7.1) ekstrapolira dosadašnji trend, **energetska
+prognoza** gleda unaprijed: koristi meteorološku prognozu da procijeni hoće li stanica
+sljedećih dana uspjeti napuniti bateriju.
+
+### Ideja
+Sustav o svakoj stanici već zna tri stvari:
+1. **koliko baterija stvarno prima po jedinici sunca** — omjer Ah po kWh/m², naučen
+   iz povijesti totalizatora punjenja i izmjerene insolacije,
+2. **koliko stanica dnevno troši** — medijan dnevnog pražnjenja (zadnjih 14 dana),
+3. **koliki joj je kapacitet** — konfigurirani nominalni ili procijenjeni (poglavlje 7.2).
+
+Open-Meteo besplatno daje **prognozu iradijancije 7 dana unaprijed**, pa se energetska
+bilanca simulira dan po dan:
+
+```
+SOC(d+1) = SOC(d) + (solarni_omjer × prognozirana_insolacija(d) − dnevna_potrošnja) / kapacitet
+```
+
+Iz SOC-a se preko krivulje napona olovne baterije (12 V / 24 V auto-skaliranje) računa
+predviđeni napon i uspoređuje s postojećim pragovima (11,5 V upozorenje, 10,5 V kritično).
+
+### Izlazne veličine
+- Dnevni niz: prognozirana insolacija, procijenjeno punjenje i potrošnja, neto bilanca,
+  predviđeni SOC i napon
+- Prvi dan pada ispod praga upozorenja i ispod kritičnog praga
+- Najniži predviđeni SOC unutar horizonta
+- Status: `ok` / `warning` / `critical` / `insufficient_data`
+
+Primjer poruke: *„Uz prognozirano vrijeme, napon pada ispod 11,5 V oko 31.07. —
+razmotrite obilazak."*
+
+### Transparentnost procjene
+Model je namjerno jednostavan i provjerljiv — nema skrivene „AI magije". Svi parametri
+(kapacitet, naučeni solarni omjer, dnevna potrošnja, početni SOC, broj dana iz kojih je
+učeno) prikazuju se uz graf, pa se procjena može ručno provjeriti.
+
+### Zaštita od pogrešnih zaključaka
+Prognoza se **ne** računa ako nema dovoljno ulaza: potrebno je najmanje 5 dana s
+podacima o punjenju i 5 dana s podacima o potrošnji, poznat kapacitet baterije i
+koordinate objekta. U protivnom se vraća status `insufficient_data` s objašnjenjem
+što nedostaje, umjesto nepouzdane procjene.
+
+### Gdje se vidi
+- **Detalj objekta → Pregled** — graf predviđenog napona kroz 7 dana s ucrtanim
+  pragovima i pozadinskom prognozom insolacije
+- **Dashboard** — kartica „Energetski rizik — sljedećih 7 dana" s popisom stanica
+  kojima se predviđa pad (prikazuje se samo kad rizika ima)
+- **Jutarnji brifing** — rizici uključeni u dnevni Telegram sažetak
+
+### Izračun u pozadini
+Scheduler periodički (default svakih 6 sati) računa prognozu za sve aktivne objekte s
+koordinatama i sprema je u cache. Zbog dnevnog ograničenja besplatnog Open-Meteo
+servisa, API poziv iz sučelja poslužuje se iz cachea dok je svjež (60 minuta) i tek se
+tada preračunava. Konfiguracija: `ENERGY_FORECAST_ENABLED`,
+`ENERGY_FORECAST_INTERVAL_HOURS`.
+
+**Značaj:** ovo je prijelaz iz *reaktivnog* nadzora (alarm kad je baterija već prazna)
+u *prediktivni* — upozorenje stiže dok se još stigne organizirati brod i tehničara, što
+je kod svjetionika na udaljenim otocima razlika od nekoliko dana.
+
+---
+
 ## 9. Sustav notifikacija
 
 ### Kanali obavješćivanja
@@ -299,6 +363,7 @@ Bot ne zahtijeva javni URL — koristi long-polling prema Telegram serverima. Od
 | `/status` | Sažetak po regijama: broj objekata, broj alarma |
 | `/alarmi` | Lista trenutno aktivnih alarma |
 | `/objekt <naziv>` | Detalji o pojedinoj stanici |
+| `/brifing` | Jutarnji brifing na zahtjev (vidi 10a) |
 | `/ai <pitanje>` | Eksplicitan upit prirodnim jezikom (vidi niže) |
 | `/pomoc` | Prikaz dostupnih naredbi |
 
@@ -334,6 +399,35 @@ postavljen, bot radi kao i prije — samo s `/` naredbama.
 
 ---
 
+## 10a. AI jutarnji brifing
+
+Svako jutro sustav sam sastavi i pošalje pregled stanja flote na sve omogućene
+Telegram kanale — bez da ga itko mora tražiti.
+
+### Što brifing sadrži
+- **Pregled flote** — ukupno objekata i koliko ih je u alarmu, razrađeno po regijama
+- **Novi alarmi u zadnja 24 sata** — po objektu, s brojem zapisa
+- **Trenutno aktivni alarmi** — s razinom ozbiljnosti i opisom
+- **Tihe stanice** — one koje su prestale slati podatke
+- **Energetski rizici** — stanice kojima prognoza predviđa pad napona (poglavlje 8a)
+
+### Uloga LLM-a
+Kao i kod ostalih AI značajki, **brojke nikad ne dolaze iz modela**. Izvještaj se
+sastavlja deterministički iz baze, a LLM (ako je `LLM_API_KEY` postavljen) dodaje samo
+kratak uvodni komentar od 2–3 rečenice na temelju već složenih činjenica. Ako LLM poziv
+padne ili ključ nije postavljen, brifing se šalje bez uvoda — sadržaj je identičan.
+
+### Konfiguracija i pristup
+- `BRIEFING_HOUR_UTC` — sat slanja (default 5 UTC ≈ 07:00 ljetnog CET-a)
+- `BRIEFING_ENABLED=false` — isključuje dnevno slanje
+- Traži `TELEGRAM_BOT_TOKEN`; bez njega je značajka neaktivna
+- Na zahtjev: komanda **`/brifing`** ili pitanje običnim jezikom
+  („daj mi jutarnji brifing", „što se dogodilo preko noći")
+
+Svako slanje bilježi se u dnevnik notifikacija (event `briefing`).
+
+---
+
 ## 11. Dashboard i vizualizacija
 
 ### Glavna nadzorna ploča
@@ -342,6 +436,9 @@ postavljen, bot radi kao i prije — samo s `/` naredbama.
 - Broj lanterni uključenih/isključenih
 - Automatsko osvježavanje svakih 60 sekundi
 - Animirani statistički prijelazi (smooth count transitions)
+- Kartica **„Energetski rizik — sljedećih 7 dana"** (poglavlje 8a) — popis stanica
+  kojima prognoza predviđa pad napona, s datumom i najnižim predviđenim SOC-om;
+  prikazuje se samo kad rizika ima, klik vodi na detalj objekta
 
 ### Popis objekata
 - Paginiran popis svih stanica
@@ -473,6 +570,7 @@ CR300 datalogeri mogu imati različite programe s različitim senzorima. Sustav 
 | Procjena kapaciteta | Analiza totalizatora — najdulji deficit niz | Usporedba s nominalnim kapacitetom |
 | Zdravlje baterije | Night sag + dnevna amplituda napona | 12V / 24V auto-skaliranje |
 | Efikasnost solarnog panela | Omjer stvarni napon / iradijancija | 75% warn, 55% critical |
+| Energetska prognoza (7 dana) | Simulacija SOC-a: prognozirana insolacija × naučeni solarni omjer − naučena potrošnja | 11.5V upozorenje, 10.5V kritično |
 | Detekcija tihe stanice | Timeout od zadnjeg mjerenja (DB trigger) | Konfigurirano po stanici (default 120 min) |
 | Geofence alarm | PostGIS prostorni upit | Konfigurirani polumjer po stanici |
 | Toplinska mapa alarma | Frekvencija po satu × dan (grid vizualizacija) | Vizualni uvid, bez praga |

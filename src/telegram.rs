@@ -183,6 +183,7 @@ async fn handle_command(pool: &PgPool, client: &reqwest::Client, text: &str) -> 
         "/start" | "/pomoc" | "/help" => help_text(),
         "/status" => cmd_status(pool).await,
         "/alarmi" | "/alarms" => cmd_alarms(pool).await,
+        "/brifing" | "/briefing" => crate::briefing::generate(pool, client).await,
         "/objekt" | "/object" => {
             if arg.is_empty() {
                 "Koristite: /objekt <ime>\nNpr. /objekt Galija".to_string()
@@ -231,6 +232,7 @@ async fn handle_natural_language(pool: &PgPool, client: &reqwest::Client, text: 
     match intent.action.as_str() {
         "status" => cmd_status(pool).await,
         "alarmi" => cmd_alarms(pool).await,
+        "brifing" => crate::briefing::generate(pool, client).await,
         "pomoc"  => help_text(),
         "objekt" => match intent.object.as_deref() {
             Some(name) => answer_object_nl(pool, client, text, name, &intent.focus).await,
@@ -249,6 +251,7 @@ fn help_text() -> String {
          /status — sažetak po regijama\n\
          /alarmi — trenutno aktivni alarmi\n\
          /objekt <ime> — stanje objekta (npr. /objekt Galija)\n\
+         /brifing — jutarnji brifing (24h pregled + energetska prognoza)\n\
          /pomoc — ova poruka");
     if crate::llm::is_enabled() {
         t.push_str(
@@ -394,7 +397,7 @@ fn build_object_facts(row: &ObjectRow, focus: &str) -> String {
 
 // ── Slanje ────────────────────────────────────────────────────────────────────
 
-async fn send_message(client: &reqwest::Client, token: &str, chat_id: &str, text: &str) -> anyhow::Result<()> {
+pub(crate) async fn send_message(client: &reqwest::Client, token: &str, chat_id: &str, text: &str) -> anyhow::Result<()> {
     let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
     let resp = client.post(&url)
         .json(&json!({ "chat_id": chat_id, "text": text }))
