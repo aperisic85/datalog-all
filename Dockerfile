@@ -9,6 +9,9 @@ WORKDIR /app
 
 # Cache dependencies first
 COPY Cargo.toml Cargo.lock ./
+# `crates/` su workspace članovi (aton_decode) — moraju postojati već ovdje,
+# inače cargo ne može učitati manifest workspacea ni u ovom cache koraku.
+COPY crates ./crates
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release 2>/dev/null || true
 
