@@ -12,6 +12,7 @@ import {
   ExternalLink, Filter, ChevronLeft, ChevronRight,
   Clock, CheckCircle, X, Wind, Eye,
   Volume2, VolumeX, Bell, BellOff, RefreshCw, Timer,
+  Lightbulb, DoorOpen, PhoneCall,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { hr } from 'date-fns/locale';
@@ -26,7 +27,13 @@ type AlarmKey = keyof Pick<AlarmListItem,
   'alarm_lantern_comm_failed' | 'alarm_lantern_other_error' |
   'alarm_modem_network_error' | 'alarm_modem_other_error' | 'alarm_station_other_error' |
   'alarm_visibility_comm_failed' | 'alarm_visibility_error' |
-  'alarm_fog_signal_off_during_fog' | 'alarm_fog_signal_on_while_no_fog'
+  'alarm_fog_signal_off_during_fog' | 'alarm_fog_signal_on_while_no_fog' |
+  'alarm_aton_call_request' | 'alarm_aton_temperature' |
+  'alarm_aton_voltage_light' | 'alarm_aton_voltage_automat' |
+  'alarm_aton_door_open' | 'alarm_aton_flash_code' |
+  'alarm_aton_light_on_automat' | 'alarm_aton_automat_on_light' |
+  'alarm_aton_lamp_blown' | 'alarm_aton_not_work_at_night' |
+  'alarm_aton_photocell_error' | 'alarm_aton_work_at_day'
 >;
 
 const ALARM_DEFS: { key: AlarmKey; label: string; icon: React.ReactNode; severity: 'danger' | 'warning' }[] = [
@@ -50,6 +57,19 @@ const ALARM_DEFS: { key: AlarmKey; label: string; icon: React.ReactNode; severit
   { key: 'alarm_visibility_error',             label: 'Vidljivost: greška senzora', icon: <Eye size={12} />,           severity: 'warning' },
   { key: 'alarm_fog_signal_off_during_fog',    label: 'Sirena: nije aktivna u magli', icon: <Wind size={12} />,        severity: 'danger'  },
   { key: 'alarm_fog_signal_on_while_no_fog',   label: 'Sirena: aktivna bez magle',  icon: <Wind size={12} />,          severity: 'warning' },
+  // AtoN stanice (csd_verzija) — alarme javlja sam RTU
+  { key: 'alarm_aton_lamp_blown',        label: 'Pregorena žarulja',            icon: <Lightbulb size={12} />,     severity: 'danger'  },
+  { key: 'alarm_aton_not_work_at_night', label: 'Ne radi po noći',              icon: <Lightbulb size={12} />,     severity: 'danger'  },
+  { key: 'alarm_aton_photocell_error',   label: 'Greška fotoćelije',            icon: <Eye size={12} />,           severity: 'danger'  },
+  { key: 'alarm_aton_flash_code',        label: 'Pogrešna karakteristika',      icon: <Lightbulb size={12} />,     severity: 'danger'  },
+  { key: 'alarm_aton_voltage_light',     label: 'Napon baterije GL.SVJ.',       icon: <Battery size={12} />,       severity: 'danger'  },
+  { key: 'alarm_aton_voltage_automat',   label: 'Napon baterije automata',      icon: <Battery size={12} />,       severity: 'danger'  },
+  { key: 'alarm_aton_work_at_day',       label: 'Svjetlo radi po danu',         icon: <Lightbulb size={12} />,     severity: 'warning' },
+  { key: 'alarm_aton_light_on_automat',  label: 'Svjetlo na bat. automata',     icon: <Battery size={12} />,       severity: 'warning' },
+  { key: 'alarm_aton_automat_on_light',  label: 'Automat na bat. svjetla',      icon: <Battery size={12} />,       severity: 'warning' },
+  { key: 'alarm_aton_temperature',       label: 'Temp. izvan granica',          icon: <Thermometer size={12} />,   severity: 'warning' },
+  { key: 'alarm_aton_door_open',         label: 'Vrata otvorena',               icon: <DoorOpen size={12} />,      severity: 'warning' },
+  { key: 'alarm_aton_call_request',      label: 'Zahtjev za pozivom',           icon: <PhoneCall size={12} />,     severity: 'warning' },
 ];
 
 // Kritičnost se izvodi iz ALARM_DEFS — jedan izvor istine za severity

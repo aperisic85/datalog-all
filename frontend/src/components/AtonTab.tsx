@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { BatteryCharging, PhoneCall, RefreshCw, Thermometer } from 'lucide-react';
+import { BatteryCharging, Lightbulb, PhoneCall, Thermometer } from 'lucide-react';
 import { getAtonReadings, getLatestAtonReading, pollAtonNow } from '../api/endpoints';
 import type { AtonReading, ObjectView } from '../types';
 import './AtonTab.css';
@@ -15,6 +15,14 @@ function ts(iso?: string): string {
   if (!iso) return '—';
   try { return format(parseISO(iso), 'dd.MM.yyyy. HH:mm:ss'); } catch { return iso; }
 }
+
+/** Minuta od ponoći → HH:MM (RTU šalje prozor noći u minutama). */
+function minutaUSat(min?: number): string {
+  if (min == null || min < 0) return '—';
+  return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+const DOBA_DANA: Record<number, string> = { 0: 'Sumrak', 1: 'Noć', 2: 'Dan' };
 
 /** Dva kanala kroz cijelu mapu: glavno svjetlo i automat. */
 function ChannelCard({
@@ -84,9 +92,10 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
       <div className="aton-conn card">
         <div className="aton-conn-info">
           <div><span>snopsy_r</span><code>{obj.aton_snopsy_endpoint ?? '—'}</code></div>
-          <div><span>Tel. podatkovni</span><code>{obj.aton_number ?? '—'}</code></div>
-          <div><span>Modbus adresa</span><code>{obj.aton_addr ?? '—'}</code></div>
+          <div><span>GSM broj (podatkovni)</span><code>{obj.aton_number ?? '—'}</code></div>
+          <div><span>ID oznaka</span><code>{obj.aton_addr ?? '—'}</code></div>
           <div><span>Registara</span><code>{obj.aton_reg_count}</code></div>
+          <div><span>Program</span><code>csd_verzija · kat. {obj.aton_category}</code></div>
           <div><span>Sinkr. sata</span><code>{obj.aton_sync_clock ? 'da' : 'ne'}</code></div>
           <div><span>Zadnje očitanje</span><code>{ts(latest?.recorded_at)}</code></div>
         </div>
@@ -142,13 +151,15 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
 
             <div className="aton-card">
               <div className="aton-card-head">
-                <RefreshCw size={14} />
-                <h4>Dnevni prosjek potrošnje</h4>
+                <Lightbulb size={14} />
+                <h4>Izvor svjetla</h4>
               </div>
-              <div className="aton-big">{fmt(latest.dnevna_potrosnja_a, 'A')}</div>
+              <div className="aton-big">{fmt(latest.struja_led_a, 'A')}</div>
               <div className="aton-rows">
-                <div><span>Struja potrošnje (izvor svj.)</span><b>{fmt(latest.potrosnja_izvor_a, 'A')}</b></div>
-                <div><span>Zaprimljeno</span><b>{ts(latest.received_at)}</b></div>
+                <div><span>Doba dana</span><b>{latest.doba_dana != null ? (DOBA_DANA[latest.doba_dana] ?? `?${latest.doba_dana}`) : '—'}</b></div>
+                <div><span>Noć traje</span><b>{minutaUSat(latest.pocetak_noci_min)} – {minutaUSat(latest.kraj_noci_min)}</b></div>
+                <div><span>Dnevni prosjek potrošnje</span><b>{fmt(latest.potrosnja_izvor_a, 'A')}</b></div>
+                <div><span>Dnevna potrošnja</span><b>{fmt(latest.dnevna_potrosnja_a, 'Ah')}</b></div>
               </div>
             </div>
           </div>
@@ -161,8 +172,10 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
             {showRegs && (
               <>
                 <p className="aton-regs-note">
-                  Mapa alarm/status bitova još nije razriješena — registri se čuvaju
-                  uz svako očitanje da se mogu naknadno mapirati bez novog poziva.
+                  Mapa je verificirana prema izvornom kodu RTU-a. Sirovi registri se
+                  i dalje čuvaju uz svako očitanje — služe za provjeru i za kategorije
+                  kojima mapa još nije poznata. Druga vrijednost je sirovi registar,
+                  treća je <code>i16 ÷ 100</code> (vrijedi samo za analogne kanale).
                 </p>
                 <div className="aton-regs-grid">
                   {(latest.regs ?? []).map((r, i) => (
@@ -193,6 +206,7 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
                   <th>GL.SVJ. struja</th>
                   <th>AUTOMAT napon</th>
                   <th>AUTOMAT struja</th>
+                  <th>Struja izvora</th>
                   <th>Dnevna potrošnja</th>
                 </tr>
               </thead>
@@ -205,7 +219,8 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
                     <td>{fmt(r.gl_svj_struja_a, 'A')}</td>
                     <td>{fmt(r.automat_napon_v, 'V')}</td>
                     <td>{fmt(r.automat_struja_a, 'A')}</td>
-                    <td>{fmt(r.dnevna_potrosnja_a, 'A')}</td>
+                    <td>{fmt(r.struja_led_a, 'A')}</td>
+                    <td>{fmt(r.dnevna_potrosnja_a, 'Ah')}</td>
                   </tr>
                 ))}
               </tbody>

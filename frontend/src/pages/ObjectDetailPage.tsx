@@ -788,6 +788,7 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
     aton_addr: obj.aton_addr != null ? String(obj.aton_addr) : '',
     aton_reg_count: String(obj.aton_reg_count ?? 31),
     aton_sync_clock: obj.aton_sync_clock ?? false,
+    aton_category: String(obj.aton_category ?? 7),
     // Program tip
     is_modular: pf != null,
     program_version: obj.program_version ?? '',
@@ -847,6 +848,7 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
       aton_addr: form.aton_addr ? Number(form.aton_addr) : undefined,
       aton_reg_count: Number(form.aton_reg_count) || 31,
       aton_sync_clock: form.aton_sync_clock,
+      aton_category: Number(form.aton_category) || 7,
       program_version: form.is_modular && form.program_version ? form.program_version : undefined,
       program_features: form.is_modular ? {
         sealite: form.pf_sealite,
@@ -921,19 +923,32 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
                   <input value={form.aton_snopsy_endpoint} onChange={(e) => set('aton_snopsy_endpoint', e.target.value)} placeholder="10.0.0.5:2007" />
                 </div>
                 <div className="form-group">
-                  <label>Tel. podatkovni (RTU)</label>
+                  <label>GSM broj (podatkovni)</label>
                   <input value={form.aton_number} onChange={(e) => set('aton_number', e.target.value)} placeholder="0917654321" />
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Modbus adresa</label>
+                  <label>ID oznaka (Modbus adresa)</label>
                   <input type="number" min={1} max={247} value={form.aton_addr} onChange={(e) => set('aton_addr', e.target.value)} placeholder="51" />
                 </div>
+                <div className="form-group">
+                  <label>Kategorija programa csd_verzija</label>
+                  <select value={form.aton_category} onChange={(e) => set('aton_category', e.target.value)}>
+                    {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+                      <option key={c} value={c}>
+                        {c === 7 ? '7 — puni set (podržano)' : `${c} — mapa još nije poznata`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
                 <div className="form-group">
                   <label>Broj registara</label>
                   <input type="number" min={1} max={125} value={form.aton_reg_count} onChange={(e) => set('aton_reg_count', e.target.value)} />
                 </div>
+                <div className="form-group" />
               </div>
               <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                 <label className="filter-checkbox">

@@ -126,6 +126,9 @@ pub fn parse_alarms(payload: &DataloggerPayload, station_id: &str) -> AppResult<
             alarm_visibility_error:           get_field_i16(row, &fm, &["Alarm_visibility_error"]),
             alarm_fog_signal_off_during_fog:  get_field_i16(row, &fm, &["Alarm_fog_signal_off_during_fog"]),
             alarm_fog_signal_on_while_no_fog: get_field_i16(row, &fm, &["Alarm_fog_signal_on_while_no_fog"]),
+            // AtoN alarme šalju samo CSD stanice (izvor `aton_csd`) — CR300
+            // ih nema, pa ostaju na nuli.
+            ..Default::default()
         })
     }).collect()
 }

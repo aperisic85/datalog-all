@@ -16,7 +16,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
-use aton_decode::{read_object, Aton, ClockSet, ObjectConfig, SessionError};
+use aton_decode::{read_object, Aton, Category, ClockSet, DobaDana, ObjectConfig, SessionError};
 use chrono::{Datelike, Timelike, Utc};
 use sqlx::PgPool;
 use tokio::sync::Mutex;
@@ -24,7 +24,7 @@ use tracing::{error, info, warn};
 
 use crate::db::aton as db_aton;
 use crate::db::domain as db;
-use crate::models::aton::{AtonPollConfig, AtonReadingInsert};
+use crate::models::aton::{alarm_insert_from_aton, AtonPollConfig, AtonReadingInsert};
 use crate::models::domain::Measurement10minInsert;
 
 use super::SharedPollerStatus;
@@ -73,7 +73,12 @@ impl AtonStation {
         let endpoint = c.aton_snopsy_endpoint.clone()?;
         let number   = c.aton_number.clone()?;
         let addr     = u8::try_from(c.aton_addr?).ok()?;
-        let reg_count = u16::try_from(c.aton_reg_count).unwrap_or(aton_decode::REG_COUNT as u16);
+        let category = u8::try_from(c.aton_category).ok().and_then(Category::from_number)?;
+        // Kategorija zna svoj broj registara; konfigurirana vrijednost je
+        // rezerva za kategorije kojima mapa još nije poznata.
+        let reg_count = category
+            .reg_count()
+            .unwrap_or_else(|| u16::try_from(c.aton_reg_count).unwrap_or(aton_decode::REG_COUNT as u16));
 
         Some(Self {
             object_id:  c.id,
@@ -85,6 +90,7 @@ impl AtonStation {
             cfg: ObjectConfig {
                 number,
                 addr,
+                category,
                 reg_count,
                 // Sat se popunjava tik prije poziva (mora biti aktualan).
                 clock: None,
@@ -181,7 +187,7 @@ async fn store_reading(pool: &PgPool, station: &AtonStation, a: &Aton) -> crate:
     let recorded_at = Utc::now().with_second(0).and_then(|t| t.with_nanosecond(0)).unwrap_or_else(Utc::now);
 
     let reading = AtonReadingInsert::from_aton(
-        Some(station.object_id), &station.station_id, recorded_at, a);
+        Some(station.object_id), &station.station_id, recorded_at, station.cfg.category, a);
     db_aton::insert_aton_reading(pool, &reading).await?;
 
     db::insert_measurement_10min(pool, &Measurement10minInsert {
@@ -192,8 +198,22 @@ async fn store_reading(pool: &PgPool, station: &AtonStation, a: &Aton) -> crate:
         // Glavna baterija stanice = baterija glavnog svjetla.
         battery_voltage_avg: Some(a.gl_svj.napon_v),
         battery_current_avg: Some(a.gl_svj.struja_a),
+        // Struja izvora svjetla je isti podatak koji CR300 stanice javljaju
+        // kao struju fenjera, pa ide u isto polje i crta se istim grafom.
+        lantern_current_avg: Some(a.struja_led_a),
+        // Doba dana RTU sam računa iz tablice sunca — 1 = noć.
+        solar_daylight_smp:  Some(i16::from(a.doba_dana != DobaDana::Noc)),
         ..Default::default()
     }).await?;
+
+    // Alarmi idu istim putem kao i alarmi CR300 stanica: snapshot u `alarms`,
+    // pa obavijesti samo za stvarno nove zapise (izbjegava ponavljanje pri
+    // ponovnom prozivanju iste minute).
+    let alarm = alarm_insert_from_aton(
+        Some(station.object_id), &station.station_id, recorded_at, a);
+    if db::insert_alarm(pool, &alarm).await? {
+        crate::notify::dispatch_for_alarm(pool, &alarm).await;
+    }
 
     Ok(())
 }

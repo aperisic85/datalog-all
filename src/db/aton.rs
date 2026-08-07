@@ -10,7 +10,7 @@ use crate::models::domain::TimeRangeQuery;
 const POLL_CONFIG_COLS: &str = "id, station_id, name,
      aton_snopsy_endpoint, aton_number, aton_addr, aton_reg_count, aton_sync_clock,
      aton_connect_timeout_sec, aton_response_timeout_sec,
-     poll_interval_sec";
+     aton_category, poll_interval_sec";
 
 /// Svi aktivni AtoN objekti s uključenim prozivanjem i potpunom konfiguracijom.
 pub async fn list_pollable_aton_objects(pool: &PgPool) -> AppResult<Vec<AtonPollConfig>> {
@@ -46,8 +46,11 @@ pub async fn insert_aton_reading(pool: &PgPool, r: &AtonReadingInsert) -> AppRes
              prosjek_napon_gl_svj_v, prosjek_napon_automat_v,
              punjenje_gl_svj_a, punjenje_automat_a,
              potrosnja_gl_svj_a, potrosnja_automat_a,
-             potrosnja_izvor_a, dnevna_potrosnja_a, regs)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+             potrosnja_izvor_a, dnevna_potrosnja_a,
+             struja_led_a, doba_dana, pocetak_noci_min, kraj_noci_min, category,
+             regs)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+                 $19,$20,$21,$22,$23,$24)
          ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.temp_trenutna_c).bind(r.temp_0100_c).bind(r.temp_1300_c)
@@ -57,6 +60,8 @@ pub async fn insert_aton_reading(pool: &PgPool, r: &AtonReadingInsert) -> AppRes
         .bind(r.punjenje_gl_svj_a).bind(r.punjenje_automat_a)
         .bind(r.potrosnja_gl_svj_a).bind(r.potrosnja_automat_a)
         .bind(r.potrosnja_izvor_a).bind(r.dnevna_potrosnja_a)
+        .bind(r.struja_led_a).bind(r.doba_dana)
+        .bind(r.pocetak_noci_min).bind(r.kraj_noci_min).bind(r.category)
         .bind(&r.regs)
         .execute(pool).await?;
     Ok(result.rows_affected() > 0)

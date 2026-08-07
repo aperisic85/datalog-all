@@ -7,9 +7,17 @@
 //!   proziva i spušta poziv;
 //! - **dekodiranje odgovora**: [`decode_ascii`] → typed [`Aton`].
 //!
-//! Registarska mapa rekonstruirana korelacijom sirovih okvira (kroz `snopsy_r`)
-//! s prikazom starog nadzora — poll 2026-08-07 10:59:47, RTU adresa 51. Svi
-//! analogni podaci su `i16` ÷100 (signed; struje potrošnje negativne).
+//! Registarska mapa je **verificirana prema izvornom kodu RTU-a** (funkcija
+//! `CreateReturnStringToCenter`, `funkcije.c`): svaki registar je jedan
+//! `sprintf("%04X", …)` na fiksnom offsetu, redom kojim ih RTU pakira.
+//! Analogni kanali su `i16` ÷100 (signed; struje potrošnje negativne),
+//! alarmi/statusi su cjelobrojne zastavice.
+//!
+//! Program na RTU-u zove se **`csd_verzija`** i ima 7 podverzija
+//! („kategorija") ovisno o tome koje podatke stanica šalje — vidi
+//! [`Category`]. Ovdje je implementirana **kategorija 7** (puni set,
+//! 31 registar, tip Prišnjak / SDN); ostale kategorije su prepoznate ali
+//! im mapa još nije poznata.
 //!
 //! Bez vanjskih ovisnosti (samo `std`) — spušta se direktno u tvoj projekt.
 //! Driver je sinkroni/blocking; u async servisu ga zovi kroz `spawn_blocking`.
@@ -21,10 +29,84 @@ use std::fmt;
 use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
 
-/// Modbus adresa RTU-a stanice Prišnjak.
+/// Modbus adresa (ID oznaka) RTU-a stanice Prišnjak.
 pub const PRISNJAK_ADDR: u8 = 51;
-/// Broj holding registara koje ova stanica vraća na Read (func 0x03).
+/// Broj holding registara koje stanica kategorije 7 vraća na Read (func 0x03).
 pub const REG_COUNT: usize = 31;
+
+// ───────────────────────── kategorije (podverzije) ─────────────────────────
+
+/// Podverzija programa `csd_verzija` na RTU-u.
+///
+/// Sve AtoN stanice govore isti Modbus ASCII protokol, ali se razlikuju po
+/// tome koliko i kojih podataka pakiraju u odgovor. Kategorija određuje
+/// registarsku mapu kojom se odgovor dekodira.
+///
+/// Trenutno je implementirana samo [`Category::C7`] — puni set od 31
+/// registra. Za ostale kategorije [`decode_aton_for`] vraća
+/// [`DecodeError::UnsupportedCategory`] dok im se mapa ne razriješi
+/// snimkom prometa, kao što je razriješena za sedmu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Category {
+    /// Kategorija 1 — mapa još nije poznata.
+    C1,
+    /// Kategorija 2 — mapa još nije poznata.
+    C2,
+    /// Kategorija 3 — mapa još nije poznata.
+    C3,
+    /// Kategorija 4 — mapa još nije poznata.
+    C4,
+    /// Kategorija 5 — mapa još nije poznata.
+    C5,
+    /// Kategorija 6 — mapa još nije poznata.
+    C6,
+    /// Kategorija 7 — puni set (31 registar), tip Prišnjak / SDN.
+    C7,
+}
+
+impl Category {
+    /// Sve kategorije, redom.
+    pub const ALL: [Self; 7] = [
+        Self::C1, Self::C2, Self::C3, Self::C4, Self::C5, Self::C6, Self::C7,
+    ];
+
+    /// Kategorija iz rednog broja 1–7.
+    #[must_use]
+    pub fn from_number(n: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(n).checked_sub(1)?).copied()
+    }
+
+    /// Redni broj kategorije (1–7).
+    #[must_use]
+    pub fn number(self) -> u8 {
+        match self {
+            Self::C1 => 1, Self::C2 => 2, Self::C3 => 3, Self::C4 => 4,
+            Self::C5 => 5, Self::C6 => 6, Self::C7 => 7,
+        }
+    }
+
+    /// Koliko holding registara stanica ove kategorije vraća.
+    /// `None` dok mapa kategorije nije poznata.
+    #[must_use]
+    pub fn reg_count(self) -> Option<u16> {
+        match self {
+            Self::C7 => Some(REG_COUNT as u16),
+            _ => None,
+        }
+    }
+
+    /// Je li dekodiranje ove kategorije implementirano.
+    #[must_use]
+    pub fn is_supported(self) -> bool {
+        matches!(self, Self::C7)
+    }
+}
+
+impl fmt::Display for Category {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "kategorija {}", self.number())
+    }
+}
 
 // ───────────────────────── dekodiranje odgovora ─────────────────────────
 
@@ -56,6 +138,11 @@ pub enum DecodeError {
         /// Koliko ih očekujemo (`REG_COUNT`).
         want: usize,
     },
+    /// Registarska mapa ove kategorije još nije razriješena.
+    UnsupportedCategory {
+        /// Kategorija za koju je dekodiranje zatraženo.
+        category: Category,
+    },
 }
 
 impl fmt::Display for DecodeError {
@@ -73,6 +160,9 @@ impl fmt::Display for DecodeError {
             Self::UnexpectedRegCount { got, want } => {
                 write!(f, "neočekivan broj registara: {got}, očekivano {want}")
             }
+            Self::UnsupportedCategory { category } => {
+                write!(f, "registarska mapa za {category} još nije poznata")
+            }
         }
     }
 }
@@ -86,6 +176,93 @@ pub struct Baterija {
     pub napon_v: f32,
     /// Trenutna struja [A] (predznak ovisi o kanalu: punjenje + / potrošnja −).
     pub struja_a: f32,
+}
+
+/// Doba dana kako ga RTU sam računa iz tablice izlaska/zalaska sunca (reg 12).
+///
+/// RTU interno razlikuje i `SUNSET`, ali ga pri pakiranju izjednačuje sa
+/// `SUNRISE` (obje vrijednosti 0) — vidi `CreateReturnStringToCenter`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DobaDana {
+    /// Sumrak/svitanje — međuvrijeme između dana i noći.
+    Sumrak,
+    /// Noć.
+    Noc,
+    /// Dan.
+    Dan,
+    /// Vrijednost koju ne poznajemo (RTU je poslao nešto izvan 0–2).
+    Nepoznato(u16),
+}
+
+impl DobaDana {
+    fn from_reg(reg: u16) -> Self {
+        match reg {
+            0 => Self::Sumrak,
+            1 => Self::Noc,
+            2 => Self::Dan,
+            other => Self::Nepoznato(other),
+        }
+    }
+}
+
+impl fmt::Display for DobaDana {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Sumrak => write!(f, "sumrak"),
+            Self::Noc => write!(f, "noć"),
+            Self::Dan => write!(f, "dan"),
+            Self::Nepoznato(v) => write!(f, "nepoznato ({v})"),
+        }
+    }
+}
+
+/// Alarmna i statusna stanja koja RTU pakira u odgovor.
+///
+/// Svako polje je jedan `CheckingIsBitOn(alarms, AL_…)` iz RTU koda; registar
+/// 17 je jedina bitmaska (tri alarma spakirana u jednu vrijednost).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Alarmi {
+    /// Zahtjev za pozivom centra — reg 5 (`AL_CALL_REQUEST`).
+    pub poziv: bool,
+    /// Temperatura izvan granica — reg 6 (`AL_TEMPERATURE`).
+    pub temperatura: bool,
+    /// Napon baterije glavnog svjetla izvan granica — reg 7 (`AL_VOLTAGE_LIGHT`).
+    pub napon_gl_svj: bool,
+    /// Napon baterije automata izvan granica — reg 8 (`AL_VOLTAGE_AUTOMAT`).
+    pub napon_automat: bool,
+    /// Vrata otvorena — reg 9 (`AL_DOOR`).
+    pub vrata: bool,
+    /// Karakteristika bljeska ne odgovara zadanoj — reg 13 (`AL_FLASH_FIL1`).
+    pub bljesak: bool,
+    /// Karakteristika bljeska 2. žarne niti — reg 14. RTU je uvijek šalje 0.
+    pub bljesak_2: bool,
+    /// Svjetlo se napaja s baterija automata — reg 15 (`AL_LIGHT_ON_AUTOMAT`).
+    pub svjetlo_na_automatu: bool,
+    /// Automat se napaja s baterija svjetla — reg 16 (`AL_AUTOMAT_ON_LIGHT`).
+    pub automat_na_svjetlu: bool,
+    /// Pregorena žarna nit / greška izvora — reg 17 bit 0 (`AL_BLOWN_FIL1`).
+    pub pregorena_zarulja: bool,
+    /// Ne radi po noći — reg 17 bit 1 (`AL_NOT_WORK_AT_NIGHT_FIL1`).
+    pub ne_radi_nocu: bool,
+    /// Greška fotoćelije — reg 17 bit 2 (`AL_NOT_WORK_AT_NIGHT_PHOTOCELL`).
+    pub greska_fotocelije: bool,
+    /// Pregorena 2. žarna nit — reg 18. RTU je uvijek šalje 0.
+    pub pregorena_zarulja_2: bool,
+    /// Svjetlo radi po danu — reg 25 (`AL_WORK_AT_DAY_FIL1`).
+    pub radi_danju: bool,
+}
+
+impl Alarmi {
+    /// Je li ijedan alarm aktivan. Zahtjev za pozivom i vrata se broje —
+    /// oba su razlog zbog kojeg RTU sam zove centar.
+    #[must_use]
+    pub fn ima_aktivnih(&self) -> bool {
+        self.poziv || self.temperatura || self.napon_gl_svj || self.napon_automat
+            || self.vrata || self.bljesak || self.bljesak_2
+            || self.svjetlo_na_automatu || self.automat_na_svjetlu
+            || self.pregorena_zarulja || self.ne_radi_nocu || self.greska_fotocelije
+            || self.pregorena_zarulja_2 || self.radi_danju
+    }
 }
 
 /// Dekodirano očitanje AtoN stanice.
@@ -114,13 +291,31 @@ pub struct Aton {
     pub potrosnja_gl_svj_a: f32,
     /// Struja potrošnje baterije automata [A], obično negativna (reg 22).
     pub potrosnja_automat_a: f32,
-    /// Dnevni prosjek struje potrošnje (izvor svjetla) [A] (reg 27).
+    /// Dnevni prosjek struje potrošnje izvora svjetla [A] (reg 27,
+    /// `avgMaxiDischargeCurrent`). Negativna.
     pub potrosnja_izvor_a: f32,
-    /// Dnevna potrošnja struje [A] (reg 28).
+    /// Dnevna potrošnja izvora svjetla [Ah] (reg 28, `sumMaxiDischargeEnergy`).
+    /// Negativna. Stari nadzor je prikazuje pod „DNEVNA POTROŠNJA".
     pub dnevna_potrosnja_a: f32,
-    /// Svih 31 sirovih registara — za još nemapirane (12, 29, 30), rezerve i
-    /// buduće alarm/status bitmaske.
+    /// Trenutna struja izvora svjetla (Maxi Halo / LED) [A] (reg 26,
+    /// `currentMaxi`). Negativna dok svjetlo troši; danju ~0.
+    pub struja_led_a: f32,
+    /// Doba dana koje RTU sam računa iz tablice sunca (reg 12).
+    pub doba_dana: DobaDana,
+    /// Početak noći — minuta od ponoći po satu RTU-a (reg 29).
+    pub pocetak_noci_min: u16,
+    /// Kraj noći — minuta od ponoći po satu RTU-a (reg 30).
+    pub kraj_noci_min: u16,
+    /// Alarmna i statusna stanja (reg 5–9, 13–18, 25).
+    pub alarmi: Alarmi,
+    /// Svih 31 sirovih registara — za rezerve i buduće provjere.
     pub regs: [u16; REG_COUNT],
+}
+
+/// Formatiraj minutu od ponoći kao `HH:MM`.
+#[must_use]
+pub fn minuta_u_sat(min: u16) -> String {
+    format!("{:02}:{:02}", (min / 60) % 24, min % 60)
 }
 
 /// Raščlanjeni Modbus ASCII okvir (LRC već provjeren).
@@ -188,7 +383,10 @@ pub fn parse_ascii_frame(raw: &[u8]) -> Result<Frame, DecodeError> {
     Ok(Frame { addr: body[0], func: body[1], payload: body[2..].to_vec() })
 }
 
-/// Dekodira Read odgovor ove stanice u [`Aton`].
+/// Dekodira Read odgovor stanice **kategorije 7** u [`Aton`].
+///
+/// Mapa je 1:1 s `CreateReturnStringToCenter` u RTU kodu: registar `i` je
+/// `sprintf("%04X", …)` na offsetu `i * 4`.
 ///
 /// # Errors
 /// [`DecodeError`] ako funkcija nije 0x03 ili broj registara nije `REG_COUNT`.
@@ -204,6 +402,8 @@ pub fn decode_aton(frame: &Frame) -> Result<Aton, DecodeError> {
     for (r, w) in regs.iter_mut().zip(data.chunks_exact(2)) {
         *r = u16::from_be_bytes([w[0], w[1]]);
     }
+    // reg 17 je jedina bitmaska: pregorena nit | ne radi noću | greška fotoćelije
+    let maska_izvora = regs[17];
     Ok(Aton {
         temp_trenutna_c: v100(regs[0]),
         temp_0100_c: v100(regs[10]),
@@ -218,16 +418,56 @@ pub fn decode_aton(frame: &Frame) -> Result<Aton, DecodeError> {
         potrosnja_automat_a: v100(regs[22]),
         potrosnja_izvor_a: v100(regs[27]),
         dnevna_potrosnja_a: v100(regs[28]),
+        struja_led_a: v100(regs[26]),
+        doba_dana: DobaDana::from_reg(regs[12]),
+        pocetak_noci_min: regs[29],
+        kraj_noci_min: regs[30],
+        alarmi: Alarmi {
+            poziv:               regs[5] != 0,
+            temperatura:         regs[6] != 0,
+            napon_gl_svj:        regs[7] != 0,
+            napon_automat:       regs[8] != 0,
+            vrata:               regs[9] != 0,
+            bljesak:             regs[13] != 0,
+            bljesak_2:           regs[14] != 0,
+            svjetlo_na_automatu: regs[15] != 0,
+            automat_na_svjetlu:  regs[16] != 0,
+            pregorena_zarulja:   maska_izvora & 0b001 != 0,
+            ne_radi_nocu:        maska_izvora & 0b010 != 0,
+            greska_fotocelije:   maska_izvora & 0b100 != 0,
+            pregorena_zarulja_2: regs[18] != 0,
+            radi_danju:          regs[25] != 0,
+        },
         regs,
     })
 }
 
-/// Pogodnost: raščlani okvir i odmah dekodiraj u [`Aton`].
+/// Dekodira Read odgovor prema zadanoj kategoriji.
+///
+/// # Errors
+/// [`DecodeError::UnsupportedCategory`] za kategorije kojima mapa još nije
+/// poznata; inače propagira greške iz [`decode_aton`].
+pub fn decode_aton_for(category: Category, frame: &Frame) -> Result<Aton, DecodeError> {
+    match category {
+        Category::C7 => decode_aton(frame),
+        other => Err(DecodeError::UnsupportedCategory { category: other }),
+    }
+}
+
+/// Pogodnost: raščlani okvir i odmah dekodiraj kao kategoriju 7.
 ///
 /// # Errors
 /// Propagira greške iz [`parse_ascii_frame`] i [`decode_aton`].
 pub fn decode_ascii(raw: &[u8]) -> Result<Aton, DecodeError> {
     decode_aton(&parse_ascii_frame(raw)?)
+}
+
+/// Pogodnost: raščlani okvir i dekodiraj prema zadanoj kategoriji.
+///
+/// # Errors
+/// Propagira greške iz [`parse_ascii_frame`] i [`decode_aton_for`].
+pub fn decode_ascii_for(category: Category, raw: &[u8]) -> Result<Aton, DecodeError> {
+    decode_aton_for(category, &parse_ascii_frame(raw)?)
 }
 
 // ───────────────────────── gradnja upita (master) ─────────────────────────
@@ -380,8 +620,13 @@ impl LineAccumulator {
 pub struct ObjectConfig {
     /// Podatkovni telefonski broj RTU-a (npr. Prišnjak: vidljiv u nadzoru).
     pub number: String,
-    /// Modbus adresa RTU-a (npr. [`PRISNJAK_ADDR`]).
+    /// ID oznaka objekta = Modbus adresa RTU-a (npr. [`PRISNJAK_ADDR`]).
+    ///
+    /// RTU je pakira na početak svakog okvira (`OBJECT_ID` u RTU kodu), pa
+    /// centar po njoj prepoznaje tko je zvao.
     pub addr: u8,
+    /// Podverzija programa `csd_verzija` — određuje registarsku mapu.
+    pub category: Category,
     /// Koliko holding registara čitati (npr. [`REG_COUNT`]).
     pub reg_count: u16,
     /// Ako je `Some`, prije prozivanja se sinkronizira sat RTU-a.
@@ -402,6 +647,13 @@ pub struct ObjectConfig {
 /// [`SessionError`] za I/O, timeout biranja/odgovora, neuspješno biranje ili
 /// grešku dekodiranja.
 pub fn read_object<S: Read + Write>(link: &mut S, cfg: &ObjectConfig) -> Result<Aton, SessionError> {
+    // Kategoriju provjeri prije nego digneš poziv — nema smisla trošiti CSD
+    // minute na okvir koji ionako ne znamo dekodirati.
+    if !cfg.category.is_supported() {
+        return Err(SessionError::Decode(DecodeError::UnsupportedCategory {
+            category: cfg.category,
+        }));
+    }
     dial(link, &cfg.number, cfg.connect_timeout)?;
     let result = (|| {
         if let Some(cs) = &cfg.clock {
@@ -411,7 +663,7 @@ pub fn read_object<S: Read + Write>(link: &mut S, cfg: &ObjectConfig) -> Result<
         }
         link.write_all(&build_read_holding(cfg.addr, 0, cfg.reg_count))?;
         let frame = read_modbus_line(link, cfg.response_timeout)?;
-        Ok(decode_ascii(&frame)?)
+        Ok(decode_ascii_for(cfg.category, &frame)?)
     })();
     // uvijek spusti poziv, čak i ako je čitanje puklo
     let _ = hangup(link);
@@ -520,6 +772,115 @@ mod tests {
         approx(a.potrosnja_automat_a, -0.15);
         approx(a.potrosnja_izvor_a, -0.13);
         approx(a.dnevna_potrosnja_a, -1.39);
+    }
+
+    /// Registri 5–9, 13–18, 25 su alarmi/statusi kako ih RTU pakira u
+    /// `CreateReturnStringToCenter`. Referentni okvir je snimljen danju, bez
+    /// aktivnih alarma — sve zastavice moraju biti spuštene, doba dana DAN.
+    #[test]
+    fn decodes_status_and_alarms_from_real_frame() {
+        let a = decode_ascii(REAL_FRAME).expect("dekodira");
+
+        assert_eq!(a.doba_dana, DobaDana::Dan);
+        assert_eq!(a.alarmi, Alarmi::default());
+        assert!(!a.alarmi.ima_aktivnih());
+
+        // Danju svjetlo ne troši — struja izvora ~0
+        approx(a.struja_led_a, 0.0);
+
+        // Prozor noći je minuta od ponoći, NE analogna vrijednost ÷100
+        assert_eq!(a.pocetak_noci_min, 1123);
+        assert_eq!(a.kraj_noci_min, 203);
+        assert_eq!(minuta_u_sat(a.pocetak_noci_min), "18:43");
+        assert_eq!(minuta_u_sat(a.kraj_noci_min), "03:23");
+    }
+
+    /// Složi okvir točno onako kako ga RTU pakira i provjeri da ga pročitamo
+    /// natrag — jedan `%04X` po registru, pa LRC preko cijelog tijela.
+    fn frame_from_regs(addr: u8, regs: &[u16; REG_COUNT]) -> Vec<u8> {
+        let mut payload = Vec::with_capacity(1 + REG_COUNT * 2);
+        payload.push((REG_COUNT * 2) as u8);
+        for r in regs {
+            payload.extend_from_slice(&r.to_be_bytes());
+        }
+        build_frame(addr, 0x03, &payload)
+    }
+
+    #[test]
+    fn decodes_every_alarm_flag() {
+        let mut regs = [0u16; REG_COUNT];
+        regs[5] = 1;   // poziv
+        regs[6] = 1;   // temperatura
+        regs[7] = 1;   // napon gl. svj.
+        regs[8] = 1;   // napon automata
+        regs[9] = 1;   // vrata
+        regs[12] = 1;  // noć
+        regs[13] = 1;  // bljesak
+        regs[14] = 1;  // bljesak 2. niti
+        regs[15] = 1;  // svjetlo na automatu
+        regs[16] = 1;  // automat na svjetlu
+        regs[17] = 0b111; // pregorena nit + ne radi noću + greška fotoćelije
+        regs[18] = 1;  // pregorena 2. nit
+        regs[25] = 1;  // radi po danu
+
+        let a = decode_ascii(&frame_from_regs(PRISNJAK_ADDR, &regs)).expect("dekodira");
+
+        assert_eq!(a.doba_dana, DobaDana::Noc);
+        assert_eq!(a.alarmi, Alarmi {
+            poziv: true, temperatura: true, napon_gl_svj: true, napon_automat: true,
+            vrata: true, bljesak: true, bljesak_2: true, svjetlo_na_automatu: true,
+            automat_na_svjetlu: true, pregorena_zarulja: true, ne_radi_nocu: true,
+            greska_fotocelije: true, pregorena_zarulja_2: true, radi_danju: true,
+        });
+        assert!(a.alarmi.ima_aktivnih());
+    }
+
+    /// Reg 17 je bitmaska — svaki bit se mora čitati zasebno.
+    #[test]
+    fn reg17_is_a_bitmask() {
+        let cases = [
+            (0b000, [false, false, false]),
+            (0b001, [true,  false, false]),
+            (0b010, [false, true,  false]),
+            (0b100, [false, false, true ]),
+            (0b011, [true,  true,  false]),
+            (0b101, [true,  false, true ]),
+        ];
+        for (mask, want) in cases {
+            let mut regs = [0u16; REG_COUNT];
+            regs[17] = mask;
+            let a = decode_ascii(&frame_from_regs(PRISNJAK_ADDR, &regs)).expect("dekodira");
+            assert_eq!(
+                [a.alarmi.pregorena_zarulja, a.alarmi.ne_radi_nocu, a.alarmi.greska_fotocelije],
+                want,
+                "maska {mask:#05b}"
+            );
+        }
+    }
+
+    /// Noćna snimka: svjetlo troši, pa struja izvora (reg 26) više nije nula.
+    /// RTU je pakira kao `(int)(currentMaxi * 100)` u 16-bitni int → dvojni
+    /// komplement za negativne vrijednosti.
+    #[test]
+    fn decodes_negative_led_current() {
+        let mut regs = [0u16; REG_COUNT];
+        regs[12] = 1;                    // noć
+        regs[26] = (-37i16) as u16;      // -0.37 A
+        let a = decode_ascii(&frame_from_regs(PRISNJAK_ADDR, &regs)).expect("dekodira");
+        approx(a.struja_led_a, -0.37);
+        assert_eq!(a.doba_dana, DobaDana::Noc);
+    }
+
+    #[test]
+    fn unsupported_categories_are_rejected() {
+        for c in Category::ALL {
+            let supported = decode_ascii_for(c, REAL_FRAME).is_ok();
+            assert_eq!(supported, c.is_supported(), "{c}");
+            assert_eq!(c, Category::from_number(c.number()).expect("okrugli put"));
+        }
+        assert_eq!(Category::C7.reg_count(), Some(REG_COUNT as u16));
+        assert_eq!(Category::from_number(0), None);
+        assert_eq!(Category::from_number(8), None);
     }
 
     #[test]

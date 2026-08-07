@@ -150,6 +150,9 @@ pub async fn get_object_by_station_id(pool: &PgPool, sid: &str) -> AppResult<Opt
 /// Dozvoljene kategorije izvora podataka (mora se poklapati s CHECK-om na tablici).
 const SOURCE_KINDS: [&str; 2] = ["cr300_http", "aton_csd"];
 
+/// Zadana podverzija programa `csd_verzija` — jedina za koju je mapa poznata.
+const DEFAULT_ATON_CATEGORY: i16 = 7;
+
 fn validate_source_kind(kind: Option<&str>) -> AppResult<()> {
     match kind {
         Some(k) if !SOURCE_KINDS.contains(&k) => Err(crate::errors::AppError::Validation(
@@ -159,8 +162,20 @@ fn validate_source_kind(kind: Option<&str>) -> AppResult<()> {
     }
 }
 
+/// Podverzija `csd_verzija` programa mora biti 1–7 (mapa je poznata samo za 7,
+/// ali objekt se smije unaprijed evidentirati s bilo kojom kategorijom).
+fn validate_aton_category(category: Option<i16>) -> AppResult<()> {
+    match category {
+        Some(c) if !(1..=7).contains(&c) => Err(crate::errors::AppError::Validation(
+            "Kategorija csd_verzija programa mora biti između 1 i 7".into(),
+        )),
+        _ => Ok(()),
+    }
+}
+
 pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<Uuid>) -> AppResult<ObjectView> {
     validate_source_kind(req.source_kind.as_deref())?;
+    validate_aton_category(req.aton_category)?;
 
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO objects (station_id, name, short_name, region_id, station_type_id,
@@ -168,9 +183,10 @@ pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<
              datalogger_url, datalogger_user, datalogger_pass,
              poll_interval_sec, polling_enabled, commissioned_at, created_by,
              source_kind, aton_snopsy_endpoint, aton_number, aton_addr, aton_reg_count,
-             aton_sync_clock, aton_connect_timeout_sec, aton_response_timeout_sec)
+             aton_sync_clock, aton_connect_timeout_sec, aton_response_timeout_sec,
+             aton_category)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-                 $19,$20,$21,$22,$23,$24,$25,$26) RETURNING id")
+                 $19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING id")
         .bind(&req.station_id).bind(&req.name).bind(&req.short_name)
         .bind(req.region_id).bind(req.station_type_id)
         .bind(req.latitude).bind(req.longitude).bind(&req.location_name)
@@ -186,6 +202,7 @@ pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<
         .bind(req.aton_sync_clock.unwrap_or(false))
         .bind(req.aton_connect_timeout_sec.unwrap_or(15))
         .bind(req.aton_response_timeout_sec.unwrap_or(10))
+        .bind(req.aton_category.unwrap_or(DEFAULT_ATON_CATEGORY))
         .fetch_one(pool).await?;
 
     get_object_by_id(pool, id).await?
@@ -194,6 +211,7 @@ pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<
 
 pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -> AppResult<ObjectView> {
     validate_source_kind(req.source_kind.as_deref())?;
+    validate_aton_category(req.aton_category)?;
 
     sqlx::query(
         "UPDATE objects SET
@@ -224,7 +242,8 @@ pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -
              aton_reg_count             = COALESCE($26, aton_reg_count),
              aton_sync_clock            = COALESCE($27, aton_sync_clock),
              aton_connect_timeout_sec   = COALESCE($28, aton_connect_timeout_sec),
-             aton_response_timeout_sec  = COALESCE($29, aton_response_timeout_sec)
+             aton_response_timeout_sec  = COALESCE($29, aton_response_timeout_sec),
+             aton_category              = COALESCE($30, aton_category)
          WHERE id = $1")
         .bind(id).bind(&req.name).bind(&req.short_name).bind(req.region_id)
         .bind(req.station_type_id).bind(req.latitude).bind(req.longitude)
@@ -237,6 +256,7 @@ pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -
         .bind(&req.aton_snopsy_endpoint).bind(&req.aton_number).bind(req.aton_addr)
         .bind(req.aton_reg_count).bind(req.aton_sync_clock)
         .bind(req.aton_connect_timeout_sec).bind(req.aton_response_timeout_sec)
+        .bind(req.aton_category)
         .execute(pool).await?;
 
     get_object_by_id(pool, id).await?
@@ -560,8 +580,14 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<bool> {
              alarm_lantern_comm_failed, alarm_lantern_other_error,
              alarm_modem_network_error, alarm_modem_other_error, alarm_station_other_error,
              alarm_visibility_comm_failed, alarm_visibility_error,
-             alarm_fog_signal_off_during_fog, alarm_fog_signal_on_while_no_fog)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+             alarm_fog_signal_off_during_fog, alarm_fog_signal_on_while_no_fog,
+             alarm_aton_call_request, alarm_aton_temperature,
+             alarm_aton_voltage_light, alarm_aton_voltage_automat, alarm_aton_door_open,
+             alarm_aton_flash_code, alarm_aton_light_on_automat, alarm_aton_automat_on_light,
+             alarm_aton_lamp_blown, alarm_aton_not_work_at_night,
+             alarm_aton_photocell_error, alarm_aton_work_at_day)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
+                 $24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
          ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.alarm_datalogger_high_temp).bind(r.alarm_datalogger_high_voltage).bind(r.alarm_datalogger_other_error)
@@ -572,6 +598,11 @@ pub async fn insert_alarm(pool: &PgPool, r: &AlarmInsert) -> AppResult<bool> {
         .bind(r.alarm_modem_network_error).bind(r.alarm_modem_other_error).bind(r.alarm_station_other_error)
         .bind(r.alarm_visibility_comm_failed).bind(r.alarm_visibility_error)
         .bind(r.alarm_fog_signal_off_during_fog).bind(r.alarm_fog_signal_on_while_no_fog)
+        .bind(r.alarm_aton_call_request).bind(r.alarm_aton_temperature)
+        .bind(r.alarm_aton_voltage_light).bind(r.alarm_aton_voltage_automat).bind(r.alarm_aton_door_open)
+        .bind(r.alarm_aton_flash_code).bind(r.alarm_aton_light_on_automat).bind(r.alarm_aton_automat_on_light)
+        .bind(r.alarm_aton_lamp_blown).bind(r.alarm_aton_not_work_at_night)
+        .bind(r.alarm_aton_photocell_error).bind(r.alarm_aton_work_at_day)
         .execute(pool).await?;
     Ok(result.rows_affected() > 0)
 }
@@ -675,7 +706,19 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
             a.alarm_visibility_comm_failed,
             a.alarm_visibility_error,
             a.alarm_fog_signal_off_during_fog,
-            a.alarm_fog_signal_on_while_no_fog";
+            a.alarm_fog_signal_on_while_no_fog,
+            a.alarm_aton_call_request,
+            a.alarm_aton_temperature,
+            a.alarm_aton_voltage_light,
+            a.alarm_aton_voltage_automat,
+            a.alarm_aton_door_open,
+            a.alarm_aton_flash_code,
+            a.alarm_aton_light_on_automat,
+            a.alarm_aton_automat_on_light,
+            a.alarm_aton_lamp_blown,
+            a.alarm_aton_not_work_at_night,
+            a.alarm_aton_photocell_error,
+            a.alarm_aton_work_at_day";
 
     let from_join = "FROM alarms a
          JOIN objects o ON o.id = a.object_id

@@ -49,6 +49,19 @@ pub const CATALOG: &[AlarmTypeDef] = &[
     AlarmTypeDef { key: "visibility_error",           label: "Greška senzora vidljivosti",                severity: 2 },
     AlarmTypeDef { key: "fog_signal_off_during_fog",  label: "Maglena sirena ugašena za magle",           severity: 4 },
     AlarmTypeDef { key: "fog_signal_on_while_no_fog", label: "Maglena sirena radi bez magle",             severity: 2 },
+    // AtoN stanice (csd_verzija) — alarmi koje RTU sam javlja
+    AlarmTypeDef { key: "aton_lamp_blown",            label: "Pregorena žarulja / greška izvora svjetla", severity: 4 },
+    AlarmTypeDef { key: "aton_not_work_at_night",     label: "Svjetlo ne radi po noći",                   severity: 4 },
+    AlarmTypeDef { key: "aton_photocell_error",       label: "Greška fotoćelije",                         severity: 3 },
+    AlarmTypeDef { key: "aton_flash_code",            label: "Karakteristika bljeska ne odgovara zadanoj", severity: 3 },
+    AlarmTypeDef { key: "aton_voltage_light",         label: "Napon baterije glavnog svjetla izvan granica", severity: 3 },
+    AlarmTypeDef { key: "aton_voltage_automat",       label: "Napon baterije automata izvan granica",     severity: 3 },
+    AlarmTypeDef { key: "aton_work_at_day",           label: "Svjetlo radi po danu",                      severity: 2 },
+    AlarmTypeDef { key: "aton_light_on_automat",      label: "Svjetlo se napaja s baterija automata",     severity: 2 },
+    AlarmTypeDef { key: "aton_automat_on_light",      label: "Automat se napaja s baterija svjetla",      severity: 2 },
+    AlarmTypeDef { key: "aton_temperature",           label: "Temperatura izvan granica",                 severity: 2 },
+    AlarmTypeDef { key: "aton_door_open",             label: "Vrata objekta otvorena",                    severity: 2 },
+    AlarmTypeDef { key: "aton_call_request",          label: "Zahtjev za pozivom s objekta",              severity: 1 },
 ];
 
 fn flag_value(rec: &AlarmInsert, key: &str) -> i16 {
@@ -73,6 +86,18 @@ fn flag_value(rec: &AlarmInsert, key: &str) -> i16 {
         "visibility_error"           => rec.alarm_visibility_error,
         "fog_signal_off_during_fog"  => rec.alarm_fog_signal_off_during_fog,
         "fog_signal_on_while_no_fog" => rec.alarm_fog_signal_on_while_no_fog,
+        "aton_call_request"          => rec.alarm_aton_call_request,
+        "aton_temperature"           => rec.alarm_aton_temperature,
+        "aton_voltage_light"         => rec.alarm_aton_voltage_light,
+        "aton_voltage_automat"       => rec.alarm_aton_voltage_automat,
+        "aton_door_open"             => rec.alarm_aton_door_open,
+        "aton_flash_code"            => rec.alarm_aton_flash_code,
+        "aton_light_on_automat"      => rec.alarm_aton_light_on_automat,
+        "aton_automat_on_light"      => rec.alarm_aton_automat_on_light,
+        "aton_lamp_blown"            => rec.alarm_aton_lamp_blown,
+        "aton_not_work_at_night"     => rec.alarm_aton_not_work_at_night,
+        "aton_photocell_error"       => rec.alarm_aton_photocell_error,
+        "aton_work_at_day"           => rec.alarm_aton_work_at_day,
         _ => 0,
     }
 }
