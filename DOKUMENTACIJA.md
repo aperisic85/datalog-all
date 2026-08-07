@@ -74,6 +74,21 @@ Aplikacija periodički pita CR300 datalogere za nove podatke. Polling je konfigu
 
 Moguće je i ručno pokrenuti poll za pojedinu stanicu direktno iz sučelja, korisno za dijagnostiku.
 
+### AtoN preko CSD-a (`snopsy_r`)
+Pomorske oznake (AtoN stanice, npr. Prišnjak) nemaju HTTP sučelje — do njih se dolazi CSD podatkovnim pozivom. Za njih aplikacija **sama postaje Modbus master**: preko TCP-a se spaja na `snopsy_r` proxy (transparentni prolaz prema GSM modemu, port 2007), digne poziv na podatkovni broj RTU-a, opcionalno sinkronizira sat RTU-a, pročita holding registre (func 0x03) i **uvijek** spusti poziv — i kad čitanje ne uspije.
+
+Kategorija izvora se bira po objektu (`source_kind`):
+- `cr300_http` — CR300 datalogger (push ili pull, zadano)
+- `aton_csd` — AtoN RTU preko CSD-a i `snopsy_r` proxyja
+
+Konfiguracija AtoN objekta: `snopsy_r` endpoint (host:port), podatkovni telefonski broj RTU-a, Modbus adresa (Prišnjak = 51), broj registara (31), interval prozivanja, sinkronizacija sata i rokovi za biranje/odgovor.
+
+**Jedan CSD poziv po modemu u isto vrijeme.** Jedan `snopsy_r` endpoint = jedan modem = jedna linija, pa se objekti koji dijele endpoint prozivaju serijski (brava po endpointu, koju poštuje i ručni poziv iz sučelja). Objekti na različitim endpointima idu paralelno. Interval je konzervativan (najmanje 5 minuta) jer poziv traje ~10-20 s.
+
+Očitanje se dekodira u pune vrijednosti (temperature, dvije baterije — glavno svjetlo i automat, dnevni prosjeci punjenja i potrošnje) i sprema u `aton_readings`, zajedno sa svih 31 sirovih registara. Podskup (temperatura, napon i struja glavne baterije) paralelno ide u `measurements_10min`, pa AtoN objekt radi u svim postojećim pregledima, grafovima, analitici baterije i detekciji tihih stanica. Neuspio poziv (timeout, BUSY, LRC/decode greška) ne ruši poller — zapisuje se u status pollera, a objekt bez svježeg mjerenja postaje "tih".
+
+Protokol živi u zasebnom crateu `crates/aton_decode` (bez vanjskih ovisnosti), s testovima koji provjeravaju dekodiranje stvarnog okvira i bajt-točnost upita prema snimljenom masteru. Registarska mapa je dokumentirana u `crates/aton_decode/REGISTAR_MAPA.md`.
+
 ### Višestruka razlučivost podataka
 Mjerni podaci se čuvaju u tri razlučivosti:
 - **10 minuta** — sirovi, najdetaljniji podaci
@@ -404,6 +419,8 @@ Naredba se bilježi u revizijskom dnevniku.
 
 ### Ručni poll
 Za dijagnostiku moguće je odmah pokrenuti dohvat podataka s datalogera za odabranu stanicu. Rezultat prikazuje broj novih zapisa po tablici.
+
+Za AtoN stanice ručni poll diže stvarni CSD poziv (traje ~10-20 s, troši minute na SIM-u) pa je dostupan samo operatorima i adminima. Čeka istu bravu kao periodični poller, tako da se nikad ne preklopi s pozivom druge stanice na istom `snopsy_r`-u.
 
 ### Status pollera
 Javno dostupan endpoint (bez autentifikacije) koji prikazuje:

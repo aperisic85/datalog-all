@@ -3,6 +3,9 @@ name = "datalogger-backend"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["crates/aton_decode"]
+
 [[bin]]
 name = "datalogger-backend"
 path = "src/main.rs"
@@ -48,6 +51,9 @@ sha2         = "0.10"
 # HTTP client (pull/poller mode)
 reqwest    = { version = "0.12", features = ["json"] }
 urlencoding = "2"
+
+# AtoN preko CSD-a / snopsy_r proxyja (Modbus ASCII master + dekoder)
+aton_decode = { path = "crates/aton_decode" }
 
 [profile.release]
 opt-level     = 3

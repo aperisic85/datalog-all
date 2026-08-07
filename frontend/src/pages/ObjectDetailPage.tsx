@@ -75,8 +75,9 @@ import { hr } from 'date-fns/locale';
 import './ObjectDetailPage.css';
 import './ObjectsPage.css';
 import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
+import AtonTab from '../components/AtonTab';
 
-type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap' | 'control';
+type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap' | 'aton' | 'control';
 type Range = '6h' | '24h' | '7d' | 'custom';
 type Resolution = '10min' | '1h' | '24h';
 type DriftRange = '1h' | '6h' | '24h' | '7d';
@@ -780,6 +781,13 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
     nominal_battery_capacity_ah: obj.nominal_battery_capacity_ah != null ? String(obj.nominal_battery_capacity_ah) : '',
     // Silent station alert
     silence_timeout_minutes: String(obj.silence_timeout_minutes ?? 120),
+    // Kategorija izvora + AtoN (CSD preko snopsy_r)
+    source_kind: obj.source_kind ?? 'cr300_http',
+    aton_snopsy_endpoint: obj.aton_snopsy_endpoint ?? '',
+    aton_number: obj.aton_number ?? '',
+    aton_addr: obj.aton_addr != null ? String(obj.aton_addr) : '',
+    aton_reg_count: String(obj.aton_reg_count ?? 31),
+    aton_sync_clock: obj.aton_sync_clock ?? false,
     // Program tip
     is_modular: pf != null,
     program_version: obj.program_version ?? '',
@@ -833,6 +841,12 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
         ? Number(form.nominal_battery_capacity_ah)
         : undefined,
       silence_timeout_minutes: Number(form.silence_timeout_minutes) || 120,
+      source_kind: form.source_kind,
+      aton_snopsy_endpoint: form.aton_snopsy_endpoint || undefined,
+      aton_number: form.aton_number || undefined,
+      aton_addr: form.aton_addr ? Number(form.aton_addr) : undefined,
+      aton_reg_count: Number(form.aton_reg_count) || 31,
+      aton_sync_clock: form.aton_sync_clock,
       program_version: form.is_modular && form.program_version ? form.program_version : undefined,
       program_features: form.is_modular ? {
         sealite: form.pf_sealite,
@@ -885,9 +899,50 @@ function EditObjectModal({ obj, onClose }: { obj: import('../types').ObjectView;
           </div>
 
           <div className="form-group">
-            <label>Datalogger URL</label>
-            <input value={form.datalogger_url} onChange={(e) => set('datalogger_url', e.target.value)} placeholder="http://192.168.1.100" />
+            <label>Kategorija izvora</label>
+            <select value={form.source_kind} onChange={(e) => set('source_kind', e.target.value)}>
+              <option value="cr300_http">CR300 datalogger (HTTP)</option>
+              <option value="aton_csd">AtoN RTU (CSD preko snopsy_r)</option>
+            </select>
           </div>
+
+          {form.source_kind === 'cr300_http' && (
+            <div className="form-group">
+              <label>Datalogger URL</label>
+              <input value={form.datalogger_url} onChange={(e) => set('datalogger_url', e.target.value)} placeholder="http://192.168.1.100" />
+            </div>
+          )}
+
+          {form.source_kind === 'aton_csd' && (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>snopsy_r endpoint</label>
+                  <input value={form.aton_snopsy_endpoint} onChange={(e) => set('aton_snopsy_endpoint', e.target.value)} placeholder="10.0.0.5:2007" />
+                </div>
+                <div className="form-group">
+                  <label>Tel. podatkovni (RTU)</label>
+                  <input value={form.aton_number} onChange={(e) => set('aton_number', e.target.value)} placeholder="0917654321" />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Modbus adresa</label>
+                  <input type="number" min={1} max={247} value={form.aton_addr} onChange={(e) => set('aton_addr', e.target.value)} placeholder="51" />
+                </div>
+                <div className="form-group">
+                  <label>Broj registara</label>
+                  <input type="number" min={1} max={125} value={form.aton_reg_count} onChange={(e) => set('aton_reg_count', e.target.value)} />
+                </div>
+              </div>
+              <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <label className="filter-checkbox">
+                  <input type="checkbox" checked={form.aton_sync_clock} onChange={(e) => set('aton_sync_clock', e.target.checked)} style={{ width: 'auto' }} />
+                  Sinkroniziraj sat RTU-a prije prozivanja
+                </label>
+              </div>
+            </>
+          )}
 
           <div className="form-group">
             <label>Lokacija</label>
@@ -1621,7 +1676,12 @@ export default function ObjectDetailPage() {
       </div>
 
       <div className="detail-tabs">
-        {(['overview', 'charts', 'alarms', 'heatmap', 'events'] as Tab[]).map((t) => (
+        {([
+          'overview', 'charts', 'alarms', 'heatmap', 'events',
+          // AtoN stanice (izvor preko CSD-a) imaju vlastiti pregled — dvije
+          // baterije, dnevni prosjeci i sirovi registri
+          ...(obj.source_kind === 'aton_csd' ? ['aton' as const] : []),
+        ] as Tab[]).map((t) => (
           <button
             key={t}
             className={`tab-btn ${tab === t ? 'active' : ''}`}
@@ -1633,6 +1693,7 @@ export default function ObjectDetailPage() {
               alarms: 'Alarmi',
               heatmap: 'Heatmap',
               events: 'Log',
+              aton: 'AtoN',
               control: 'Kontrola',
             }[t]}
           </button>
@@ -2368,6 +2429,10 @@ export default function ObjectDetailPage() {
 
       {tab === 'heatmap' && (
         <AlarmHeatmapTab objectId={id!} />
+      )}
+
+      {tab === 'aton' && obj.source_kind === 'aton_csd' && (
+        <AtonTab obj={obj} canControl={authUser?.role !== 'viewer'} />
       )}
 
       {tab === 'events' && (

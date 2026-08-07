@@ -147,13 +147,30 @@ pub async fn get_object_by_station_id(pool: &PgPool, sid: &str) -> AppResult<Opt
         .bind(sid).fetch_optional(pool).await?)
 }
 
+/// Dozvoljene kategorije izvora podataka (mora se poklapati s CHECK-om na tablici).
+const SOURCE_KINDS: [&str; 2] = ["cr300_http", "aton_csd"];
+
+fn validate_source_kind(kind: Option<&str>) -> AppResult<()> {
+    match kind {
+        Some(k) if !SOURCE_KINDS.contains(&k) => Err(crate::errors::AppError::Validation(
+            format!("Kategorija izvora mora biti {}", SOURCE_KINDS.join(" ili ")),
+        )),
+        _ => Ok(()),
+    }
+}
+
 pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<Uuid>) -> AppResult<ObjectView> {
+    validate_source_kind(req.source_kind.as_deref())?;
+
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO objects (station_id, name, short_name, region_id, station_type_id,
              latitude, longitude, location_name, allowed_radius_m, description, notes,
              datalogger_url, datalogger_user, datalogger_pass,
-             poll_interval_sec, polling_enabled, commissioned_at, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id")
+             poll_interval_sec, polling_enabled, commissioned_at, created_by,
+             source_kind, aton_snopsy_endpoint, aton_number, aton_addr, aton_reg_count,
+             aton_sync_clock, aton_connect_timeout_sec, aton_response_timeout_sec)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+                 $19,$20,$21,$22,$23,$24,$25,$26) RETURNING id")
         .bind(&req.station_id).bind(&req.name).bind(&req.short_name)
         .bind(req.region_id).bind(req.station_type_id)
         .bind(req.latitude).bind(req.longitude).bind(&req.location_name)
@@ -163,6 +180,12 @@ pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<
         .bind(req.poll_interval_sec.unwrap_or(60))
         .bind(req.polling_enabled.unwrap_or(false))
         .bind(req.commissioned_at).bind(by)
+        .bind(req.source_kind.as_deref().unwrap_or("cr300_http"))
+        .bind(&req.aton_snopsy_endpoint).bind(&req.aton_number).bind(req.aton_addr)
+        .bind(req.aton_reg_count.unwrap_or(aton_decode::REG_COUNT as i16))
+        .bind(req.aton_sync_clock.unwrap_or(false))
+        .bind(req.aton_connect_timeout_sec.unwrap_or(15))
+        .bind(req.aton_response_timeout_sec.unwrap_or(10))
         .fetch_one(pool).await?;
 
     get_object_by_id(pool, id).await?
@@ -170,6 +193,8 @@ pub async fn create_object(pool: &PgPool, req: &CreateObjectRequest, by: Option<
 }
 
 pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -> AppResult<ObjectView> {
+    validate_source_kind(req.source_kind.as_deref())?;
+
     sqlx::query(
         "UPDATE objects SET
              name                       = COALESCE($2,  name),
@@ -191,7 +216,15 @@ pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -
              program_version            = COALESCE($18, program_version),
              program_features           = COALESCE($19, program_features),
              nominal_battery_capacity_ah = COALESCE($20, nominal_battery_capacity_ah),
-             silence_timeout_minutes    = COALESCE($21, silence_timeout_minutes)
+             silence_timeout_minutes    = COALESCE($21, silence_timeout_minutes),
+             source_kind                = COALESCE($22, source_kind),
+             aton_snopsy_endpoint       = COALESCE($23, aton_snopsy_endpoint),
+             aton_number                = COALESCE($24, aton_number),
+             aton_addr                  = COALESCE($25, aton_addr),
+             aton_reg_count             = COALESCE($26, aton_reg_count),
+             aton_sync_clock            = COALESCE($27, aton_sync_clock),
+             aton_connect_timeout_sec   = COALESCE($28, aton_connect_timeout_sec),
+             aton_response_timeout_sec  = COALESCE($29, aton_response_timeout_sec)
          WHERE id = $1")
         .bind(id).bind(&req.name).bind(&req.short_name).bind(req.region_id)
         .bind(req.station_type_id).bind(req.latitude).bind(req.longitude)
@@ -200,6 +233,10 @@ pub async fn update_object(pool: &PgPool, id: Uuid, req: &UpdateObjectRequest) -
         .bind(req.poll_interval_sec).bind(req.polling_enabled).bind(req.is_active)
         .bind(&req.program_version).bind(&req.program_features)
         .bind(req.nominal_battery_capacity_ah).bind(req.silence_timeout_minutes)
+        .bind(&req.source_kind)
+        .bind(&req.aton_snopsy_endpoint).bind(&req.aton_number).bind(req.aton_addr)
+        .bind(req.aton_reg_count).bind(req.aton_sync_clock)
+        .bind(req.aton_connect_timeout_sec).bind(req.aton_response_timeout_sec)
         .execute(pool).await?;
 
     get_object_by_id(pool, id).await?
@@ -231,6 +268,7 @@ pub async fn list_pollable_objects(pool: &PgPool) -> AppResult<Vec<ObjectPollCon
                 poll_interval_sec, polling_enabled
          FROM objects
          WHERE is_active = TRUE AND polling_enabled = TRUE AND datalogger_url IS NOT NULL
+           AND source_kind = 'cr300_http'
          ORDER BY station_id")
         .fetch_all(pool).await?)
 }

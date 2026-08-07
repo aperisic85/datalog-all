@@ -66,6 +66,55 @@ export interface ObjectView {
   silence_timeout_minutes: number;
   last_measurement_at?: string;
   is_silent: boolean;
+  // Kategorija izvora podataka
+  source_kind: SourceKind;
+  // AtoN (CSD preko snopsy_r proxyja) — samo za source_kind === 'aton_csd'
+  aton_snopsy_endpoint?: string;
+  aton_number?: string;
+  aton_addr?: number;
+  aton_reg_count: number;
+  aton_sync_clock: boolean;
+}
+
+/** Kategorija izvora: CR300 datalogger preko HTTP-a ili AtoN RTU preko CSD-a. */
+export type SourceKind = 'cr300_http' | 'aton_csd';
+
+// ── AtoN (izvor `aton_csd`) ────────────────────────────────────────────────
+
+export interface AtonReading {
+  id?: number;
+  object_id?: string;
+  station_id: string;
+  recorded_at: string;
+  received_at: string;
+  temp_trenutna_c?: number;
+  temp_0100_c?: number;
+  temp_1300_c?: number;
+  gl_svj_napon_v?: number;
+  gl_svj_struja_a?: number;
+  automat_napon_v?: number;
+  automat_struja_a?: number;
+  prosjek_napon_gl_svj_v?: number;
+  prosjek_napon_automat_v?: number;
+  punjenje_gl_svj_a?: number;
+  punjenje_automat_a?: number;
+  potrosnja_gl_svj_a?: number;
+  potrosnja_automat_a?: number;
+  potrosnja_izvor_a?: number;
+  dnevna_potrosnja_a?: number;
+  /** Svih 31 sirovih registara — alarm/status bitovi još nisu mapirani. */
+  regs: number[];
+}
+
+export interface AtonPollResult {
+  station_id: string;
+  success: boolean;
+  error?: string;
+  temperatura_c?: number;
+  gl_svj_napon_v?: number;
+  gl_svj_struja_a?: number;
+  automat_napon_v?: number;
+  automat_struja_a?: number;
 }
 
 export interface Measurement10min {
