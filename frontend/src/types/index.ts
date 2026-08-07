@@ -66,6 +66,68 @@ export interface ObjectView {
   silence_timeout_minutes: number;
   last_measurement_at?: string;
   is_silent: boolean;
+  // Kategorija izvora podataka
+  source_kind: SourceKind;
+  // AtoN (CSD preko snopsy_r proxyja) — samo za source_kind === 'aton_csd'
+  aton_snopsy_endpoint?: string;
+  aton_number?: string;
+  aton_addr?: number;
+  aton_reg_count: number;
+  aton_sync_clock: boolean;
+  /** Podverzija programa `csd_verzija` (1-7); implementirana je 7. */
+  aton_category: number;
+}
+
+/** Kategorija izvora: CR300 datalogger preko HTTP-a ili AtoN RTU preko CSD-a. */
+export type SourceKind = 'cr300_http' | 'aton_csd';
+
+// ── AtoN (izvor `aton_csd`) ────────────────────────────────────────────────
+
+export interface AtonReading {
+  id?: number;
+  object_id?: string;
+  station_id: string;
+  recorded_at: string;
+  received_at: string;
+  temp_trenutna_c?: number;
+  temp_0100_c?: number;
+  temp_1300_c?: number;
+  gl_svj_napon_v?: number;
+  gl_svj_struja_a?: number;
+  automat_napon_v?: number;
+  automat_struja_a?: number;
+  prosjek_napon_gl_svj_v?: number;
+  prosjek_napon_automat_v?: number;
+  punjenje_gl_svj_a?: number;
+  punjenje_automat_a?: number;
+  potrosnja_gl_svj_a?: number;
+  potrosnja_automat_a?: number;
+  potrosnja_izvor_a?: number;
+  /** Dnevna potrošnja izvora svjetla [Ah], negativna. */
+  dnevna_potrosnja_a?: number;
+  /** Trenutna struja izvora svjetla (LED / Maxi Halo) [A]. */
+  struja_led_a?: number;
+  /** Doba dana koje RTU sam računa: 0 = sumrak, 1 = noć, 2 = dan. */
+  doba_dana?: number;
+  /** Početak noći — minuta od ponoći po satu RTU-a. */
+  pocetak_noci_min?: number;
+  /** Kraj noći — minuta od ponoći po satu RTU-a. */
+  kraj_noci_min?: number;
+  /** Podverzija `csd_verzija` kojom je zapis dekodiran. */
+  category: number;
+  /** Svih 31 sirovih registara. */
+  regs: number[];
+}
+
+export interface AtonPollResult {
+  station_id: string;
+  success: boolean;
+  error?: string;
+  temperatura_c?: number;
+  gl_svj_napon_v?: number;
+  gl_svj_struja_a?: number;
+  automat_napon_v?: number;
+  automat_struja_a?: number;
 }
 
 export interface Measurement10min {
@@ -185,6 +247,19 @@ export interface AlarmListItem {
   alarm_visibility_error: number;
   alarm_fog_signal_off_during_fog: number;
   alarm_fog_signal_on_while_no_fog: number;
+  // AtoN alarmi (csd_verzija) — RTU ih sam javlja
+  alarm_aton_call_request: number;
+  alarm_aton_temperature: number;
+  alarm_aton_voltage_light: number;
+  alarm_aton_voltage_automat: number;
+  alarm_aton_door_open: number;
+  alarm_aton_flash_code: number;
+  alarm_aton_light_on_automat: number;
+  alarm_aton_automat_on_light: number;
+  alarm_aton_lamp_blown: number;
+  alarm_aton_not_work_at_night: number;
+  alarm_aton_photocell_error: number;
+  alarm_aton_work_at_day: number;
 }
 
 // Alarm shelving — privremeno odloženi alarmi
@@ -227,6 +302,19 @@ export interface AlarmRecord {
   alarm_visibility_error: number;
   alarm_fog_signal_off_during_fog: number;
   alarm_fog_signal_on_while_no_fog: number;
+  // AtoN alarmi (csd_verzija) — RTU ih sam javlja
+  alarm_aton_call_request: number;
+  alarm_aton_temperature: number;
+  alarm_aton_voltage_light: number;
+  alarm_aton_voltage_automat: number;
+  alarm_aton_door_open: number;
+  alarm_aton_flash_code: number;
+  alarm_aton_light_on_automat: number;
+  alarm_aton_automat_on_light: number;
+  alarm_aton_lamp_blown: number;
+  alarm_aton_not_work_at_night: number;
+  alarm_aton_photocell_error: number;
+  alarm_aton_work_at_day: number;
   any_alarm_active: boolean;
 }
 

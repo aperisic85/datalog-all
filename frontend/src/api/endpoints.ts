@@ -20,6 +20,8 @@ import type {
   BatteryCapacityEstimate,
   BatteryHealthAssessment,
   AlarmHeatmapData,
+  AtonReading,
+  AtonPollResult,
   WeatherResponse,
   SolarEfficiency,
   AuditLogEntry,
@@ -148,6 +150,17 @@ export const shelveAlarm = (objectId: string, data: {
 
 export const unshelveAlarm = (shelfId: string) =>
   api.delete(`/api/v1/alarms/shelves/${shelfId}`);
+
+// AtoN (izvor `aton_csd` — CSD poziv preko snopsy_r proxyja)
+export const getLatestAtonReading = (id: string) =>
+  api.get<AtonReading | null>(`/api/v1/objects/${id}/aton/latest`).then((r) => r.data);
+
+export const getAtonReadings = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
+  api.get<AtonReading[]>(`/api/v1/objects/${id}/aton/readings`, { params }).then((r) => r.data);
+
+/** Ručno digni CSD poziv i prozovi RTU. Traje ~10-20 s. */
+export const pollAtonNow = (id: string) =>
+  api.post<AtonPollResult>(`/api/v1/objects/${id}/aton/poll`).then((r) => r.data);
 
 // Alarm heatmap
 export const getAlarmHeatmap = (id: string) =>

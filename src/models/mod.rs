@@ -1,3 +1,4 @@
+pub mod aton;
 pub mod domain;
 pub mod notify;
 

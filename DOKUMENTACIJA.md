@@ -74,6 +74,30 @@ Aplikacija periodički pita CR300 datalogere za nove podatke. Polling je konfigu
 
 Moguće je i ručno pokrenuti poll za pojedinu stanicu direktno iz sučelja, korisno za dijagnostiku.
 
+### AtoN preko CSD-a (`snopsy_r`)
+Pomorske oznake (AtoN stanice, npr. Prišnjak) nemaju HTTP sučelje — do njih se dolazi CSD podatkovnim pozivom. Za njih aplikacija **sama postaje Modbus master**: preko TCP-a se spaja na `snopsy_r` proxy (transparentni prolaz prema GSM modemu, port 2007), digne poziv na podatkovni broj RTU-a, opcionalno sinkronizira sat RTU-a, pročita holding registre (func 0x03) i **uvijek** spusti poziv — i kad čitanje ne uspije.
+
+Kategorija izvora se bira po objektu (`source_kind`):
+- `cr300_http` — CR300 datalogger (push ili pull, zadano)
+- `aton_csd` — AtoN RTU preko CSD-a i `snopsy_r` proxyja
+
+**Program na RTU-u zove se `csd_verzija`** i ima **7 podverzija (kategorija)** ovisno o tome koje podatke stanica šalje. Kategorija se bira po objektu i određuje registarsku mapu kojom se odgovor dekodira. Implementirana je **kategorija 7** — puni set od 31 registra (tip Prišnjak / SDN). Objekt se smije evidentirati i s drugom kategorijom, ali dok joj se mapa ne razriješi snimkom prometa, prozivanje se odbija s jasnom porukom **prije** nego što se digne poziv — da se ne troše CSD minute na okvir koji se ionako ne bi dekodirao.
+
+Konfiguracija AtoN objekta, unosi se već pri kreiranju: **GSM broj (podatkovni)** RTU-a, **ID oznaka** (Prišnjak = 51), `snopsy_r` endpoint (host:port), kategorija programa, interval prozivanja, sinkronizacija sata i rokovi za biranje/odgovor. ID oznaka je ujedno Modbus adresa — RTU je pakira **na početak svakog okvira**, pa centar po njoj prepoznaje tko javlja.
+
+**Jedan CSD poziv po modemu u isto vrijeme.** Jedan `snopsy_r` endpoint = jedan modem = jedna linija, pa se objekti koji dijele endpoint prozivaju serijski (brava po endpointu, koju poštuje i ručni poziv iz sučelja). Objekti na različitim endpointima idu paralelno. Interval je konzervativan (najmanje 5 minuta) jer poziv traje ~10-20 s.
+
+Očitanje se dekodira u pune vrijednosti i sprema u `aton_readings`, zajedno sa svih 31 sirovih registara:
+- **analogno** — temperature (trenutna, u 01:00, u 13:00), dvije baterije (glavno svjetlo i automat) s naponom i strujom, dnevni prosjeci napona te struja punjenja i potrošnje, struja izvora svjetla i dnevna potrošnja u Ah;
+- **statusi** — doba dana koje RTU sam računa iz tablice sunca te prozor noći (početak/kraj u minutama);
+- **alarmi** — zahtjev za pozivom, temperatura, napon obje baterije, vrata, karakteristika bljeska, napajanje unakrsno s druge baterije, pregorena žarulja, ne radi po noći, greška fotoćelije, radi po danu.
+
+Podskup koji nadzor već servira paralelno ide u `measurements_10min` (temperatura, napon i struja glavne baterije, struja izvora svjetla, doba dana), a alarmi u `alarms` — istim putem kao alarmi CR300 stanica. AtoN objekt time bez ijedne iznimke radi u svim postojećim pregledima, grafovima, analitici baterije, detekciji tihih stanica, obavijestima, potvrđivanju, odlaganju alarma i heatmapu.
+
+Neuspio poziv (timeout, BUSY, LRC/decode greška) ne ruši poller — zapisuje se u status pollera, a objekt bez svježeg mjerenja postaje "tih".
+
+Protokol živi u zasebnom crateu `crates/aton_decode` (bez vanjskih ovisnosti). Registarska mapa je **verificirana prema izvornom kodu RTU-a** (funkcija `CreateReturnStringToCenter`) i dokumentirana u `crates/aton_decode/REGISTAR_MAPA.md`; testovi provjeravaju dekodiranje stvarnog okvira, sve alarmne zastavice, bitmasku registra 17 i bajt-točnost upita prema snimljenom masteru.
+
 ### Višestruka razlučivost podataka
 Mjerni podaci se čuvaju u tri razlučivosti:
 - **10 minuta** — sirovi, najdetaljniji podaci
@@ -116,7 +140,7 @@ Po svakoj stanici prikupljaju se:
 ## 5. Sustav alarma
 
 ### Tipovi alarma
-Definirano je 20 tipova alarma:
+Definirana su 32 tipa alarma — 20 za CR300 stanice i 12 za AtoN stanice (`csd_verzija`):
 
 | Kategorija | Tipovi |
 |-----------|--------|
@@ -129,6 +153,11 @@ Definirano je 20 tipova alarma:
 | **Senzor vidljivosti** | komunikacijska greška, senzorska greška |
 | **Signal magle** | isključen za magle, uključen bez magle |
 | **Opće** | opća greška stanice |
+| **AtoN — izvor svjetla** | pregorena žarulja, ne radi po noći, greška fotoćelije, pogrešna karakteristika bljeska, radi po danu |
+| **AtoN — baterije** | napon baterije glavnog svjetla, napon baterije automata, svjetlo na bateriji automata, automat na bateriji svjetla |
+| **AtoN — objekt** | temperatura izvan granica, vrata otvorena, zahtjev za pozivom |
+
+AtoN alarme **računa sam RTU** (pragovi i vremena kašnjenja su u njegovoj konfiguraciji) i pakira ih u odgovor; aplikacija ih samo dekodira. Kritičnima se smatraju pregorena žarulja i „ne radi po noći" — u oba slučaja oznaka noću ne svijetli.
 
 ### Predmemorija alarma (alarm cache)
 Za svaki objekt sustav održava predmemoriju s: statusom aktivnih alarma, brojem alarma, najgorom razinom i zadnjim vremenom alarma. Ovo omogućuje brze upite bez skupih JOIN operacija.
@@ -404,6 +433,8 @@ Naredba se bilježi u revizijskom dnevniku.
 
 ### Ručni poll
 Za dijagnostiku moguće je odmah pokrenuti dohvat podataka s datalogera za odabranu stanicu. Rezultat prikazuje broj novih zapisa po tablici.
+
+Za AtoN stanice ručni poll diže stvarni CSD poziv (traje ~10-20 s, troši minute na SIM-u) pa je dostupan samo operatorima i adminima. Čeka istu bravu kao periodični poller, tako da se nikad ne preklopi s pozivom druge stanice na istom `snopsy_r`-u.
 
 ### Status pollera
 Javno dostupan endpoint (bez autentifikacije) koji prikazuje:

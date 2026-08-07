@@ -68,6 +68,16 @@ pub struct ObjectView {
     // Program tip (modularni CR300)
     pub program_version:     Option<String>,
     pub program_features:    Option<JsonValue>,
+    // Kategorija izvora: "cr300_http" | "aton_csd"
+    pub source_kind:         String,
+    // AtoN (CSD preko snopsy_r) — popunjeno samo za source_kind = "aton_csd"
+    pub aton_snopsy_endpoint: Option<String>,
+    pub aton_number:          Option<String>,
+    pub aton_addr:            Option<i16>,
+    pub aton_reg_count:       i16,
+    pub aton_sync_clock:      bool,
+    /// Podverzija programa `csd_verzija` (1–7); implementirana je 7.
+    pub aton_category:        i16,
     // Alarm cache
     pub alarm_active:        bool,
     pub alarm_count:         i16,
@@ -115,6 +125,16 @@ pub struct CreateObjectRequest {
     pub commissioned_at:   Option<NaiveDate>,
     pub program_version:   Option<String>,
     pub program_features:  Option<JsonValue>,
+    // Kategorija izvora + AtoN konfiguracija
+    pub source_kind:              Option<String>,
+    pub aton_snopsy_endpoint:     Option<String>,
+    pub aton_number:              Option<String>,
+    pub aton_addr:                Option<i16>,
+    pub aton_reg_count:           Option<i16>,
+    pub aton_sync_clock:          Option<bool>,
+    pub aton_connect_timeout_sec: Option<i16>,
+    pub aton_response_timeout_sec: Option<i16>,
+    pub aton_category:            Option<i16>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -139,6 +159,16 @@ pub struct UpdateObjectRequest {
     pub program_features:  Option<JsonValue>,
     pub nominal_battery_capacity_ah: Option<f32>,
     pub silence_timeout_minutes:     Option<i32>,
+    // Kategorija izvora + AtoN konfiguracija
+    pub source_kind:               Option<String>,
+    pub aton_snopsy_endpoint:      Option<String>,
+    pub aton_number:               Option<String>,
+    pub aton_addr:                 Option<i16>,
+    pub aton_reg_count:            Option<i16>,
+    pub aton_sync_clock:           Option<bool>,
+    pub aton_connect_timeout_sec:  Option<i16>,
+    pub aton_response_timeout_sec: Option<i16>,
+    pub aton_category:             Option<i16>,
 }
 
 // ================================================================
@@ -371,6 +401,19 @@ pub struct AlarmRecord {
     pub alarm_visibility_error:                i16,
     pub alarm_fog_signal_off_during_fog:       i16,
     pub alarm_fog_signal_on_while_no_fog:      i16,
+    // AtoN (csd_verzija) — alarmi i statusi koje RTU pakira u odgovor
+    pub alarm_aton_call_request:               i16,
+    pub alarm_aton_temperature:                i16,
+    pub alarm_aton_voltage_light:              i16,
+    pub alarm_aton_voltage_automat:            i16,
+    pub alarm_aton_door_open:                  i16,
+    pub alarm_aton_flash_code:                 i16,
+    pub alarm_aton_light_on_automat:           i16,
+    pub alarm_aton_automat_on_light:           i16,
+    pub alarm_aton_lamp_blown:                 i16,
+    pub alarm_aton_not_work_at_night:          i16,
+    pub alarm_aton_photocell_error:            i16,
+    pub alarm_aton_work_at_day:                i16,
     pub any_alarm_active:                      bool,
 }
 
@@ -411,6 +454,19 @@ pub struct AlarmListItem {
     pub alarm_visibility_error:                i16,
     pub alarm_fog_signal_off_during_fog:       i16,
     pub alarm_fog_signal_on_while_no_fog:      i16,
+    // AtoN (csd_verzija) — alarmi i statusi koje RTU pakira u odgovor
+    pub alarm_aton_call_request:               i16,
+    pub alarm_aton_temperature:                i16,
+    pub alarm_aton_voltage_light:              i16,
+    pub alarm_aton_voltage_automat:            i16,
+    pub alarm_aton_door_open:                  i16,
+    pub alarm_aton_flash_code:                 i16,
+    pub alarm_aton_light_on_automat:           i16,
+    pub alarm_aton_automat_on_light:           i16,
+    pub alarm_aton_lamp_blown:                 i16,
+    pub alarm_aton_not_work_at_night:          i16,
+    pub alarm_aton_photocell_error:            i16,
+    pub alarm_aton_work_at_day:                i16,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -448,6 +504,19 @@ pub struct AlarmInsert {
     pub alarm_visibility_error:                i16,
     pub alarm_fog_signal_off_during_fog:       i16,
     pub alarm_fog_signal_on_while_no_fog:      i16,
+    // AtoN (csd_verzija) — alarmi i statusi koje RTU pakira u odgovor
+    pub alarm_aton_call_request:               i16,
+    pub alarm_aton_temperature:                i16,
+    pub alarm_aton_voltage_light:              i16,
+    pub alarm_aton_voltage_automat:            i16,
+    pub alarm_aton_door_open:                  i16,
+    pub alarm_aton_flash_code:                 i16,
+    pub alarm_aton_light_on_automat:           i16,
+    pub alarm_aton_automat_on_light:           i16,
+    pub alarm_aton_lamp_blown:                 i16,
+    pub alarm_aton_not_work_at_night:          i16,
+    pub alarm_aton_photocell_error:            i16,
+    pub alarm_aton_work_at_day:                i16,
 }
 
 // ================================================================

@@ -38,6 +38,9 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
     station_type_id: '', datalogger_url: '', location_name: '',
     latitude: '', longitude: '', allowed_radius_m: '0', poll_interval_sec: '60',
     polling_enabled: false, description: '',
+    // Kategorija izvora + AtoN (csd_verzija) konfiguracija
+    source_kind: 'cr300_http', aton_snopsy_endpoint: '', aton_number: '',
+    aton_addr: '', aton_category: '7', aton_sync_clock: false,
   });
 
   const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: listRegions });
@@ -64,6 +67,12 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
         poll_interval_sec: Number(form.poll_interval_sec) || 60,
         polling_enabled: form.polling_enabled,
         description:     form.description || undefined,
+        source_kind:     form.source_kind,
+        aton_snopsy_endpoint: form.aton_snopsy_endpoint || undefined,
+        aton_number:     form.aton_number || undefined,
+        aton_addr:       form.aton_addr ? Number(form.aton_addr) : undefined,
+        aton_category:   Number(form.aton_category) || 7,
+        aton_sync_clock: form.aton_sync_clock,
       });
       qc.invalidateQueries({ queryKey: ['objects'] });
       onClose();
@@ -144,9 +153,77 @@ function CreateObjectModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="form-group">
-            <label>Datalogger URL</label>
-            <input value={form.datalogger_url} onChange={(e) => set('datalogger_url', e.target.value)} placeholder="http://192.168.1.100" />
+            <label>Kategorija izvora *</label>
+            <select value={form.source_kind} onChange={(e) => set('source_kind', e.target.value)}>
+              <option value="cr300_http">CR300 datalogger (HTTP)</option>
+              <option value="aton_csd">AtoN RTU — csd_verzija (CSD preko snopsy_r)</option>
+            </select>
           </div>
+
+          {form.source_kind === 'cr300_http' && (
+            <div className="form-group">
+              <label>Datalogger URL</label>
+              <input value={form.datalogger_url} onChange={(e) => set('datalogger_url', e.target.value)} placeholder="http://192.168.1.100" />
+            </div>
+          )}
+
+          {form.source_kind === 'aton_csd' && (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>GSM broj (podatkovni) *</label>
+                  <input
+                    value={form.aton_number}
+                    onChange={(e) => set('aton_number', e.target.value)}
+                    required
+                    placeholder="npr. 0917654321"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>ID oznaka *</label>
+                  <input
+                    type="number" min={1} max={247}
+                    value={form.aton_addr}
+                    onChange={(e) => set('aton_addr', e.target.value)}
+                    required
+                    placeholder="npr. 51"
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>snopsy_r endpoint *</label>
+                  <input
+                    value={form.aton_snopsy_endpoint}
+                    onChange={(e) => set('aton_snopsy_endpoint', e.target.value)}
+                    required
+                    placeholder="10.0.0.5:2007"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Kategorija programa csd_verzija</label>
+                  <select value={form.aton_category} onChange={(e) => set('aton_category', e.target.value)}>
+                    {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+                      <option key={c} value={c}>
+                        {c === 7 ? '7 — puni set (podržano)' : `${c} — mapa još nije poznata`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <label className="filter-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.aton_sync_clock}
+                    onChange={(e) => set('aton_sync_clock', e.target.checked)}
+                    style={{ width: 'auto' }}
+                  />
+                  Sinkroniziraj sat RTU-a prije prozivanja
+                </label>
+              </div>
+            </>
+          )}
 
           <div className="form-row">
             <div className="form-group">

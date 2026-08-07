@@ -1,0 +1,7 @@
+[package]
+name = "aton_decode"
+version = "0.1.0"
+edition = "2021"
+description = "Modbus ASCII protokol i dekoder za AtoN stanice preko CSD-a i snopsy_r proxyja"
+
+[dependencies]

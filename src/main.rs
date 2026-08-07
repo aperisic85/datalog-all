@@ -85,6 +85,15 @@ async fn main() -> anyhow::Result<()> {
         poller::start_pollers(all_configs, pool.clone(), poller_status.clone());
     }
 
+    // ── AtoN poller (CSD preko snopsy_r proxyja) ─────────────────────────
+    let aton_stations = poller::aton::load_stations_from_db(&pool).await;
+    if aton_stations.is_empty() {
+        tracing::info!("Nema AtoN objekata s uključenim prozivanjem");
+    } else {
+        tracing::info!("Pokrećem {} AtoN poller(a)...", aton_stations.len());
+        poller::aton::start_aton_pollers(aton_stations, pool.clone(), poller_status.clone());
+    }
+
     // ── Telegram bot (dvosmjerna komunikacija — upiti) ──────────────────────
     telegram::start_bot(pool.clone());
 
@@ -181,6 +190,10 @@ async fn main() -> anyhow::Result<()> {
         // Poller control
         .route("/api/v1/control/setvalue",            post(handlers::poller_handler::set_datalogger_value))
         .route("/api/v1/objects/:id/poll",            post(handlers::poller_handler::poll_object_now))
+        // AtoN (izvor preko CSD-a / snopsy_r proxyja)
+        .route("/api/v1/objects/:id/aton/latest",     get(handlers::aton::get_latest_aton_reading))
+        .route("/api/v1/objects/:id/aton/readings",   get(handlers::aton::get_aton_readings))
+        .route("/api/v1/objects/:id/aton/poll",       post(handlers::aton::poll_aton_now))
         .layer(axum_middleware::from_fn_with_state(jwt_secret.clone(), middleware::jwt_middleware))
         .layer(axum::Extension(jwt_secret.clone()))
         .with_state(pool.clone());
