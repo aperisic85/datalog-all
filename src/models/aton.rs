@@ -47,8 +47,8 @@ pub struct AtonReading {
     pub kraj_noci_min:           Option<i16>,
     /// Podverzija `csd_verzija` programa kojom je zapis dekodiran.
     pub category:                i16,
-    /// Svih 31 sirovih registara — mapa alarm/status bitova još nije
-    /// razriješena, pa ih čuvamo za naknadno mapiranje.
+    /// Svih 31 sirovih registara — čuvamo ih za provjeru dekodiranja i
+    /// buduće registarske mape drugih kategorija programa.
     pub regs:                    JsonValue,
 }
 
@@ -220,3 +220,4 @@ pub struct AtonPollConfig {
     pub aton_category:             i16,
     pub poll_interval_sec:         i32,
 }
+
