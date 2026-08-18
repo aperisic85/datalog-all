@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { BatteryCharging, Lightbulb, PhoneCall, Thermometer } from 'lucide-react';
+import { AlertTriangle, BatteryCharging, CheckCircle2, Lightbulb, PhoneCall, Thermometer } from 'lucide-react';
 import { getAtonReadings, getLatestAtonReading, pollAtonNow } from '../api/endpoints';
 import type { AtonReading, ObjectView } from '../types';
 import './AtonTab.css';
@@ -23,6 +23,37 @@ function minutaUSat(min?: number): string {
 }
 
 const DOBA_DANA: Record<number, string> = { 0: 'Sumrak', 1: 'Noć', 2: 'Dan' };
+
+type AtonFlag = {
+  label: string;
+  reg: number;
+  mask?: number;
+  severity: 'danger' | 'warning';
+};
+
+/** Alarmne zastavice prema RTU funkciji CreateReturnStringToCenter. */
+const ATON_FLAGS: AtonFlag[] = [
+  { label: 'Zahtjev za pozivom centra', reg: 5, severity: 'warning' },
+  { label: 'Temperatura izvan granica', reg: 6, severity: 'warning' },
+  { label: 'Napon baterije GL. SVJ.', reg: 7, severity: 'danger' },
+  { label: 'Napon baterije automata', reg: 8, severity: 'danger' },
+  { label: 'Vrata otvorena', reg: 9, severity: 'warning' },
+  { label: 'Pogrešna karakteristika bljeska', reg: 13, severity: 'danger' },
+  { label: 'Bljesak 2. žarne niti', reg: 14, severity: 'danger' },
+  { label: 'Svjetlo na bateriji automata', reg: 15, severity: 'warning' },
+  { label: 'Automat na bateriji svjetla', reg: 16, severity: 'warning' },
+  { label: 'Pregorena žarulja', reg: 17, mask: 0b001, severity: 'danger' },
+  { label: 'Ne radi po noći', reg: 17, mask: 0b010, severity: 'danger' },
+  { label: 'Greška fotoćelije', reg: 17, mask: 0b100, severity: 'danger' },
+  { label: 'Pregorena 2. žarna nit', reg: 18, severity: 'danger' },
+  { label: 'Svjetlo radi po danu', reg: 25, severity: 'warning' },
+];
+
+/** Zasebni alarmni registri su 0/1; registar 17 je bitmaska. */
+function isAtonFlagActive(regs: number[] | undefined, flag: AtonFlag): boolean {
+  const value = regs?.[flag.reg] ?? 0;
+  return flag.mask == null ? value !== 0 : (value & flag.mask) !== 0;
+}
 
 /** Dva kanala kroz cijelu mapu: glavno svjetlo i automat. */
 function ChannelCard({
@@ -68,6 +99,12 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
     queryKey: ['aton-readings', obj.id],
     queryFn: () => getAtonReadings(obj.id, { limit: 50 }),
   });
+
+  const flags = ATON_FLAGS.map((flag) => ({
+    ...flag,
+    active: isAtonFlagActive(latest?.regs, flag),
+  }));
+  const activeFlagCount = flags.filter((flag) => flag.active).length;
 
   const handlePoll = async () => {
     setPolling(true);
@@ -164,6 +201,31 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
             </div>
           </div>
 
+          {/* ── Alarmi i bitovna stanja ── */}
+          <div className={`aton-flags card ${activeFlagCount > 0 ? 'aton-flags-active' : ''}`}>
+            <div className="aton-flags-head">
+              <div>
+                {activeFlagCount > 0
+                  ? <AlertTriangle size={16} />
+                  : <CheckCircle2 size={16} />}
+                <h3>Alarmi i stanja</h3>
+              </div>
+              <strong>{activeFlagCount > 0 ? `${activeFlagCount} aktivno` : 'Sve uredno'}</strong>
+            </div>
+            <div className="aton-flags-grid">
+              {flags.map((flag) => (
+                <div
+                  key={`${flag.reg}-${flag.mask ?? 0}`}
+                  className={`aton-flag ${flag.active ? `aton-flag-${flag.severity}` : ''}`}
+                >
+                  <span className="aton-flag-dot" aria-hidden="true" />
+                  <span>{flag.label}</span>
+                  <b>{flag.active ? 'AKTIVNO' : 'U redu'}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* ── Sirovi registri ── */}
           <div className="aton-regs card">
             <button className="aton-regs-toggle" onClick={() => setShowRegs((v) => !v)}>
@@ -231,3 +293,4 @@ export default function AtonTab({ obj, canControl }: { obj: ObjectView; canContr
     </div>
   );
 }
+
