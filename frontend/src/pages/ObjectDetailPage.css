@@ -538,3 +538,74 @@
 
   .drift-stat-value { font-size: 15px; }
 }
+
+
+/* ── AtoN Watch object status header ────────────────────────────────────── */
+.object-detail { max-width:1320px; }
+.detail-header { margin-bottom:14px; }
+.detail-title {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px;
+  box-shadow:var(--shadow);
+}
+.detail-name-row h2 { font-size:22px; font-weight:800; letter-spacing:-.025em; }
+.detail-meta { padding-left:26px; }
+.detail-operational-status {
+  margin-top:14px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:11px 12px;
+  border-radius:9px;
+  border:1px solid var(--border);
+  background:var(--bg3);
+}
+.detail-operational-status.is-ok {
+  background:rgba(18,134,92,.055);
+  border-color:rgba(18,134,92,.18);
+}
+.detail-operational-status.is-alarm {
+  background:rgba(217,54,62,.055);
+  border-color:rgba(217,54,62,.20);
+}
+.detail-operational-status.is-offline {
+  background:rgba(100,116,139,.07);
+  border-color:rgba(100,116,139,.18);
+}
+.detail-operational-icon { display:flex; flex-shrink:0; }
+.is-ok .detail-operational-icon { color:var(--success); }
+.is-alarm .detail-operational-icon { color:var(--danger); }
+.is-offline .detail-operational-icon { color:#64748b; }
+.detail-operational-copy { display:flex; flex-direction:column; min-width:0; }
+.detail-operational-copy strong { font-size:13px; }
+.detail-operational-copy span { font-size:11px; color:var(--text2); }
+.detail-status-action {
+  margin-left:auto;
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  background:transparent;
+  color:var(--danger);
+  padding:5px 6px;
+  font-size:11px;
+  font-weight:700;
+}
+.detail-tabs {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:4px;
+  margin-bottom:16px;
+  margin-top:12px;
+}
+.tab-btn { border-bottom:0; margin-bottom:0; border-radius:7px; padding:7px 13px; font-size:12px; font-weight:700; }
+.tab-btn.active { color:var(--accent); background:rgba(22,119,184,.08); border-bottom-color:transparent; }
+
+@media (max-width:680px) {
+  .detail-title { padding:13px; }
+  .detail-meta { padding-left:0; }
+  .detail-operational-status { align-items:flex-start; }
+  .detail-status-action { margin-left:0; }
+}
