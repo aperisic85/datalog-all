@@ -276,3 +276,48 @@
     display: none;
   }
 }
+
+
+/* ── AtoN Watch compare refinement ──────────────────────────────────────── */
+.compare-page { max-width:1320px; }
+.compare-header { margin-bottom:16px; }
+.compare-title-row { align-items:flex-start; gap:10px; }
+.compare-title-row > svg { color:var(--accent); margin-top:6px; }
+.compare-title-row h2 {
+  font-size:26px;
+  font-weight:800;
+  letter-spacing:-.03em;
+  margin:1px 0 4px;
+}
+.compare-kicker {
+  display:block;
+  color:var(--accent);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.compare-desc { max-width:780px; font-size:12px; line-height:1.55; }
+.compare-selector { padding:14px; border-radius:12px; }
+.station-chip { border-radius:8px; padding:6px 9px; }
+.station-search-wrap { max-width:320px; }
+.station-search-input-row { background:var(--bg2); border-radius:8px; min-height:36px; }
+.compare-empty {
+  background:var(--bg2);
+  border:1px dashed var(--border);
+  border-radius:12px;
+  min-height:260px;
+}
+.compare-chart-card { padding:16px 16px 12px; border-radius:12px; }
+.compare-chart-card h4 {
+  color:var(--text);
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+@media (max-width:640px) {
+  .compare-title-row h2 { font-size:23px; }
+  .compare-selector { padding:12px; }
+  .compare-chips-row { align-items:stretch; }
+  .station-search-wrap { flex-basis:100%; }
+}

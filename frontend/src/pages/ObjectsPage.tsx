@@ -15,7 +15,7 @@ function AlarmBadge({ active, count }: { active: boolean; count: number }) {
 
 function SilentBadge({ lastAt }: { lastAt?: string }) {
   const ago = lastAt
-    ? formatDistanceToNow(parseISO(lastAt), { addSuffix: false, locale: hr })
+    ? formatDistanceToNow(parseISO(lastAt), { addSuffix: true, locale: hr })
     : 'nepoznato';
   return (
     <span
@@ -24,7 +24,7 @@ function SilentBadge({ lastAt }: { lastAt?: string }) {
       style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}
     >
       <Clock size={11} />
-      {ago} ago
+      {ago}
     </span>
   );
 }
@@ -384,118 +384,56 @@ export default function ObjectsPage() {
             </div>
           )}
 
-          {/* Desktop table view */}
+          {/* Operativni list view — desktop + mobile */}
           {viewMode === 'list' && (
-            <div className="objects-table card objects-table">
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Naziv</th>
-                      <th>ID Stanice</th>
-                      <th>Regija</th>
-                      <th>Lokacija</th>
-                      <th>Status</th>
-                      <th>Alarm</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data?.data.length === 0 && (
-                      <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text2)', padding: 32 }}>Nema rezultata</td></tr>
-                    )}
-                    {data?.data.map((obj) => (
-                      <tr key={obj.id}>
-                        <td>
-                          <Link to={`/objects/${obj.id}`} className="obj-name">
-                            <Radio size={14} />
-                            {obj.name}
-                          </Link>
-                          {obj.short_name && <div className="obj-sub">{obj.short_name}</div>}
-                          {obj.program_features != null
-                            ? <span className="badge" style={{ fontSize: 10, background: 'var(--accent)', color: '#fff', marginTop: 2 }}>Tip 2</span>
-                            : <span className="badge badge-neutral" style={{ fontSize: 10, marginTop: 2 }}>Tip 1</span>
-                          }
-                        </td>
-                        <td><code className="station-id">{obj.station_id}</code></td>
-                        <td>
-                          <div className="region-tag">
-                            <span className="region-dot" style={{ background: obj.region_color }} />
-                            {obj.region_name}
-                          </div>
-                        </td>
-                        <td>
-                          {obj.location_name ? (
-                            <div className="location-cell">
-                              <MapPin size={12} />
-                              <span>{obj.location_name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            {obj.is_active
-                              ? <span className="badge badge-success">Aktivan</span>
-                              : <span className="badge badge-neutral">Neaktivan</span>
-                            }
-                            {obj.is_silent && (
-                              <SilentBadge lastAt={obj.last_measurement_at} />
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Mobile card view — only in list mode */}
-          {viewMode === 'list' && (
-            <div className="obj-card-list">
+            <div className="operational-list card">
               {data?.data.length === 0 && (
                 <div className="obj-card-empty">Nema rezultata</div>
               )}
               {data?.data.map((obj) => (
-                <Link to={`/objects/${obj.id}`} key={obj.id} className="obj-card card">
-                  <div className="obj-card-top">
-                    <div className="obj-card-name">
-                      <span className={`status-dot ${obj.alarm_active ? 'status-dot-alarm' : obj.is_active ? 'status-dot-active' : 'status-dot-inactive'}`} />
-                      <span>{obj.name}</span>
+                <Link to={`/objects/${obj.id}`} key={obj.id} className="operational-row">
+                  <span className={`status-dot ${obj.alarm_active ? 'status-dot-alarm' : obj.is_silent ? 'status-dot-silent' : obj.is_active ? 'status-dot-active' : 'status-dot-inactive'}`} />
+                  <div className="operational-main">
+                    <div className="operational-name-row">
+                      <strong>{obj.name}</strong>
+                      {obj.short_name && <span>{obj.short_name}</span>}
                     </div>
+                    <div className="operational-meta">
+                      <code>{obj.station_id}</code>
+                      {obj.region_name && (
+                        <span className="region-tag">
+                          <span className="region-dot" style={{ background: obj.region_color }} />
+                          {obj.region_name}
+                        </span>
+                      )}
+                      {obj.location_name && <span><MapPin size={12} />{obj.location_name}</span>}
+                    </div>
+                  </div>
+                  <div className="operational-health">
+                    {obj.alarm_active ? (
+                      <>
+                        <strong className="health-danger">{obj.alarm_count} aktivnih alarma</strong>
+                        <span>Potrebna provjera</span>
+                      </>
+                    ) : obj.is_silent ? (
+                      <>
+                        <strong className="health-offline">Nema komunikacije</strong>
+                        <span><SilentBadge lastAt={obj.last_measurement_at} /></span>
+                      </>
+                    ) : (
+                      <>
+                        <strong className="health-ok">Sustav uredan</strong>
+                        <span>{obj.is_active ? 'Objekt operativan' : 'Objekt neaktivan'}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="operational-status">
                     <AlarmBadge active={obj.alarm_active} count={obj.alarm_count} />
-                  </div>
-                  <div className="obj-card-meta">
-                    <span className="region-tag">
-                      <span className="region-dot" style={{ background: obj.region_color }} />
-                      {obj.region_name}
-                    </span>
-                    {obj.location_name && (
-                      <span className="location-cell">
-                        <MapPin size={12} />
-                        {obj.location_name}
-                      </span>
-                    )}
-                  </div>
-                  <div className="obj-card-footer">
-                    <code className="station-id">{obj.station_id}</code>
                     {obj.program_features != null
-                      ? <span className="badge" style={{ fontSize: 10, background: 'var(--accent)', color: '#fff' }}>Tip 2</span>
-                      : <span className="badge badge-neutral" style={{ fontSize: 10 }}>Tip 1</span>
-                    }
-                    {obj.is_active
-                      ? <span className="badge badge-success" style={{ fontSize: 11 }}>Aktivan</span>
-                      : <span className="badge badge-neutral" style={{ fontSize: 11 }}>Neaktivan</span>
-                    }
-                    {obj.is_silent && (
-                      <SilentBadge lastAt={obj.last_measurement_at} />
-                    )}
+                      ? <span className="badge badge-neutral">Tip 2</span>
+                      : <span className="badge badge-neutral">Tip 1</span>}
                   </div>
+                  <ChevronRight size={18} className="operational-chevron" />
                 </Link>
               ))}
             </div>

@@ -538,3 +538,236 @@
 
   .drift-stat-value { font-size: 15px; }
 }
+
+
+/* ── AtoN Watch object status header ────────────────────────────────────── */
+.object-detail { max-width:1320px; }
+.detail-header { margin-bottom:14px; }
+.detail-title {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px;
+  box-shadow:var(--shadow);
+}
+.detail-name-row h2 { font-size:22px; font-weight:800; letter-spacing:-.025em; }
+.detail-meta { padding-left:26px; }
+.detail-operational-status {
+  margin-top:14px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:11px 12px;
+  border-radius:9px;
+  border:1px solid var(--border);
+  background:var(--bg3);
+}
+.detail-operational-status.is-ok {
+  background:rgba(18,134,92,.055);
+  border-color:rgba(18,134,92,.18);
+}
+.detail-operational-status.is-alarm {
+  background:rgba(217,54,62,.055);
+  border-color:rgba(217,54,62,.20);
+}
+.detail-operational-status.is-offline {
+  background:rgba(100,116,139,.07);
+  border-color:rgba(100,116,139,.18);
+}
+.detail-operational-icon { display:flex; flex-shrink:0; }
+.is-ok .detail-operational-icon { color:var(--success); }
+.is-alarm .detail-operational-icon { color:var(--danger); }
+.is-offline .detail-operational-icon { color:#64748b; }
+.detail-operational-copy { display:flex; flex-direction:column; min-width:0; }
+.detail-operational-copy strong { font-size:13px; }
+.detail-operational-copy span { font-size:11px; color:var(--text2); }
+.detail-status-action {
+  margin-left:auto;
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  background:transparent;
+  color:var(--danger);
+  padding:5px 6px;
+  font-size:11px;
+  font-weight:700;
+}
+.detail-tabs {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:4px;
+  margin-bottom:16px;
+  margin-top:12px;
+}
+.tab-btn { border-bottom:0; margin-bottom:0; border-radius:7px; padding:7px 13px; font-size:12px; font-weight:700; }
+.tab-btn.active { color:var(--accent); background:rgba(22,119,184,.08); border-bottom-color:transparent; }
+
+@media (max-width:680px) {
+  .detail-title { padding:13px; }
+  .detail-meta { padding-left:0; }
+  .detail-operational-status { align-items:flex-start; }
+  .detail-status-action { margin-left:0; }
+}
+
+
+/* ── AtoN Watch system overview ─────────────────────────────────────────── */
+.system-overview-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+
+.system-panel {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+}
+
+.system-panel-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:13px 15px;
+  border-bottom:1px solid var(--border);
+}
+
+.system-panel-header h3 {
+  margin:1px 0 0;
+  font-size:15px;
+  font-weight:800;
+}
+
+.system-panel-header > svg { color:var(--text2); }
+
+.system-panel-kicker {
+  display:block;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text2);
+}
+
+.system-panel-energy .system-panel-header > svg { color:var(--success); }
+.system-panel-light .system-panel-header > svg { color:var(--warning); }
+
+.system-panel > .card {
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  margin:0 !important;
+}
+
+.system-panel > .card:hover {
+  border-color:transparent;
+  box-shadow:none;
+}
+
+.system-metrics {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:0;
+  border-top:1px solid var(--border);
+}
+
+.system-metrics-primary {
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  border-top:0;
+}
+
+.system-metrics .metric-card {
+  border:0;
+  border-right:1px solid var(--border);
+  border-radius:0;
+  box-shadow:none;
+  min-width:0;
+}
+
+.system-metrics .metric-card:last-child { border-right:0; }
+.system-metrics .metric-card:hover { transform:none; box-shadow:none; border-color:var(--border); }
+
+.system-state-note {
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  padding:10px 14px;
+  border-top:1px solid var(--border);
+  background:var(--bg3);
+}
+
+.system-state-note > div {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+
+.system-state-note strong {
+  font-size:11px;
+  color:var(--text);
+}
+
+.system-state-note span {
+  font-size:10px;
+  color:var(--text2);
+}
+
+.state-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--text2);
+  margin-top:3px;
+  flex-shrink:0;
+}
+
+.state-dot.state-on {
+  background:var(--success);
+  box-shadow:0 0 0 4px rgba(18,134,92,.08);
+}
+
+@media (max-width: 900px) {
+  .system-overview-grid { grid-template-columns:1fr; }
+}
+
+@media (max-width: 520px) {
+  .system-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .system-metrics .metric-card:nth-child(2n) { border-right:0; }
+  .system-metrics .metric-card:nth-child(n+3) { border-top:1px solid var(--border); }
+}
+
+
+/* ── Analytics + charts refinement ─────────────────────────────────────── */
+.analytics-grid {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+.analytics-grid > .card {
+  margin-top:0 !important;
+  height:100%;
+}
+
+.chart-title-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+.chart-title-row h4 { margin:1px 0 0; color:var(--text); font-weight:800; }
+.chart-kicker {
+  display:block;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text2);
+}
+
+@media (max-width: 980px) {
+  .analytics-grid { grid-template-columns:1fr; }
+}

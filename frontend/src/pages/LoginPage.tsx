@@ -63,8 +63,8 @@ export default function LoginPage() {
           <div className="login-logo-wrap" style={{ color: 'var(--accent)' }}>
             <LighthouseIcon size={26} />
           </div>
-          <h1>Beacon</h1>
-          <p>Prijavite se na sistem</p>
+          <h1>AtoN Watch</h1>
+          <p>Operativni nadzor navigacijskih objekata</p>
         </div>
         <div className="login-divider" />
 

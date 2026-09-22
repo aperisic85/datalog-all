@@ -326,3 +326,71 @@ tr:hover td { background: rgba(59,130,246,0.04); }
 @media (max-width: 600px) {
   .form-row { grid-template-columns: 1fr; }
 }
+
+
+/* ── AtoN Watch design system ───────────────────────────────────────────── */
+:root {
+  --bg: #0b111a;
+  --bg2: #121a25;
+  --bg3: #182231;
+  --border: #263244;
+  --text: #eef3f8;
+  --text2: #92a0b2;
+  --accent: #2f8bd3;
+  --accent-hover: #2277ba;
+  --accent-glow: rgba(47,139,211,.18);
+  --success: #18a86b;
+  --warning: #d98a10;
+  --danger: #df3b3b;
+  --danger-dark: #b92727;
+  --shadow: 0 2px 10px rgba(0,0,0,.22);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.28);
+}
+
+[data-theme="light"] {
+  --bg: #f4f6f8;
+  --bg2: #ffffff;
+  --bg3: #f0f3f6;
+  --border: #dfe5ec;
+  --text: #172033;
+  --text2: #687588;
+  --accent: #1677b8;
+  --accent-hover: #0f639a;
+  --accent-glow: rgba(22,119,184,.14);
+  --success: #12865c;
+  --warning: #c97808;
+  --danger: #d9363e;
+  --danger-dark: #b4232b;
+  --shadow: 0 1px 3px rgba(16,24,40,.05), 0 1px 2px rgba(16,24,40,.04);
+  --shadow-lg: 0 8px 24px rgba(16,24,40,.10);
+}
+
+[data-theme="light"] body,
+[data-theme="light"] #root {
+  background: var(--bg);
+  background-image: none;
+}
+
+[data-theme="light"] .card {
+  background: #fff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+[data-theme="light"] .card:hover {
+  border-color: #cfd8e3;
+  box-shadow: var(--shadow-lg);
+}
+
+[data-theme="light"] .btn-primary {
+  background: var(--accent);
+  box-shadow: none;
+}
+[data-theme="light"] .btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: none;
+}
+
+h1, h2, h3, h4 { letter-spacing: -.015em; }

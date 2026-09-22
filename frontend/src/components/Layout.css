@@ -458,3 +458,55 @@
   [data-theme="light"] .bottom-nav-item.active { color: #7dd3fc; }
   [data-theme="light"] .bottom-nav-item.active::before { background: #7dd3fc; }
 }
+
+
+/* ── AtoN Watch sidebar refinement ──────────────────────────────────────── */
+.sidebar { width: 232px; min-width: 232px; }
+.content { margin-left: 232px; }
+.sidebar-logo { padding: 20px 18px; font-size: 17px; letter-spacing: -.02em; }
+.sidebar-logo::after {
+  content: 'AtoN Monitoring';
+  display: block;
+  position: absolute;
+  left: 47px;
+  top: 41px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  opacity: .55;
+}
+.sidebar-logo { position: relative; padding-bottom: 28px; }
+.nav-section { margin-top: 6px; font-size: 10px; }
+.nav-item { font-weight: 600; font-size: 13px; border-radius: 8px; }
+.nav-item:hover { transform: none; }
+
+[data-theme="light"] .sidebar {
+  background: #102d49;
+  box-shadow: none;
+  border-right: 1px solid #173b5e;
+}
+[data-theme="light"] .sidebar-logo {
+  background: transparent;
+  border-bottom-color: rgba(255,255,255,.08);
+}
+[data-theme="light"] .sidebar-nav::before { display:none; }
+[data-theme="light"] .nav-item { color: rgba(255,255,255,.68); }
+[data-theme="light"] .nav-item.active {
+  background: #176aa4;
+  color: #fff;
+}
+[data-theme="light"] .nav-item.active svg { color:#fff; }
+[data-theme="light"] .nav-section { color:rgba(255,255,255,.36); }
+[data-theme="light"] .user-avatar { background:#176aa4; }
+
+@media (max-width: 768px) {
+  .content { margin-left:0; }
+  [data-theme="light"] .mobile-topbar {
+    background:#102d49;
+    box-shadow:none;
+  }
+  [data-theme="light"] .bottom-nav {
+    background:rgba(16,45,73,.98);
+  }
+}

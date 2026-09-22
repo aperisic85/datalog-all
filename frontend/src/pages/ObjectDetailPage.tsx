@@ -64,6 +64,7 @@ import {
   Cpu,
   Cloud,
   Check,
+  CheckCircle,
   Calendar,
   Table as TableIcon,
   Download,
@@ -1649,8 +1650,8 @@ export default function ObjectDetailPage() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
               >
                 <Clock size={11} />
-                Tiha stanica — {obj.last_measurement_at
-                  ? formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: false, locale: hr }) + ' ago'
+                Bez komunikacije — {obj.last_measurement_at
+                  ? formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: true, locale: hr })
                   : 'nema podataka'}
               </span>
             )}
@@ -1686,6 +1687,33 @@ export default function ObjectDetailPage() {
               ? <span className="badge" style={{ background: 'var(--accent)', color: '#fff', fontSize: 11 }}><Cpu size={10} /> Tip 2 — Modularni</span>
               : <span className="badge badge-neutral" style={{ fontSize: 11 }}><Cpu size={10} /> Tip 1 — Galija</span>
             }
+          </div>
+
+          <div className={`detail-operational-status ${obj.alarm_active ? 'is-alarm' : obj.is_silent ? 'is-offline' : 'is-ok'}`}>
+            <div className="detail-operational-icon">
+              {obj.alarm_active ? <AlertTriangle size={18} /> : obj.is_silent ? <Clock size={18} /> : <CheckCircle size={18} />}
+            </div>
+            <div className="detail-operational-copy">
+              <strong>
+                {obj.alarm_active
+                  ? `Aktivni alarmi (${obj.alarm_count})`
+                  : obj.is_silent
+                    ? 'Nema komunikacije s objektom'
+                    : 'Sustav uredan'}
+              </strong>
+              <span>
+                {obj.alarm_active
+                  ? 'Objekt zahtijeva operativnu provjeru'
+                  : obj.is_silent
+                    ? `Zadnji kontakt: ${obj.last_measurement_at ? new Date(obj.last_measurement_at).toLocaleString('hr-HR') : 'nema podataka'}`
+                    : `Zadnji kontakt: ${obj.last_measurement_at ? new Date(obj.last_measurement_at).toLocaleString('hr-HR') : 'nema podataka'}`}
+              </span>
+            </div>
+            {obj.alarm_active && (
+              <button className="detail-status-action" onClick={() => setTab('alarms')}>
+                Prikaži alarme <ChevronRight size={14} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1789,98 +1817,192 @@ export default function ObjectDetailPage() {
             </div>
           </div>
 
-          {/* ── Trenutna mjerenja ── */}
-          <div className="overview-section-label">Trenutna mjerenja</div>
-          <BatterySection
-            objectId={id!}
-            voltage={latest?.battery_voltage_avg}
-            current={latest?.battery_current_avg}
-            prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
-            prevCurrent={recentPositions?.[1]?.battery_current_avg}
-          />
-          <div className="metrics-grid" style={{ marginTop: 10 }}>
-            <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
-              prev={recentPositions?.[1]?.solar_voltage_avg} />
-            <MetricCard icon={<Thermometer size={20} />} label="Temp. datalogera" value={latest?.datalogger_temp_avg} unit="°C" color="var(--danger)"
-              prev={recentPositions?.[1]?.datalogger_temp_avg} />
-            <MetricCard icon={<Wifi size={20} />} label="Internet"
-              value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null} unit="%" color="var(--accent)"
-              prev={recentPositions?.[1]?.internet_ok_avg != null ? recentPositions[1].internet_ok_avg! * 100 : null} />
-            <MetricCard icon={<Zap size={20} />} label="Svjetlo aktivno"
-              value={obj.program_features?.navlite
-                ? (latest?.lantern_current_active_avg != null ? latest.lantern_current_active_avg * 100 : null)
-                : (latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null)}
-              unit="%" color="var(--warning)"
-              prev={obj.program_features?.navlite
-                ? (recentPositions?.[1]?.lantern_current_active_avg != null ? recentPositions[1].lantern_current_active_avg! * 100 : null)
-                : (recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null)} />
-            <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A"
-              prev={recentPositions?.[1]?.lantern_current_avg} />
-            {/* Tip 1 — Galija: GPS sateliti */}
-            {!obj.program_features && (
-              <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
-                prev={recentPositions?.[1]?.garmin_satellites_avg} />
-            )}
-            {/* Tip 1 — Galija: GPS udaljenost od zadane pozicije */}
-            {!obj.program_features && (
-              <MetricCard
-                icon={<MapPin size={20} />}
-                label="GPS udaljenost"
-                value={latest?.garmin_distance_avg}
-                unit="m"
-                color={
-                  latest?.garmin_distance_avg == null ? undefined :
-                  obj.allowed_radius_m && obj.allowed_radius_m > 0
-                    ? (latest.garmin_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
-                    : 'var(--accent)'
-                }
-                prev={recentPositions?.[1]?.garmin_distance_avg}
+          {/* ── Operativni sustavi ── */}
+          <div className="overview-section-label">Operativni sustavi</div>
+          <div className="system-overview-grid">
+            <section className="system-panel system-panel-energy">
+              <div className="system-panel-header">
+                <div>
+                  <span className="system-panel-kicker">Napajanje</span>
+                  <h3>Energija</h3>
+                </div>
+                <Battery size={18} />
+              </div>
+              <BatterySection
+                objectId={id!}
+                voltage={latest?.battery_voltage_avg}
+                current={latest?.battery_current_avg}
+                prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
+                prevCurrent={recentPositions?.[1]?.battery_current_avg}
               />
-            )}
-            {/* Tip 2 — Modularni: udaljenost lanterne/modema od zadane pozicije */}
-            {obj.program_features?.modem && (
-              <MetricCard
-                icon={<MapPin size={20} />}
-                label="Udaljenost od pozicije"
-                value={latest?.lantern_distance_avg}
-                unit="m"
-                color={
-                  latest?.lantern_distance_avg == null ? undefined :
-                  obj.allowed_radius_m && obj.allowed_radius_m > 0
-                    ? (latest.lantern_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
-                    : 'var(--accent)'
-                }
-                prev={recentPositions?.[1]?.lantern_distance_avg}
-              />
-            )}
-            {/* Tip 2 — Modularni: vidljivost i sirena */}
-            {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
-              <MetricCard
-                icon={<Eye size={20} />}
-                label="Vidljivost"
-                value={latest?.visibility_value_avg}
-                unit="m"
-                color={
-                  latest?.visibility_value_avg == null ? undefined :
-                  latest.visibility_value_avg < 200 ? 'var(--danger)' :
-                  latest.visibility_value_avg < 1000 ? 'var(--warning)' : 'var(--success)'
-                }
-                prev={recentPositions?.[1]?.visibility_value_avg}
-              />
-            )}
-            {obj.program_features?.fog_signal && (
-              <MetricCard
-                icon={<Wind size={20} />}
-                label="Sirena aktivna"
-                value={latest?.fog_signal_active_avg != null ? latest.fog_signal_active_avg * 100 : null}
-                unit="%"
-                color="var(--accent)"
-                prev={recentPositions?.[1]?.fog_signal_active_avg != null ? recentPositions[1].fog_signal_active_avg! * 100 : null}
-              />
-            )}
-            {obj.program_features?.fog_signal && (
-              <MetricCard icon={<Wind size={20} />} label="Struja sirene" value={latest?.fog_signal_current_avg} unit="A"
-                prev={recentPositions?.[1]?.fog_signal_current_avg} />
+              <div className="system-metrics">
+                <MetricCard
+                  icon={<Sun size={18} />}
+                  label="Solarni napon"
+                  value={latest?.solar_voltage_avg}
+                  unit="V"
+                  color="var(--warning)"
+                  prev={recentPositions?.[1]?.solar_voltage_avg}
+                />
+                <MetricCard
+                  icon={<Thermometer size={18} />}
+                  label="Temp. datalogera"
+                  value={latest?.datalogger_temp_avg}
+                  unit="°C"
+                  color="var(--danger)"
+                  prev={recentPositions?.[1]?.datalogger_temp_avg}
+                />
+                <MetricCard
+                  icon={<Wifi size={18} />}
+                  label="Internet"
+                  value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null}
+                  unit="%"
+                  color="var(--accent)"
+                  prev={recentPositions?.[1]?.internet_ok_avg != null ? recentPositions[1].internet_ok_avg! * 100 : null}
+                />
+              </div>
+            </section>
+
+            <section className="system-panel system-panel-light">
+              <div className="system-panel-header">
+                <div>
+                  <span className="system-panel-kicker">Navigacijsko svjetlo</span>
+                  <h3>Svjetlo</h3>
+                </div>
+                <Zap size={18} />
+              </div>
+              <div className="system-metrics system-metrics-primary">
+                <MetricCard
+                  icon={<Zap size={18} />}
+                  label="Aktivno"
+                  value={obj.program_features?.navlite
+                    ? (latest?.lantern_current_active_avg != null ? latest.lantern_current_active_avg * 100 : null)
+                    : (latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null)}
+                  unit="%"
+                  color="var(--warning)"
+                  prev={obj.program_features?.navlite
+                    ? (recentPositions?.[1]?.lantern_current_active_avg != null ? recentPositions[1].lantern_current_active_avg! * 100 : null)
+                    : (recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null)}
+                />
+                <MetricCard
+                  icon={<Zap size={18} />}
+                  label="Struja svjetla"
+                  value={latest?.lantern_current_avg}
+                  unit="A"
+                  prev={recentPositions?.[1]?.lantern_current_avg}
+                />
+              </div>
+              <div className="system-state-note">
+                <span className={latest?.lantern_current_avg != null && latest.lantern_current_avg > 0 ? 'state-dot state-on' : 'state-dot'} />
+                <div>
+                  <strong>{latest?.lantern_current_avg != null && latest.lantern_current_avg > 0 ? 'Svjetlo troši struju' : 'Nema izmjerene potrošnje svjetla'}</strong>
+                  <span>Za operativnu odluku koristi se i stanje alarma objekta.</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="system-panel">
+              <div className="system-panel-header">
+                <div>
+                  <span className="system-panel-kicker">Lokacija</span>
+                  <h3>Pozicija</h3>
+                </div>
+                <MapPin size={18} />
+              </div>
+              <div className="system-metrics">
+                {!obj.program_features && (
+                  <>
+                    <MetricCard
+                      icon={<Radio size={18} />}
+                      label="GPS sateliti"
+                      value={latest?.garmin_satellites_avg}
+                      prev={recentPositions?.[1]?.garmin_satellites_avg}
+                    />
+                    <MetricCard
+                      icon={<MapPin size={18} />}
+                      label="Udaljenost"
+                      value={latest?.garmin_distance_avg}
+                      unit="m"
+                      color={
+                        latest?.garmin_distance_avg == null ? undefined :
+                        obj.allowed_radius_m && obj.allowed_radius_m > 0
+                          ? (latest.garmin_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
+                          : 'var(--accent)'
+                      }
+                      prev={recentPositions?.[1]?.garmin_distance_avg}
+                    />
+                  </>
+                )}
+                {obj.program_features?.modem && (
+                  <MetricCard
+                    icon={<MapPin size={18} />}
+                    label="Udaljenost"
+                    value={latest?.lantern_distance_avg}
+                    unit="m"
+                    color={
+                      latest?.lantern_distance_avg == null ? undefined :
+                      obj.allowed_radius_m && obj.allowed_radius_m > 0
+                        ? (latest.lantern_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
+                        : 'var(--accent)'
+                    }
+                    prev={recentPositions?.[1]?.lantern_distance_avg}
+                  />
+                )}
+                <MetricCard
+                  icon={<MapPin size={18} />}
+                  label="Dozvoljeni radijus"
+                  value={obj.allowed_radius_m && obj.allowed_radius_m > 0 ? obj.allowed_radius_m : null}
+                  unit="m"
+                  color="var(--accent)"
+                />
+              </div>
+            </section>
+
+            {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station || obj.program_features?.fog_signal) && (
+              <section className="system-panel">
+                <div className="system-panel-header">
+                  <div>
+                    <span className="system-panel-kicker">Okoliš</span>
+                    <h3>Vidljivost i sirena</h3>
+                  </div>
+                  <Wind size={18} />
+                </div>
+                <div className="system-metrics">
+                  {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
+                    <MetricCard
+                      icon={<Eye size={18} />}
+                      label="Vidljivost"
+                      value={latest?.visibility_value_avg}
+                      unit="m"
+                      color={
+                        latest?.visibility_value_avg == null ? undefined :
+                        latest.visibility_value_avg < 200 ? 'var(--danger)' :
+                        latest.visibility_value_avg < 1000 ? 'var(--warning)' : 'var(--success)'
+                      }
+                      prev={recentPositions?.[1]?.visibility_value_avg}
+                    />
+                  )}
+                  {obj.program_features?.fog_signal && (
+                    <>
+                      <MetricCard
+                        icon={<Wind size={18} />}
+                        label="Sirena aktivna"
+                        value={latest?.fog_signal_active_avg != null ? latest.fog_signal_active_avg * 100 : null}
+                        unit="%"
+                        color="var(--accent)"
+                        prev={recentPositions?.[1]?.fog_signal_active_avg != null ? recentPositions[1].fog_signal_active_avg! * 100 : null}
+                      />
+                      <MetricCard
+                        icon={<Wind size={18} />}
+                        label="Struja sirene"
+                        value={latest?.fog_signal_current_avg}
+                        unit="A"
+                        prev={recentPositions?.[1]?.fog_signal_current_avg}
+                      />
+                    </>
+                  )}
+                </div>
+              </section>
             )}
           </div>
 
@@ -1904,10 +2026,12 @@ export default function ObjectDetailPage() {
           )}
 
           {/* ── Analitika ── */}
-          <div className="overview-section-label">Analitika</div>
-          <BatteryCapacitySection objectId={id!} />
-          <BatteryHealthSection objectId={id!} />
-          {hasCoords && <SolarEfficiencySection objectId={id!} />}
+          <div className="overview-section-label">Prediktivna analitika</div>
+          <div className="analytics-grid">
+            <BatteryCapacitySection objectId={id!} />
+            <BatteryHealthSection objectId={id!} />
+            {hasCoords && <SolarEfficiencySection objectId={id!} />}
+          </div>
 
           {obj.latitude && obj.longitude && (() => {
             const isModular = !!(obj.program_features?.modem || obj.program_features?.navlite || obj.program_features?.sealite);
@@ -2228,29 +2352,24 @@ export default function ObjectDetailPage() {
             <div className="no-data">Nema podataka za odabrani period</div>
           ) : (
             <div className="charts-grid">
-              <div className="chart-card card">
-                <h4>Napon baterije (V)</h4>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={chartData}>
+              <div className="chart-card card chart-wide">
+                <div className="chart-title-row">
+                  <div>
+                    <span className="chart-kicker">Energija</span>
+                    <h4>Baterija — napon i struja</h4>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <ComposedChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
-                    <Line type="monotone" dataKey="battery_voltage_avg" stroke="var(--success)" dot={false} name="Napon (V)" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="chart-card card">
-                <h4>Struja baterije (A)</h4>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
-                    <Line type="monotone" dataKey="battery_current_avg" stroke="var(--accent)" dot={false} name="Struja (A)" />
-                  </LineChart>
+                    <YAxis yAxisId="voltage" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                    <YAxis yAxisId="current" orientation="right" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8 }} />
+                    <Legend />
+                    <Line yAxisId="voltage" type="monotone" dataKey="battery_voltage_avg" stroke="var(--success)" dot={false} name="Napon (V)" />
+                    <Line yAxisId="current" type="monotone" dataKey="battery_current_avg" stroke="var(--accent)" dot={false} name="Struja (A)" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
 

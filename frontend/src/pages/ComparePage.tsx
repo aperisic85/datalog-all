@@ -96,7 +96,7 @@ function StationSearch({
         <input
           className="station-search-input"
           type="text"
-          placeholder="Pretraži stanicu…"
+          placeholder="Pretraži objekt…"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -256,7 +256,7 @@ export default function ComparePage() {
       <div className="compare-header">
         <div className="compare-title-row">
           <GitCompare size={20} />
-          <h2>Usporedi stanice</h2>
+          <div><span className="compare-kicker">Analiza</span><h2>Usporedi objekte</h2></div>
         </div>
         <p className="compare-desc">
           Odaberi 2–4 stanice i promatraj napona, solarni napon, temperaturu i struju baterije
@@ -301,8 +301,8 @@ export default function ComparePage() {
       {selected.length < 2 && (
         <div className="compare-empty">
           <Info size={32} />
-          <p>Odaberi barem <strong>2 stanice</strong> za usporedbu grafova.</p>
-          <p className="compare-empty-sub">Možeš odabrati do {MAX_STATIONS} stanica.</p>
+          <p>Odaberi barem <strong>2 objekta</strong> za usporedbu grafova.</p>
+          <p className="compare-empty-sub">Možeš odabrati do {MAX_STATIONS} objekta.</p>
         </div>
       )}
 
