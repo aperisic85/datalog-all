@@ -179,7 +179,7 @@ export default function Layout() {
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <LighthouseIcon size={20} />
-          <span>Beacon</span>
+          <span>AtoN Watch</span>
           <button className="sidebar-close-btn" onClick={closeSidebar} title="Zatvori">
             <X size={18} />
           </button>
@@ -208,7 +208,7 @@ export default function Layout() {
           </NavLink>
           {isAdmin && (
             <>
-              <div className="nav-section">Admin</div>
+              <div className="nav-section">Administracija</div>
               <NavLink to="/admin/regions" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                 <MapPin size={16} />
                 Regije
@@ -257,7 +257,7 @@ export default function Layout() {
         <div className="mobile-topbar">
           <div className="mobile-logo">
             <LighthouseIcon size={18} />
-            <span>Beacon</span>
+            <span>AtoN Watch</span>
           </div>
           <div className="mobile-topbar-actions">
             <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Svijetla tema' : 'Tamna tema'}>
@@ -283,7 +283,7 @@ export default function Layout() {
           className={`bottom-nav-item${location.pathname === '/dashboard' ? ' active' : ''}`}
         >
           <LayoutDashboard size={22} />
-          <span>Dashboard</span>
+          <span>Pregled</span>
         </NavLink>
         <NavLink
           to="/objects"
