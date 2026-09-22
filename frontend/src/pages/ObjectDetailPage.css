@@ -738,3 +738,36 @@
   .system-metrics .metric-card:nth-child(2n) { border-right:0; }
   .system-metrics .metric-card:nth-child(n+3) { border-top:1px solid var(--border); }
 }
+
+
+/* ── Analytics + charts refinement ─────────────────────────────────────── */
+.analytics-grid {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+.analytics-grid > .card {
+  margin-top:0 !important;
+  height:100%;
+}
+
+.chart-title-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+.chart-title-row h4 { margin:1px 0 0; color:var(--text); font-weight:800; }
+.chart-kicker {
+  display:block;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text2);
+}
+
+@media (max-width: 980px) {
+  .analytics-grid { grid-template-columns:1fr; }
+}
