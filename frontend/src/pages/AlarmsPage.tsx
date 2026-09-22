@@ -831,8 +831,9 @@ export default function AlarmsPage() {
       )}
 
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header alarms-header">
         <div>
+          <span className="alarms-kicker">Operativni prioriteti</span>
           <h2>Alarmi</h2>
           <span className="text-muted">
             {total > 0 ? `${total} ${total === 1 ? 'zapis' : 'zapisa'}` : 'Nema zapisa'}
