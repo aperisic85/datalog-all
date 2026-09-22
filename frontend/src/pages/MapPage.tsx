@@ -103,7 +103,7 @@ export default function MapPage() {
     <div className="map-page">
       <div className="map-header">
         <div className="map-title">
-          <h1>Karta objekata</h1>
+          <span className="map-kicker">Operativna slika</span>\n          <h1>Karta objekata</h1>
           <span className="map-subtitle">{inRegion.length} objekata s koordinatama</span>
         </div>
         <div className="map-controls">
@@ -134,16 +134,16 @@ export default function MapPage() {
               className={`map-filter-btn inactive ${filter === 'inactive' ? 'active' : ''}`}
               onClick={() => setFilter('inactive')}
             >
-              Neaktivni ({inactiveCount})
+              Izvan pogona ({inactiveCount})
             </button>
           </div>
         </div>
       </div>
 
       <div className="map-legend">
-        <span className="legend-item"><span className="legend-dot active" />Aktivan</span>
+        <span className="legend-item"><span className="legend-dot active" />Operativan</span>
         <span className="legend-item"><span className="legend-dot alarm" />Alarm</span>
-        <span className="legend-item"><span className="legend-dot inactive" />Neaktivan</span>
+        <span className="legend-item"><span className="legend-dot inactive" />Izvan pogona</span>
         <span className="legend-item map-legend-hint">Skupine se otvaraju klikom</span>
       </div>
 
