@@ -1817,98 +1817,192 @@ export default function ObjectDetailPage() {
             </div>
           </div>
 
-          {/* ── Trenutna mjerenja ── */}
-          <div className="overview-section-label">Trenutna mjerenja</div>
-          <BatterySection
-            objectId={id!}
-            voltage={latest?.battery_voltage_avg}
-            current={latest?.battery_current_avg}
-            prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
-            prevCurrent={recentPositions?.[1]?.battery_current_avg}
-          />
-          <div className="metrics-grid" style={{ marginTop: 10 }}>
-            <MetricCard icon={<Sun size={20} />} label="Napon solarnog" value={latest?.solar_voltage_avg} unit="V" color="var(--warning)"
-              prev={recentPositions?.[1]?.solar_voltage_avg} />
-            <MetricCard icon={<Thermometer size={20} />} label="Temp. datalogera" value={latest?.datalogger_temp_avg} unit="°C" color="var(--danger)"
-              prev={recentPositions?.[1]?.datalogger_temp_avg} />
-            <MetricCard icon={<Wifi size={20} />} label="Internet"
-              value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null} unit="%" color="var(--accent)"
-              prev={recentPositions?.[1]?.internet_ok_avg != null ? recentPositions[1].internet_ok_avg! * 100 : null} />
-            <MetricCard icon={<Zap size={20} />} label="Svjetlo aktivno"
-              value={obj.program_features?.navlite
-                ? (latest?.lantern_current_active_avg != null ? latest.lantern_current_active_avg * 100 : null)
-                : (latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null)}
-              unit="%" color="var(--warning)"
-              prev={obj.program_features?.navlite
-                ? (recentPositions?.[1]?.lantern_current_active_avg != null ? recentPositions[1].lantern_current_active_avg! * 100 : null)
-                : (recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null)} />
-            <MetricCard icon={<Zap size={20} />} label="Struja svjetla" value={latest?.lantern_current_avg} unit="A"
-              prev={recentPositions?.[1]?.lantern_current_avg} />
-            {/* Tip 1 — Galija: GPS sateliti */}
-            {!obj.program_features && (
-              <MetricCard icon={<Radio size={20} />} label="Garmin sateliti" value={latest?.garmin_satellites_avg}
-                prev={recentPositions?.[1]?.garmin_satellites_avg} />
-            )}
-            {/* Tip 1 — Galija: GPS udaljenost od zadane pozicije */}
-            {!obj.program_features && (
-              <MetricCard
-                icon={<MapPin size={20} />}
-                label="GPS udaljenost"
-                value={latest?.garmin_distance_avg}
-                unit="m"
-                color={
-                  latest?.garmin_distance_avg == null ? undefined :
-                  obj.allowed_radius_m && obj.allowed_radius_m > 0
-                    ? (latest.garmin_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
-                    : 'var(--accent)'
-                }
-                prev={recentPositions?.[1]?.garmin_distance_avg}
+          {/* ── Operativni sustavi ── */}
+          <div className="overview-section-label">Operativni sustavi</div>
+          <div className="system-overview-grid">
+            <section className="system-panel system-panel-energy">
+              <div className="system-panel-header">
+                <div>
+                  <span className="system-panel-kicker">Napajanje</span>
+                  <h3>Energija</h3>
+                </div>
+                <Battery size={18} />
+              </div>
+              <BatterySection
+                objectId={id!}
+                voltage={latest?.battery_voltage_avg}
+                current={latest?.battery_current_avg}
+                prevVoltage={recentPositions?.[1]?.battery_voltage_avg}
+                prevCurrent={recentPositions?.[1]?.battery_current_avg}
               />
-            )}
-            {/* Tip 2 — Modularni: udaljenost lanterne/modema od zadane pozicije */}
-            {obj.program_features?.modem && (
-              <MetricCard
-                icon={<MapPin size={20} />}
-                label="Udaljenost od pozicije"
-                value={latest?.lantern_distance_avg}
-                unit="m"
-                color={
-                  latest?.lantern_distance_avg == null ? undefined :
-                  obj.allowed_radius_m && obj.allowed_radius_m > 0
-                    ? (latest.lantern_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
-                    : 'var(--accent)'
-                }
-                prev={recentPositions?.[1]?.lantern_distance_avg}
-              />
-            )}
-            {/* Tip 2 — Modularni: vidljivost i sirena */}
-            {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
-              <MetricCard
-                icon={<Eye size={20} />}
-                label="Vidljivost"
-                value={latest?.visibility_value_avg}
-                unit="m"
-                color={
-                  latest?.visibility_value_avg == null ? undefined :
-                  latest.visibility_value_avg < 200 ? 'var(--danger)' :
-                  latest.visibility_value_avg < 1000 ? 'var(--warning)' : 'var(--success)'
-                }
-                prev={recentPositions?.[1]?.visibility_value_avg}
-              />
-            )}
-            {obj.program_features?.fog_signal && (
-              <MetricCard
-                icon={<Wind size={20} />}
-                label="Sirena aktivna"
-                value={latest?.fog_signal_active_avg != null ? latest.fog_signal_active_avg * 100 : null}
-                unit="%"
-                color="var(--accent)"
-                prev={recentPositions?.[1]?.fog_signal_active_avg != null ? recentPositions[1].fog_signal_active_avg! * 100 : null}
-              />
-            )}
-            {obj.program_features?.fog_signal && (
-              <MetricCard icon={<Wind size={20} />} label="Struja sirene" value={latest?.fog_signal_current_avg} unit="A"
-                prev={recentPositions?.[1]?.fog_signal_current_avg} />
+              <div className="system-metrics">
+                <MetricCard
+                  icon={<Sun size={18} />}
+                  label="Solarni napon"
+                  value={latest?.solar_voltage_avg}
+                  unit="V"
+                  color="var(--warning)"
+                  prev={recentPositions?.[1]?.solar_voltage_avg}
+                />
+                <MetricCard
+                  icon={<Thermometer size={18} />}
+                  label="Temp. datalogera"
+                  value={latest?.datalogger_temp_avg}
+                  unit="°C"
+                  color="var(--danger)"
+                  prev={recentPositions?.[1]?.datalogger_temp_avg}
+                />
+                <MetricCard
+                  icon={<Wifi size={18} />}
+                  label="Internet"
+                  value={latest?.internet_ok_avg != null ? latest.internet_ok_avg * 100 : null}
+                  unit="%"
+                  color="var(--accent)"
+                  prev={recentPositions?.[1]?.internet_ok_avg != null ? recentPositions[1].internet_ok_avg! * 100 : null}
+                />
+              </div>
+            </section>
+
+            <section className="system-panel system-panel-light">
+              <div className="system-panel-header">
+                <div>
+                  <span className="system-panel-kicker">Navigacijsko svjetlo</span>
+                  <h3>Svjetlo</h3>
+                </div>
+                <Zap size={18} />
+              </div>
+              <div className="system-metrics system-metrics-primary">
+                <MetricCard
+                  icon={<Zap size={18} />}
+                  label="Aktivno"
+                  value={obj.program_features?.navlite
+                    ? (latest?.lantern_current_active_avg != null ? latest.lantern_current_active_avg * 100 : null)
+                    : (latest?.lantern_light_active_avg != null ? latest.lantern_light_active_avg * 100 : null)}
+                  unit="%"
+                  color="var(--warning)"
+                  prev={obj.program_features?.navlite
+                    ? (recentPositions?.[1]?.lantern_current_active_avg != null ? recentPositions[1].lantern_current_active_avg! * 100 : null)
+                    : (recentPositions?.[1]?.lantern_light_active_avg != null ? recentPositions[1].lantern_light_active_avg! * 100 : null)}
+                />
+                <MetricCard
+                  icon={<Zap size={18} />}
+                  label="Struja svjetla"
+                  value={latest?.lantern_current_avg}
+                  unit="A"
+                  prev={recentPositions?.[1]?.lantern_current_avg}
+                />
+              </div>
+              <div className="system-state-note">
+                <span className={latest?.lantern_current_avg != null && latest.lantern_current_avg > 0 ? 'state-dot state-on' : 'state-dot'} />
+                <div>
+                  <strong>{latest?.lantern_current_avg != null && latest.lantern_current_avg > 0 ? 'Svjetlo troši struju' : 'Nema izmjerene potrošnje svjetla'}</strong>
+                  <span>Za operativnu odluku koristi se i stanje alarma objekta.</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="system-panel">
+              <div className="system-panel-header">
+                <div>
+                  <span className="system-panel-kicker">Lokacija</span>
+                  <h3>Pozicija</h3>
+                </div>
+                <MapPin size={18} />
+              </div>
+              <div className="system-metrics">
+                {!obj.program_features && (
+                  <>
+                    <MetricCard
+                      icon={<Radio size={18} />}
+                      label="GPS sateliti"
+                      value={latest?.garmin_satellites_avg}
+                      prev={recentPositions?.[1]?.garmin_satellites_avg}
+                    />
+                    <MetricCard
+                      icon={<MapPin size={18} />}
+                      label="Udaljenost"
+                      value={latest?.garmin_distance_avg}
+                      unit="m"
+                      color={
+                        latest?.garmin_distance_avg == null ? undefined :
+                        obj.allowed_radius_m && obj.allowed_radius_m > 0
+                          ? (latest.garmin_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
+                          : 'var(--accent)'
+                      }
+                      prev={recentPositions?.[1]?.garmin_distance_avg}
+                    />
+                  </>
+                )}
+                {obj.program_features?.modem && (
+                  <MetricCard
+                    icon={<MapPin size={18} />}
+                    label="Udaljenost"
+                    value={latest?.lantern_distance_avg}
+                    unit="m"
+                    color={
+                      latest?.lantern_distance_avg == null ? undefined :
+                      obj.allowed_radius_m && obj.allowed_radius_m > 0
+                        ? (latest.lantern_distance_avg <= obj.allowed_radius_m ? 'var(--success)' : 'var(--danger)')
+                        : 'var(--accent)'
+                    }
+                    prev={recentPositions?.[1]?.lantern_distance_avg}
+                  />
+                )}
+                <MetricCard
+                  icon={<MapPin size={18} />}
+                  label="Dozvoljeni radijus"
+                  value={obj.allowed_radius_m && obj.allowed_radius_m > 0 ? obj.allowed_radius_m : null}
+                  unit="m"
+                  color="var(--accent)"
+                />
+              </div>
+            </section>
+
+            {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station || obj.program_features?.fog_signal) && (
+              <section className="system-panel">
+                <div className="system-panel-header">
+                  <div>
+                    <span className="system-panel-kicker">Okoliš</span>
+                    <h3>Vidljivost i sirena</h3>
+                  </div>
+                  <Wind size={18} />
+                </div>
+                <div className="system-metrics">
+                  {(obj.program_features?.vaisala_pwd20 || obj.program_features?.visibility_on_other_station) && (
+                    <MetricCard
+                      icon={<Eye size={18} />}
+                      label="Vidljivost"
+                      value={latest?.visibility_value_avg}
+                      unit="m"
+                      color={
+                        latest?.visibility_value_avg == null ? undefined :
+                        latest.visibility_value_avg < 200 ? 'var(--danger)' :
+                        latest.visibility_value_avg < 1000 ? 'var(--warning)' : 'var(--success)'
+                      }
+                      prev={recentPositions?.[1]?.visibility_value_avg}
+                    />
+                  )}
+                  {obj.program_features?.fog_signal && (
+                    <>
+                      <MetricCard
+                        icon={<Wind size={18} />}
+                        label="Sirena aktivna"
+                        value={latest?.fog_signal_active_avg != null ? latest.fog_signal_active_avg * 100 : null}
+                        unit="%"
+                        color="var(--accent)"
+                        prev={recentPositions?.[1]?.fog_signal_active_avg != null ? recentPositions[1].fog_signal_active_avg! * 100 : null}
+                      />
+                      <MetricCard
+                        icon={<Wind size={18} />}
+                        label="Struja sirene"
+                        value={latest?.fog_signal_current_avg}
+                        unit="A"
+                        prev={recentPositions?.[1]?.fog_signal_current_avg}
+                      />
+                    </>
+                  )}
+                </div>
+              </section>
             )}
           </div>
 
