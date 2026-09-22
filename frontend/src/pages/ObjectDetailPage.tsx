@@ -64,6 +64,7 @@ import {
   Cpu,
   Cloud,
   Check,
+  CheckCircle,
   Calendar,
   Table as TableIcon,
   Download,
