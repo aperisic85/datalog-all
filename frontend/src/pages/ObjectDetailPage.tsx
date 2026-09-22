@@ -2026,10 +2026,12 @@ export default function ObjectDetailPage() {
           )}
 
           {/* ── Analitika ── */}
-          <div className="overview-section-label">Analitika</div>
-          <BatteryCapacitySection objectId={id!} />
-          <BatteryHealthSection objectId={id!} />
-          {hasCoords && <SolarEfficiencySection objectId={id!} />}
+          <div className="overview-section-label">Prediktivna analitika</div>
+          <div className="analytics-grid">
+            <BatteryCapacitySection objectId={id!} />
+            <BatteryHealthSection objectId={id!} />
+            {hasCoords && <SolarEfficiencySection objectId={id!} />}
+          </div>
 
           {obj.latitude && obj.longitude && (() => {
             const isModular = !!(obj.program_features?.modem || obj.program_features?.navlite || obj.program_features?.sealite);
@@ -2350,29 +2352,24 @@ export default function ObjectDetailPage() {
             <div className="no-data">Nema podataka za odabrani period</div>
           ) : (
             <div className="charts-grid">
-              <div className="chart-card card">
-                <h4>Napon baterije (V)</h4>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={chartData}>
+              <div className="chart-card card chart-wide">
+                <div className="chart-title-row">
+                  <div>
+                    <span className="chart-kicker">Energija</span>
+                    <h4>Baterija — napon i struja</h4>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <ComposedChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
-                    <Line type="monotone" dataKey="battery_voltage_avg" stroke="var(--success)" dot={false} name="Napon (V)" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="chart-card card">
-                <h4>Struja baterije (A)</h4>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }} />
-                    <Line type="monotone" dataKey="battery_current_avg" stroke="var(--accent)" dot={false} name="Struja (A)" />
-                  </LineChart>
+                    <YAxis yAxisId="voltage" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                    <YAxis yAxisId="current" orientation="right" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                    <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8 }} />
+                    <Legend />
+                    <Line yAxisId="voltage" type="monotone" dataKey="battery_voltage_avg" stroke="var(--success)" dot={false} name="Napon (V)" />
+                    <Line yAxisId="current" type="monotone" dataKey="battery_current_avg" stroke="var(--accent)" dot={false} name="Struja (A)" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
 
