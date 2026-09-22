@@ -1649,8 +1649,8 @@ export default function ObjectDetailPage() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
               >
                 <Clock size={11} />
-                Tiha stanica — {obj.last_measurement_at
-                  ? formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: false, locale: hr }) + ' ago'
+                Bez komunikacije — {obj.last_measurement_at
+                  ? formatDistanceToNow(parseDateISO(obj.last_measurement_at), { addSuffix: true, locale: hr })
                   : 'nema podataka'}
               </span>
             )}
@@ -1686,6 +1686,33 @@ export default function ObjectDetailPage() {
               ? <span className="badge" style={{ background: 'var(--accent)', color: '#fff', fontSize: 11 }}><Cpu size={10} /> Tip 2 — Modularni</span>
               : <span className="badge badge-neutral" style={{ fontSize: 11 }}><Cpu size={10} /> Tip 1 — Galija</span>
             }
+          </div>
+
+          <div className={`detail-operational-status ${obj.alarm_active ? 'is-alarm' : obj.is_silent ? 'is-offline' : 'is-ok'}`}>
+            <div className="detail-operational-icon">
+              {obj.alarm_active ? <AlertTriangle size={18} /> : obj.is_silent ? <Clock size={18} /> : <CheckCircle size={18} />}
+            </div>
+            <div className="detail-operational-copy">
+              <strong>
+                {obj.alarm_active
+                  ? `Aktivni alarmi (${obj.alarm_count})`
+                  : obj.is_silent
+                    ? 'Nema komunikacije s objektom'
+                    : 'Sustav uredan'}
+              </strong>
+              <span>
+                {obj.alarm_active
+                  ? 'Objekt zahtijeva operativnu provjeru'
+                  : obj.is_silent
+                    ? `Zadnji kontakt: ${obj.last_measurement_at ? new Date(obj.last_measurement_at).toLocaleString('hr-HR') : 'nema podataka'}`
+                    : `Zadnji kontakt: ${obj.last_measurement_at ? new Date(obj.last_measurement_at).toLocaleString('hr-HR') : 'nema podataka'}`}
+              </span>
+            </div>
+            {obj.alarm_active && (
+              <button className="detail-status-action" onClick={() => setTab('alarms')}>
+                Prikaži alarme <ChevronRight size={14} />
+              </button>
+            )}
           </div>
         </div>
       </div>
