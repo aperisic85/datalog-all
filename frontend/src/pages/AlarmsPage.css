@@ -784,3 +784,95 @@
 @media (min-width: 900px) {
   .alarm-list { display: none; }
 }
+
+
+/* ── AtoN Watch alarm refinement ───────────────────────────────────────── */
+.alarms-page { max-width:1320px; }
+.alarms-header h2 {
+  font-size:26px;
+  font-weight:800;
+  letter-spacing:-.03em;
+  margin:2px 0 3px;
+}
+.alarms-kicker {
+  display:block;
+  color:var(--accent);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+
+.scada-banner {
+  padding:12px 14px;
+  border-radius:12px;
+  box-shadow:var(--shadow);
+}
+.scada-tile {
+  min-width:104px;
+  padding:8px 14px;
+  border-radius:9px;
+}
+.scada-tile-count { font-size:24px; font-weight:800; }
+.scada-tile-label { font-size:9px; }
+.scada-tile-critical.lit {
+  background:rgba(217,54,62,.08);
+  border-color:rgba(217,54,62,.28);
+}
+.scada-tile-warning.lit {
+  background:rgba(201,120,8,.08);
+  border-color:rgba(201,120,8,.25);
+}
+.scada-tile-total.ok {
+  background:rgba(18,134,92,.06);
+  border-color:rgba(18,134,92,.20);
+}
+
+.alarm-status-tabs {
+  border-radius:10px;
+  padding:4px;
+  background:var(--bg2);
+}
+.alarm-status-tab {
+  border:0;
+  border-radius:7px;
+  font-size:12px;
+  font-weight:700;
+}
+.alarm-status-tab.active {
+  background:rgba(22,119,184,.08);
+  color:var(--accent);
+}
+
+.alarms-filters {
+  padding:10px 12px;
+  border-radius:10px;
+}
+.alarm-table-wrap { border-radius:12px; }
+.alarm-table th { background:var(--bg2); }
+.alarm-row-critical { background:rgba(217,54,62,.035); }
+.alarm-row-warning { background:rgba(201,120,8,.028); }
+.alarm-row-critical:hover { background:rgba(217,54,62,.065); }
+.alarm-row-warning:hover { background:rgba(201,120,8,.055); }
+
+.alarm-card {
+  border-radius:12px;
+  box-shadow:var(--shadow);
+}
+.alarm-card-critical {
+  background:var(--bg2);
+  border-color:rgba(217,54,62,.18);
+}
+.alarm-card-warning {
+  background:var(--bg2);
+  border-color:rgba(201,120,8,.18);
+}
+.alarm-tag { border-radius:7px; }
+.alarm-action-btn { border-radius:7px; }
+
+@media (max-width:640px) {
+  .alarms-header h2 { font-size:23px; }
+  .scada-tiles { display:grid; grid-template-columns:repeat(3,1fr); width:100%; }
+  .scada-tile { min-width:0; padding:7px 8px; }
+  .scada-banner-right { width:100%; }
+}
