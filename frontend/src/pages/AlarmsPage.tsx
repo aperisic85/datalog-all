@@ -391,6 +391,19 @@ function ScadaBanner({ critical, warning, activeTotal, updatedAt, onRefresh, isF
   );
 }
 
+function formatAlarmDuration(item: AlarmListItem): string {
+  if (item.acknowledged_at) return '—';
+  const start = new Date(item.active_since || item.recorded_at).getTime();
+  const totalMinutes = Math.max(0, Math.floor((Date.now() - start) / 60_000));
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours < 24) return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days} d ${remainingHours} h` : `${days} d`;
+}
+
 // ── Redak SCADA tablice ────────────────────────────────────────────────────
 function AlarmRow({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking, selected, onToggleSelect }: {
   item: AlarmListItem;
@@ -423,6 +436,16 @@ function AlarmRow({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking, 
       </td>
       <td className="col-time" title={formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}>
         {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
+      </td>
+      <td className="col-duration">
+        {!item.acknowledged_at ? (
+          <span
+            className="alarm-duration"
+            title={`Aktivno od ${format(new Date(item.active_since || item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}`}
+          >
+            <Timer size={11} /> {formatAlarmDuration(item)}
+          </span>
+        ) : <span className="text-muted">—</span>}
       </td>
       <td className="col-object">
         <Link to={`/objects/${item.object_id}`} className="alarm-obj-link">{item.object_name}</Link>
@@ -535,6 +558,11 @@ function AlarmCard({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking,
           {' · '}
           {formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}
         </span>
+        {!isAcknowledged && (
+          <span className="alarm-duration-mobile">
+            <Timer size={11} /> Traje {formatAlarmDuration(item)}
+          </span>
+        )}
         {isAcknowledged && item.acknowledged_at && (
           <span className="alarm-ack-info">
             <CheckCircle size={11} />
@@ -971,6 +999,7 @@ export default function AlarmsPage() {
                 </th>
                 <th className="col-state">Stanje</th>
                 <th className="col-time">Vrijeme</th>
+                <th className="col-duration">Trajanje</th>
                 <th className="col-object">Objekt</th>
                 <th className="col-region">Regija</th>
                 <th className="col-alarms">Alarmi</th>
