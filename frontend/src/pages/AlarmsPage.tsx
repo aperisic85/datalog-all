@@ -606,6 +606,7 @@ export default function AlarmsPage() {
   );
   const [regionFilter, setRegionFilter] = useState(searchParams.get('region_id') || '');
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<'severity' | 'duration' | 'region' | 'object' | 'newest'>('severity');
 
   // Modalne potvrde
   const [ackTarget, setAckTarget]       = useState<AlarmListItem | null>(null);
@@ -724,6 +725,31 @@ export default function AlarmsPage() {
   };
 
   const items = useMemo(() => data?.data ?? [], [data]);
+  const sortedItems = useMemo(() => {
+    const copy = [...items];
+    copy.sort((a, b) => {
+      if (sortBy === 'severity') {
+        const rank = (item: AlarmListItem) => {
+          const s = severityOf(item);
+          return s === 'critical' ? 3 : s === 'warning' ? 2 : 1;
+        };
+        return rank(b) - rank(a)
+          || new Date(a.active_since || a.recorded_at).getTime() - new Date(b.active_since || b.recorded_at).getTime();
+      }
+      if (sortBy === 'duration') {
+        return new Date(a.active_since || a.recorded_at).getTime() - new Date(b.active_since || b.recorded_at).getTime();
+      }
+      if (sortBy === 'region') {
+        return a.region_name.localeCompare(b.region_name, 'hr') || a.object_name.localeCompare(b.object_name, 'hr');
+      }
+      if (sortBy === 'object') {
+        return a.object_name.localeCompare(b.object_name, 'hr');
+      }
+      return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+    });
+    return copy;
+  }, [items, sortBy]);
+
   const totalPages = data?.total_pages ?? 1;
   const total = data?.total ?? 0;
 
@@ -914,6 +940,13 @@ export default function AlarmsPage() {
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} title="Sortiranje alarma">
+          <option value="severity">Kritičnost</option>
+          <option value="duration">Trajanje</option>
+          <option value="newest">Najnoviji</option>
+          <option value="region">Regija</option>
+          <option value="object">Objekt</option>
+        </select>
         {regionFilter && (
           <button className="clear-filter-btn" onClick={() => handleRegion('')}>
             <X size={14} /> Sve regije
@@ -1008,7 +1041,7 @@ export default function AlarmsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {sortedItems.map(item => (
                 <AlarmRow
                   key={item.id}
                   item={item}
@@ -1029,7 +1062,7 @@ export default function AlarmsPage() {
       {/* Kartice (mobilni) */}
       {items.length > 0 && (
         <div className="alarm-list">
-          {items.map(item => (
+          {sortedItems.map(item => (
             <AlarmCard
               key={item.id}
               item={item}
