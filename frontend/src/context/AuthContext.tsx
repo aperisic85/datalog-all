@@ -1,34 +1,23 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import type { UserPublic } from '../types';
 import * as endpoints from '../api/endpoints';
-
-interface AuthContextType {
-  user: UserPublic | null;
-  loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  isAdmin: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | null>(null);
+import { AuthContext } from './auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserPublic | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => localStorage.getItem('access_token') !== null);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
-    if (token) {
-      endpoints.me()
-        .then(setUser)
-        .catch(() => {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    if (!token) return;
+
+    endpoints.me()
+      .then(setUser)
+      .catch(() => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -55,10 +44,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
 }
