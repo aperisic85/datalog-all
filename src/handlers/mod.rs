@@ -3,6 +3,7 @@ pub mod domain;
 pub mod notify;
 pub mod parser;
 pub mod poller_handler;
+pub mod system_health;
 
 use axum::{extract::State, http::StatusCode, Json};
 use sqlx::PgPool;
