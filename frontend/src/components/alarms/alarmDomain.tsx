@@ -113,18 +113,3 @@ export const SHELF_DURATIONS: { minutes: number; label: string }[] = [
   { minutes: 3 * 1440, label: '3 dana' },
   { minutes: 7 * 1440, label: '7 dana' },
 ];
-
-export function AlarmTags({ item }: { item: AlarmListItem }) {
-  const active = ALARM_DEFS.filter(def => item[def.key] > 0);
-  if (active.length === 0) return null;
-
-  return (
-    <div className="alarm-tag-list">
-      {active.map(def => (
-        <span key={def.key} className={`alarm-tag alarm-tag-${def.severity}`}>
-          {def.icon} {def.label}
-        </span>
-      ))}
-    </div>
-  );
-}

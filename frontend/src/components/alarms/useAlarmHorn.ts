@@ -8,10 +8,13 @@ export function useAlarmHorn(criticalCount: number) {
   const previousCount = useRef(criticalCount);
 
   useEffect(() => {
-    if (criticalCount > previousCount.current) {
-      setSilenced(false);
-    }
+    const previous = previousCount.current;
     previousCount.current = criticalCount;
+
+    if (criticalCount <= previous) return;
+
+    const timer = window.setTimeout(() => setSilenced(false), 0);
+    return () => window.clearTimeout(timer);
   }, [criticalCount]);
 
   const sounding = enabled && !silenced && criticalCount > 0;

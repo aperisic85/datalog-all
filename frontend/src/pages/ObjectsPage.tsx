@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { listObjects, listRegions, listStationTypes, createObject } from '../api/endpoints';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth';
 import { AlertTriangle, Clock, Search, ChevronLeft, ChevronRight, MapPin, Plus, X, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { hr } from 'date-fns/locale';

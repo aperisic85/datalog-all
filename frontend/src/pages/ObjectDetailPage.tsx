@@ -23,7 +23,7 @@ import {
   acknowledgeAlarm,
   setDataloggerValue,
 } from '../api/endpoints';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth';
 import 'leaflet/dist/leaflet.css';
 import {
   LineChart,
