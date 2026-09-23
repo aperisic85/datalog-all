@@ -30,6 +30,7 @@ import type {
   NotificationLogEntry,
   SetValueResponse,
   SystemHealth,
+  ObjectTimelineItem,
 } from '../types';
 
 // Auth
@@ -191,6 +192,9 @@ export const getSolarEfficiency = (id: string) =>
 // Event logs
 export const getEventLogs = (id: string, params?: { from?: string; to?: string; limit?: number }) =>
   api.get<EventLogRecord[]>(`/api/v1/objects/${id}/eventlogs`, { params }).then((r) => r.data);
+
+export const getObjectTimeline = (id: string, limit = 80) =>
+  api.get<ObjectTimelineItem[]>(`/api/v1/objects/${id}/timeline`, { params: { limit } }).then((r) => r.data);
 
 // Users
 export const listUsers = () =>
