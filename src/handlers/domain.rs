@@ -608,6 +608,18 @@ pub async fn get_event_logs(
     Ok(Json(db::get_event_logs(&pool, id, q.min_level, &trq).await?))
 }
 
+/// GET /api/v1/objects/:id/timeline
+pub async fn get_object_timeline(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<ObjectTimelineQuery>,
+) -> AppResult<Json<Vec<ObjectTimelineItem>>> {
+    check_object_access(&pool, &claims, id).await?;
+    let limit = q.limit.unwrap_or(80).clamp(10, 200);
+    Ok(Json(db::get_object_timeline(&pool, id, limit).await?))
+}
+
 #[derive(serde::Deserialize)]
 pub struct EventLogQuery {
     pub from:      Option<chrono::DateTime<chrono::Utc>>,
