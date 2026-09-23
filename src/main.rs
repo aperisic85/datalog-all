@@ -102,6 +102,12 @@ async fn main() -> anyhow::Result<()> {
 
     // ── Routes ────────────────────────────────────────────────────────────
 
+    let system_health_state = handlers::system_health::SystemHealthState {
+        pool: pool.clone(),
+        poller_status: poller_status.clone(),
+        started_at: chrono::Utc::now(),
+    };
+
     // Push ingest (CR300 → backend) — API key auth
     let push_routes = Router::new()
         .route("/api/v1/datalogger/alarms",       post(handlers::ingest_alarms))
@@ -198,6 +204,13 @@ async fn main() -> anyhow::Result<()> {
         .layer(axum::Extension(jwt_secret.clone()))
         .with_state(pool.clone());
 
+    // Global system health — authenticated users
+    let system_health_routes = Router::new()
+        .route("/api/v1/system/health", get(handlers::system_health::system_health))
+        .layer(axum_middleware::from_fn_with_state(jwt_secret.clone(), middleware::jwt_middleware))
+        .layer(axum::Extension(jwt_secret.clone()))
+        .with_state(system_health_state);
+
     // Poller status (no auth — internal monitoring)
     let poller_routes = Router::new()
         .route("/api/v1/poller/status", get(handlers::poller_handler::poller_status))
@@ -212,6 +225,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(push_routes)
         .merge(auth_routes)
         .merge(protected)
+        .merge(system_health_routes)
         .merge(poller_routes)
         .merge(health)
         .layer(TraceLayer::new_for_http())
@@ -234,6 +248,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  GET   /api/v1/objects");
     tracing::info!("  GET   /api/v1/objects/:id/measurements/10min");
     tracing::info!("  GET   /api/v1/objects/:id/alarms/active");
+    tracing::info!("  GET   /api/v1/system/health");
     tracing::info!("  GET   /health");
     tracing::info!("════════════════════════════════════════════");
 
