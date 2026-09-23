@@ -876,3 +876,22 @@
   .scada-tile { min-width:0; padding:7px 8px; }
   .scada-banner-right { width:100%; }
 }
+
+
+/* ── Alarm duration ─────────────────────────────────────────────────────── */
+.col-duration { width:112px; white-space:nowrap; }
+.alarm-duration,
+.alarm-duration-mobile {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  color:var(--warning);
+  font-size:11px;
+  font-weight:800;
+}
+.alarm-duration-mobile {
+  margin-top:2px;
+}
+@media (max-width:900px) {
+  .col-duration { width:96px; }
+}
