@@ -608,3 +608,36 @@ export interface BatteryPrediction {
   sample_count: number;
   r_squared?: number;
 }
+
+
+export interface SystemHealth {
+  status: 'ok' | 'degraded' | 'critical';
+  checked_at: string;
+  uptime_seconds: number;
+  api: {
+    status: string;
+    message: string;
+  };
+  database: {
+    status: string;
+    message: string;
+  };
+  pollers: {
+    total: number;
+    online: number;
+    offline: number;
+    late: number;
+    last_successful_poll?: string;
+  };
+  data: {
+    active_objects: number;
+    stale_objects: number;
+  };
+  notifications: {
+    status: 'ok' | 'degraded' | 'unknown' | 'not_configured' | 'error';
+    enabled_channels: number;
+    failed_last_24h: number;
+    last_success_at?: string;
+    last_failure_at?: string;
+  };
+}

@@ -48,6 +48,7 @@ function LighthouseIcon({ size = 24 }: { size?: number }) {
 import './Layout.css';
 import OfflineBanner from './OfflineBanner';
 import IosInstallHint from './IosInstallHint';
+import SystemHealthStatus from './SystemHealthStatus';
 
 // ── Change Password Modal ─────────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
@@ -271,6 +272,7 @@ export default function Layout() {
             </button>
           </div>
         </div>
+        <SystemHealthStatus />
         <div className="content-inner">
           <Outlet />
         </div>

@@ -29,6 +29,7 @@ import type {
   NotificationRule,
   NotificationLogEntry,
   SetValueResponse,
+  SystemHealth,
 } from '../types';
 
 // Auth
@@ -302,3 +303,7 @@ export const setDataloggerValue = (data: {
 // Log
 export const listNotificationLog = (params?: { page?: number; page_size?: number }) =>
   api.get<Page<NotificationLogEntry>>('/api/v1/notifications/log', { params }).then((r) => r.data);
+
+
+export const getSystemHealth = () =>
+  api.get<SystemHealth>('/api/v1/system/health').then((r) => r.data);
