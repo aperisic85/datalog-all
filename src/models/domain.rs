@@ -432,6 +432,7 @@ pub struct AlarmListItem {
     pub recorded_at:                  DateTime<Utc>,
     pub acknowledged_at:              Option<DateTime<Utc>>,
     pub acknowledged_by:              Option<String>,
+    pub active_since:                 Option<DateTime<Utc>>,
     pub any_alarm_active:             bool,
     pub alarm_datalogger_high_temp:   i16,
     pub alarm_datalogger_high_voltage: i16,
@@ -547,6 +548,27 @@ pub struct ShelveAlarmRequest {
     /// Trajanje shelfa u minutama
     pub duration_minutes: i64,
     pub reason:           Option<String>,
+}
+
+// ================================================================
+// OBJECT TIMELINE
+// ================================================================
+
+#[derive(Debug, Serialize)]
+pub struct ObjectTimelineItem {
+    pub id:          String,
+    pub kind:        String,
+    pub occurred_at: DateTime<Utc>,
+    pub title:       String,
+    pub message:     Option<String>,
+    pub severity:    String,
+    pub actor:       Option<String>,
+    pub details:     Option<JsonValue>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ObjectTimelineQuery {
+    pub limit: Option<i64>,
 }
 
 // ================================================================
