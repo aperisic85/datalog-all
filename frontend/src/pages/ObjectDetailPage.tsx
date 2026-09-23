@@ -77,8 +77,9 @@ import './ObjectDetailPage.css';
 import './ObjectsPage.css';
 import AlarmHeatmapTab from '../components/AlarmHeatmapTab';
 import AtonTab from '../components/AtonTab';
+import ObjectTimelineTab from '../components/ObjectTimelineTab';
 
-type Tab = 'overview' | 'charts' | 'alarms' | 'events' | 'heatmap' | 'aton' | 'control';
+type Tab = 'overview' | 'charts' | 'alarms' | 'timeline' | 'events' | 'heatmap' | 'aton' | 'control';
 type Range = '6h' | '24h' | '7d' | 'custom';
 type Resolution = '10min' | '1h' | '24h';
 type DriftRange = '1h' | '6h' | '24h' | '7d';
@@ -1720,7 +1721,7 @@ export default function ObjectDetailPage() {
 
       <div className="detail-tabs">
         {([
-          'overview', 'charts', 'alarms', 'heatmap', 'events',
+          'overview', 'charts', 'alarms', 'timeline', 'heatmap', 'events',
           // AtoN stanice (izvor preko CSD-a) imaju vlastiti pregled — dvije
           // baterije, dnevni prosjeci i sirovi registri
           ...(obj.source_kind === 'aton_csd' ? ['aton' as const] : []),
@@ -1734,6 +1735,7 @@ export default function ObjectDetailPage() {
               overview: 'Pregled',
               charts: 'Grafovi',
               alarms: 'Alarmi',
+              timeline: 'Timeline',
               heatmap: 'Heatmap',
               events: 'Log',
               aton: 'AtoN',
@@ -2559,6 +2561,10 @@ export default function ObjectDetailPage() {
             );
           })()}
         </div>
+      )}
+
+      {tab === 'timeline' && (
+        <ObjectTimelineTab objectId={id!} />
       )}
 
       {tab === 'heatmap' && (
