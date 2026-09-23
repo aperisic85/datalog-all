@@ -225,6 +225,7 @@ export interface AlarmListItem {
   recorded_at: string;
   acknowledged_at?: string;
   acknowledged_by?: string;
+  active_since?: string;
   any_alarm_active: boolean;
   alarm_datalogger_high_temp: number;
   alarm_datalogger_high_voltage: number;
@@ -640,4 +641,16 @@ export interface SystemHealth {
     last_success_at?: string;
     last_failure_at?: string;
   };
+}
+
+
+export interface ObjectTimelineItem {
+  id: string;
+  kind: 'alarm_raised' | 'alarm_cleared' | 'event_log' | 'audit' | string;
+  occurred_at: string;
+  title: string;
+  message?: string;
+  severity: 'danger' | 'warning' | 'success' | 'info' | string;
+  actor?: string;
+  details?: Record<string, unknown>;
 }
