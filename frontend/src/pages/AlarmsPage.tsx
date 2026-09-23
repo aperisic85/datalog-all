@@ -391,6 +391,19 @@ function ScadaBanner({ critical, warning, activeTotal, updatedAt, onRefresh, isF
   );
 }
 
+function formatAlarmDuration(item: AlarmListItem): string {
+  if (item.acknowledged_at) return '—';
+  const start = new Date(item.active_since || item.recorded_at).getTime();
+  const totalMinutes = Math.max(0, Math.floor((Date.now() - start) / 60_000));
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours < 24) return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days} d ${remainingHours} h` : `${days} d`;
+}
+
 // ── Redak SCADA tablice ────────────────────────────────────────────────────
 function AlarmRow({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking, selected, onToggleSelect }: {
   item: AlarmListItem;
@@ -423,6 +436,16 @@ function AlarmRow({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking, 
       </td>
       <td className="col-time" title={formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}>
         {format(new Date(item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}
+      </td>
+      <td className="col-duration">
+        {!item.acknowledged_at ? (
+          <span
+            className="alarm-duration"
+            title={`Aktivno od ${format(new Date(item.active_since || item.recorded_at), 'dd.MM.yyyy HH:mm:ss')}`}
+          >
+            <Timer size={11} /> {formatAlarmDuration(item)}
+          </span>
+        ) : <span className="text-muted">—</span>}
       </td>
       <td className="col-object">
         <Link to={`/objects/${item.object_id}`} className="alarm-obj-link">{item.object_name}</Link>
@@ -535,6 +558,11 @@ function AlarmCard({ item, shelved, onAcknowledge, onShelve, onDelete, isAcking,
           {' · '}
           {formatDistanceToNow(new Date(item.recorded_at), { addSuffix: true, locale: hr })}
         </span>
+        {!isAcknowledged && (
+          <span className="alarm-duration-mobile">
+            <Timer size={11} /> Traje {formatAlarmDuration(item)}
+          </span>
+        )}
         {isAcknowledged && item.acknowledged_at && (
           <span className="alarm-ack-info">
             <CheckCircle size={11} />
@@ -578,6 +606,7 @@ export default function AlarmsPage() {
   );
   const [regionFilter, setRegionFilter] = useState(searchParams.get('region_id') || '');
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<'severity' | 'duration' | 'region' | 'object' | 'newest'>('severity');
 
   // Modalne potvrde
   const [ackTarget, setAckTarget]       = useState<AlarmListItem | null>(null);
@@ -696,6 +725,31 @@ export default function AlarmsPage() {
   };
 
   const items = useMemo(() => data?.data ?? [], [data]);
+  const sortedItems = useMemo(() => {
+    const copy = [...items];
+    copy.sort((a, b) => {
+      if (sortBy === 'severity') {
+        const rank = (item: AlarmListItem) => {
+          const s = severityOf(item);
+          return s === 'critical' ? 3 : s === 'warning' ? 2 : 1;
+        };
+        return rank(b) - rank(a)
+          || new Date(a.active_since || a.recorded_at).getTime() - new Date(b.active_since || b.recorded_at).getTime();
+      }
+      if (sortBy === 'duration') {
+        return new Date(a.active_since || a.recorded_at).getTime() - new Date(b.active_since || b.recorded_at).getTime();
+      }
+      if (sortBy === 'region') {
+        return a.region_name.localeCompare(b.region_name, 'hr') || a.object_name.localeCompare(b.object_name, 'hr');
+      }
+      if (sortBy === 'object') {
+        return a.object_name.localeCompare(b.object_name, 'hr');
+      }
+      return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+    });
+    return copy;
+  }, [items, sortBy]);
+
   const totalPages = data?.total_pages ?? 1;
   const total = data?.total ?? 0;
 
@@ -886,6 +940,13 @@ export default function AlarmsPage() {
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} title="Sortiranje alarma">
+          <option value="severity">Kritičnost</option>
+          <option value="duration">Trajanje</option>
+          <option value="newest">Najnoviji</option>
+          <option value="region">Regija</option>
+          <option value="object">Objekt</option>
+        </select>
         {regionFilter && (
           <button className="clear-filter-btn" onClick={() => handleRegion('')}>
             <X size={14} /> Sve regije
@@ -971,6 +1032,7 @@ export default function AlarmsPage() {
                 </th>
                 <th className="col-state">Stanje</th>
                 <th className="col-time">Vrijeme</th>
+                <th className="col-duration">Trajanje</th>
                 <th className="col-object">Objekt</th>
                 <th className="col-region">Regija</th>
                 <th className="col-alarms">Alarmi</th>
@@ -979,7 +1041,7 @@ export default function AlarmsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {sortedItems.map(item => (
                 <AlarmRow
                   key={item.id}
                   item={item}
@@ -1000,7 +1062,7 @@ export default function AlarmsPage() {
       {/* Kartice (mobilni) */}
       {items.length > 0 && (
         <div className="alarm-list">
-          {items.map(item => (
+          {sortedItems.map(item => (
             <AlarmCard
               key={item.id}
               item={item}

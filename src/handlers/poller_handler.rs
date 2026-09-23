@@ -15,7 +15,7 @@ pub async fn poll_object_now(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let _uid = Uuid::parse_str(&claims.sub).map_err(|_| AppError::Unauthorized)?;
+    let uid = Uuid::parse_str(&claims.sub).map_err(|_| AppError::Unauthorized)?;
 
     let poll_cfg = db::get_object_poll_config(&pool, id).await?
         .ok_or_else(|| AppError::NotFound(format!("Object {}", id)))?;
@@ -48,6 +48,17 @@ pub async fn poll_object_now(
             Err(e) => results.push(serde_json::json!({ "table": table_cfg.name, "error": e.to_string() })),
         }
     }
+
+    let _ = db::write_audit(
+        &pool,
+        Some(uid),
+        Some(&claims.username),
+        "POLL_OBJECT",
+        Some("object"),
+        Some(&id.to_string()),
+        Some(serde_json::json!({ "station_id": poll_cfg.station_id, "results": results })),
+        None,
+    ).await;
 
     Ok(Json(serde_json::json!({ "station_id": poll_cfg.station_id, "results": results })))
 }

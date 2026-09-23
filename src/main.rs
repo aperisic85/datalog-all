@@ -172,6 +172,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/objects/:id/alarms/shelve",       post(handlers::domain::shelve_alarm))
         // Event log po objektu
         .route("/api/v1/objects/:id/eventlogs",      get(handlers::domain::get_event_logs))
+        .route("/api/v1/objects/:id/timeline",       get(handlers::domain::get_object_timeline))
         // Users (admin only)
         .route("/api/v1/users",                       get(handlers::domain::list_users))
         .route("/api/v1/users",                       post(handlers::domain::create_user))

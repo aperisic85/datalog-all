@@ -60,8 +60,8 @@ pub async fn poll_aton_now(
 
     let lock = endpoint_lock(&station.endpoint);
 
-    match poll_aton_once(&pool, &station, &lock).await {
-        Ok(a) => Ok(Json(serde_json::json!({
+    let result = match poll_aton_once(&pool, &station, &lock).await {
+        Ok(a) => serde_json::json!({
             "station_id":  station.station_id,
             "success":     true,
             "temperatura_c":     a.temp_trenutna_c,
@@ -69,11 +69,24 @@ pub async fn poll_aton_now(
             "gl_svj_struja_a":   a.gl_svj.struja_a,
             "automat_napon_v":   a.automat.napon_v,
             "automat_struja_a":  a.automat.struja_a,
-        }))),
-        Err(e) => Ok(Json(serde_json::json!({
+        }),
+        Err(e) => serde_json::json!({
             "station_id": station.station_id,
             "success":    false,
             "error":      e.to_string(),
-        }))),
-    }
+        }),
+    };
+
+    let _ = db::write_audit(
+        &pool,
+        Some(uid),
+        Some(&claims.username),
+        "POLL_ATON",
+        Some("object"),
+        Some(&id.to_string()),
+        Some(result.clone()),
+        None,
+    ).await;
+
+    Ok(Json(result))
 }

@@ -686,6 +686,9 @@ pub async fn list_alarms_global(pool: &PgPool, q: &AlarmListQuery) -> AppResult<
             a.recorded_at,
             a.acknowledged_at,
             a.acknowledged_by,
+            (SELECT MIN(ns.since)
+               FROM notification_state ns
+              WHERE ns.object_id = o.id AND ns.active = TRUE) AS active_since,
             a.any_alarm_active,
             a.alarm_datalogger_high_temp,
             a.alarm_datalogger_high_voltage,
@@ -918,6 +921,124 @@ pub async fn get_event_logs(
          ORDER BY recorded_at DESC LIMIT $5",
         object_id, min_level, q.from, q.to, limit)
         .fetch_all(pool).await?)
+}
+
+// ================================================================
+// OBJECT TIMELINE
+// ================================================================
+
+pub async fn get_object_timeline(
+    pool: &PgPool,
+    object_id: Uuid,
+    limit: i64,
+) -> AppResult<Vec<ObjectTimelineItem>> {
+    let per_source = limit.clamp(10, 200);
+
+    let alarm_rows: Vec<(i64, chrono::DateTime<Utc>, bool)> = sqlx::query_as(
+        r#"WITH ordered AS (
+               SELECT id, recorded_at, any_alarm_active,
+                      LAG(any_alarm_active) OVER (ORDER BY recorded_at) AS prev_active
+               FROM alarms
+               WHERE object_id = $1
+           )
+           SELECT id, recorded_at, any_alarm_active
+           FROM ordered
+           WHERE (prev_active IS NULL AND any_alarm_active = TRUE)
+              OR (prev_active IS NOT NULL AND prev_active IS DISTINCT FROM any_alarm_active)
+           ORDER BY recorded_at DESC
+           LIMIT $2"#)
+        .bind(object_id)
+        .bind(per_source)
+        .fetch_all(pool).await?;
+
+    let event_rows: Vec<(i64, chrono::DateTime<Utc>, i16, String)> = sqlx::query_as(
+        r#"SELECT id, recorded_at, log_level, log_message
+           FROM event_logs
+           WHERE object_id = $1
+           ORDER BY recorded_at DESC
+           LIMIT $2"#)
+        .bind(object_id)
+        .bind(per_source)
+        .fetch_all(pool).await?;
+
+    let audit_rows: Vec<(i64, chrono::DateTime<Utc>, Option<String>, String, Option<serde_json::Value>)> = sqlx::query_as(
+        r#"SELECT id, created_at, username, action, details
+           FROM audit_log
+           WHERE entity_type = 'object' AND entity_id = $1
+           ORDER BY created_at DESC
+           LIMIT $2"#)
+        .bind(object_id.to_string())
+        .bind(per_source)
+        .fetch_all(pool).await?;
+
+    let mut items = Vec::with_capacity(alarm_rows.len() + event_rows.len() + audit_rows.len());
+
+    for (id, occurred_at, active) in alarm_rows {
+        items.push(ObjectTimelineItem {
+            id: format!("alarm-{id}"),
+            kind: if active { "alarm_raised" } else { "alarm_cleared" }.into(),
+            occurred_at,
+            title: if active { "Alarm aktiviran" } else { "Alarm riješen" }.into(),
+            message: Some(if active {
+                "Objekt je prešao u alarmno stanje.".into()
+            } else {
+                "Objekt se vratio iz alarmnog stanja.".into()
+            }),
+            severity: if active { "danger" } else { "success" }.into(),
+            actor: None,
+            details: None,
+        });
+    }
+
+    for (id, occurred_at, log_level, log_message) in event_rows {
+        items.push(ObjectTimelineItem {
+            id: format!("event-{id}"),
+            kind: "event_log".into(),
+            occurred_at,
+            title: match log_level {
+                4 => "Fatalni događaj",
+                3 => "Greška uređaja",
+                2 => "Upozorenje uređaja",
+                _ => "Događaj uređaja",
+            }.into(),
+            message: Some(log_message),
+            severity: match log_level {
+                4 | 3 => "danger",
+                2 => "warning",
+                _ => "info",
+            }.into(),
+            actor: None,
+            details: Some(serde_json::json!({ "log_level": log_level })),
+        });
+    }
+
+    for (id, occurred_at, username, action, details) in audit_rows {
+        let (title, severity) = match action.as_str() {
+            "ACKNOWLEDGE_ALARM" => ("Alarm potvrđen", "info"),
+            "SHELVE_ALARM" => ("Alarm odložen", "warning"),
+            "UNSHELVE_ALARM" => ("Odlaganje alarma ukinuto", "info"),
+            "SET_VALUE" => ("Poslana upravljačka naredba", "warning"),
+            "POLL_OBJECT" => ("Ručno pokrenut poll", "info"),
+            "POLL_ATON" => ("Ručno pokrenut AtoN poll", "info"),
+            "UPDATE_OBJECT" => ("Postavke objekta promijenjene", "info"),
+            _ => ("Korisnička akcija", "info"),
+        };
+
+        items.push(ObjectTimelineItem {
+            id: format!("audit-{id}"),
+            kind: "audit".into(),
+            occurred_at,
+            title: title.into(),
+            message: Some(action.replace('_', " ")),
+            severity: severity.into(),
+            actor: username,
+            details,
+        });
+    }
+
+    items.sort_by(|a, b| b.occurred_at.cmp(&a.occurred_at));
+    items.truncate(limit.clamp(10, 200) as usize);
+    Ok(items)
 }
 
 // ================================================================
