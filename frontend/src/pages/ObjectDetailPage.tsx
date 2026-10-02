@@ -440,6 +440,87 @@ function BatteryCapacitySection({ objectId }: { objectId: string }) {
   );
 }
 
+// ─── Daily battery analytics (Measurements_24h) ───────────────────────────────
+
+function DailyBatteryAnalyticsSection({ objectId }: { objectId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['battery-daily-analytics', objectId],
+    queryFn: () => getMeasurements24h(objectId, { limit: 7 }),
+    refetchInterval: 60 * 60_000,
+    retry: 1,
+  });
+
+  if (isLoading) return null;
+  if (!data?.length) return null;
+
+  const latestDay = data[0];
+  const charge = latestDay.battery_charge_tot;
+  const discharge = latestDay.battery_discharge_tot;
+  const net = charge != null && discharge != null ? charge - discharge : null;
+
+  const formatExtremaTime = (value?: string) =>
+    value ? format(parseISO(value), 'dd.MM.yyyy HH:mm') : '—';
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 10 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+      }}>
+        <Battery size={14} style={{ color: 'var(--accent)' }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Dnevna bilanca baterije
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text3)' }}>
+          {format(parseISO(latestDay.recorded_at), 'dd.MM.yyyy')}
+        </span>
+      </div>
+
+      <div style={{ padding: '10px 14px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
+          gap: '8px 16px',
+          fontSize: 12,
+        }}>
+          <div>
+            <div className="metric-label">Punjenje</div>
+            <strong>{charge != null ? `${charge.toFixed(2)} Ah` : '—'}</strong>
+          </div>
+          <div>
+            <div className="metric-label">Pražnjenje</div>
+            <strong>{discharge != null ? `${discharge.toFixed(2)} Ah` : '—'}</strong>
+          </div>
+          <div>
+            <div className="metric-label">Dnevna bilanca</div>
+            <strong style={{ color: net == null ? undefined : net >= 0 ? 'var(--success)' : 'var(--warning)' }}>
+              {net != null ? `${net >= 0 ? '+' : ''}${net.toFixed(2)} Ah` : '—'}
+            </strong>
+          </div>
+          <div>
+            <div className="metric-label">Minimalna struja</div>
+            <strong>{latestDay.battery_current_min != null ? `${latestDay.battery_current_min.toFixed(2)} A` : '—'}</strong>
+            <div style={{ color: 'var(--text3)', marginTop: 2 }}>
+              TMn: {formatExtremaTime(latestDay.battery_current_tmn)}
+            </div>
+          </div>
+          <div>
+            <div className="metric-label">Maksimalna struja</div>
+            <strong>{latestDay.battery_current_max != null ? `${latestDay.battery_current_max.toFixed(2)} A` : '—'}</strong>
+            <div style={{ color: 'var(--text3)', marginTop: 2 }}>
+              TMax: {formatExtremaTime(latestDay.battery_current_tmax)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)' }}>
+          Izvor: Measurements_24h. TMn/TMax označavaju vrijeme kada je zabilježena minimalna odnosno maksimalna struja baterije.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Battery Health Section (detekcija degradacije iz napona) ─────────────────
 
 const HEALTH_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -2030,6 +2111,7 @@ export default function ObjectDetailPage() {
           {/* ── Analitika ── */}
           <div className="overview-section-label">Prediktivna analitika</div>
           <div className="analytics-grid">
+            <DailyBatteryAnalyticsSection objectId={id!} />
             <BatteryCapacitySection objectId={id!} />
             <BatteryHealthSection objectId={id!} />
             {hasCoords && <SolarEfficiencySection objectId={id!} />}

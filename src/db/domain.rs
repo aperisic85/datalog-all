@@ -385,18 +385,20 @@ pub async fn insert_measurement_24h(pool: &PgPool, r: &Measurement24hInsert) -> 
     sqlx::query(
         "INSERT INTO measurements_24h (object_id, station_id, recorded_at,
              datalogger_temp_avg, battery_voltage_avg, battery_current_avg,
-             battery_current_min, battery_current_max, battery_charge_tot,
-             battery_discharge_tot, battery_status_avg, solar_daylight_avg,
+             battery_current_min, battery_current_tmn, battery_current_max, battery_current_tmax,
+             battery_charge_tot, battery_discharge_tot, battery_status_avg, solar_daylight_avg,
              modem_power_avg, internet_ok_avg, lantern_light_active_avg, lantern_current_avg,
              visibility_value_avg, fog_signal_current_avg)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
          ON CONFLICT (object_id, recorded_at) DO NOTHING")
         .bind(r.object_id).bind(&r.station_id).bind(r.recorded_at)
         .bind(r.datalogger_temp_avg).bind(r.battery_voltage_avg).bind(r.battery_current_avg)
-        .bind(r.battery_current_min).bind(r.battery_current_max).bind(r.battery_charge_tot)
-        .bind(r.battery_discharge_tot).bind(r.battery_status_avg).bind(r.solar_daylight_avg)
-        .bind(r.modem_power_avg).bind(r.internet_ok_avg).bind(r.lantern_light_active_avg)
-        .bind(r.lantern_current_avg).bind(r.visibility_value_avg).bind(r.fog_signal_current_avg)
+        .bind(r.battery_current_min).bind(r.battery_current_tmn)
+        .bind(r.battery_current_max).bind(r.battery_current_tmax)
+        .bind(r.battery_charge_tot).bind(r.battery_discharge_tot).bind(r.battery_status_avg)
+        .bind(r.solar_daylight_avg).bind(r.modem_power_avg).bind(r.internet_ok_avg)
+        .bind(r.lantern_light_active_avg).bind(r.lantern_current_avg)
+        .bind(r.visibility_value_avg).bind(r.fog_signal_current_avg)
         .execute(pool).await?;
     Ok(())
 }
