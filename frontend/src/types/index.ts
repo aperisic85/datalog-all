@@ -198,7 +198,9 @@ export interface Measurement24h {
   battery_voltage_avg?: number;
   battery_current_avg?: number;
   battery_current_min?: number;
+  battery_current_tmn?: string;
   battery_current_max?: number;
+  battery_current_tmax?: string;
   battery_charge_tot?: number;
   battery_discharge_tot?: number;
   battery_status_avg?: number;
