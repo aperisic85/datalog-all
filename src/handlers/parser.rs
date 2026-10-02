@@ -57,14 +57,18 @@ fn as_i16(v: &Value) -> Option<i16> {
     }
 }
 
-fn parse_ts(val: &Value) -> Option<DateTime<Utc>> {
-    let ts = val.as_str().and_then(|s| {
+fn parse_ts_raw(val: &Value) -> Option<DateTime<Utc>> {
+    val.as_str().and_then(|s| {
         DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&Utc))
             .or_else(|| {
                 chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
                     .ok().map(|ndt| ndt.and_utc())
             })
-    })?;
+    })
+}
+
+fn parse_ts(val: &Value) -> Option<DateTime<Utc>> {
+    let ts = parse_ts_raw(val)?;
 
     // Zaštita od pomaknutih satova na CR300: ako timestamp dolazi s
     // budućim vremenom (> 2 min), koristimo server-side "now".
@@ -249,9 +253,9 @@ pub fn parse_measurements_24h(payload: &DataloggerPayload, station_id: &str) -> 
             battery_voltage_avg:      g("Battery_voltage_Avg"),
             battery_current_avg:      g("Battery_current_Avg"),
             battery_current_min:      g("Battery_current_Min"),
-            battery_current_tmn:      get_val(row, &fm, "Battery_current_TMn").and_then(parse_ts),
+            battery_current_tmn:      get_val(row, &fm, "Battery_current_TMn").and_then(parse_ts_raw),
             battery_current_max:      g("Battery_current_Max"),
-            battery_current_tmax:     get_val(row, &fm, "Battery_current_TMax").and_then(parse_ts),
+            battery_current_tmax:     get_val(row, &fm, "Battery_current_TMax").and_then(parse_ts_raw),
             battery_charge_tot:       g("Battery_charge_Tot"),
             battery_discharge_tot:    g("Battery_discharge_Tot"),
             battery_status_avg:       g("Battery_status_Avg"),
