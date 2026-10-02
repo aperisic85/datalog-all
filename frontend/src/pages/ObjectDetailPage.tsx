@@ -1503,6 +1503,20 @@ export default function ObjectDetailPage() {
     enabled: chartsEnabled && resolution === '24h',
   });
 
+  // Dnevna baterijska statistika uvijek se čita iz Measurements_24h,
+  // neovisno o rezoluciji glavnih grafova (7d inače koristi Measurements_1h).
+  const dailyBatteryRange = range === 'custom'
+    ? { from: customFromDate.toISOString(), to: customToDate.toISOString(), limit: 365 }
+    : range === '7d'
+      ? { from: subDays(new Date(), 8).toISOString(), limit: 16 }
+      : { from: subDays(new Date(), 2).toISOString(), limit: 8 };
+
+  const { data: dailyBatteryMeasurements } = useQuery({
+    queryKey: ['measurements-24h-battery', id, rangeKey],
+    queryFn: () => getMeasurements24h(id!, dailyBatteryRange),
+    enabled: chartsEnabled,
+  });
+
   const loadingM = resolution === '10min' ? loadingM10 : resolution === '1h' ? loadingM1h : loadingM24h;
 
   const { data: activeAlarms, isLoading: loadingAlarms } = useQuery({
@@ -1551,6 +1565,9 @@ export default function ObjectDetailPage() {
         setPollResult(`Dohvaćeno ${total} novih zapisa`);
         qc.invalidateQueries({ queryKey: ['latest', id] });
         qc.invalidateQueries({ queryKey: ['measurements-10min', id] });
+        qc.invalidateQueries({ queryKey: ['measurements-1h', id] });
+        qc.invalidateQueries({ queryKey: ['measurements-24h', id] });
+        qc.invalidateQueries({ queryKey: ['measurements-24h-battery', id] });
       }
     } catch {
       setPollResult('Greška — datalogger nije dostupan');
@@ -1595,6 +1612,15 @@ export default function ObjectDetailPage() {
         time: format(parseISO(m.recorded_at), timeFormat),
       };
     });
+
+  const dailyBatteryChartData = (dailyBatteryMeasurements ?? [])
+    .slice()
+    .reverse()
+    .map((m) => ({
+      ...m,
+      time: format(parseISO(m.recorded_at), 'dd.MM.'),
+      net_ah: (m.battery_charge_tot ?? 0) - (m.battery_discharge_tot ?? 0),
+    }));
 
   return (
     <div className="object-detail">
@@ -2374,6 +2400,54 @@ export default function ObjectDetailPage() {
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
+
+              {dailyBatteryChartData.length > 0 && (
+                <div className="chart-card card chart-wide">
+                  <div className="chart-title-row">
+                    <div>
+                      <span className="chart-kicker">Dnevna bilanca</span>
+                      <h4>Baterija — punjenje, pražnjenje i ekstremi struje</h4>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <ComposedChart data={dailyBatteryChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <YAxis yAxisId="ah" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <YAxis yAxisId="amps" orientation="right" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8 }}
+                        formatter={(val: unknown, name: unknown, item: unknown) => {
+                          const n = Number(val);
+                          const label = String(name);
+                          const payload = (item as { payload?: Measurement24h })?.payload;
+                          if (label === 'Min struja (A)') {
+                            const at = payload?.battery_current_tmn
+                              ? format(parseISO(payload.battery_current_tmn), 'dd.MM.yyyy HH:mm')
+                              : '—';
+                            return [`${n.toFixed(2)} A @ ${at}`, label] as [string, string];
+                          }
+                          if (label === 'Max struja (A)') {
+                            const at = payload?.battery_current_tmax
+                              ? format(parseISO(payload.battery_current_tmax), 'dd.MM.yyyy HH:mm')
+                              : '—';
+                            return [`${n.toFixed(2)} A @ ${at}`, label] as [string, string];
+                          }
+                          return [`${n.toFixed(2)} Ah`, label] as [string, string];
+                        }}
+                      />
+                      <Legend />
+                      <Bar yAxisId="ah" dataKey="battery_charge_tot" name="Punjenje (Ah)" fill="var(--success)" />
+                      <Bar yAxisId="ah" dataKey="battery_discharge_tot" name="Pražnjenje (Ah)" fill="var(--warning)" />
+                      <Line yAxisId="amps" type="monotone" dataKey="battery_current_min" stroke="var(--danger)" dot name="Min struja (A)" />
+                      <Line yAxisId="amps" type="monotone" dataKey="battery_current_max" stroke="var(--accent)" dot name="Max struja (A)" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                  <div className="measurements-table-count">
+                    TMn/TMax u tooltipu prikazuju točno vrijeme dnevnog minimuma/maksimuma struje.
+                  </div>
+                </div>
+              )}
 
               <div className="chart-card card">
                 <h4>Solarni panel (V) + Iradijancija (W/m²)</h4>
